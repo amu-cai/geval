@@ -1,4 +1,4 @@
-module Lib
+module GEval
     ( geval
     ) where
 

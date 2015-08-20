@@ -1,6 +1,6 @@
 import Test.Hspec
 
-import Lib
+import GEval
 import qualified Test.HUnit as HU
 
 main :: IO ()
