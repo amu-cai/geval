@@ -6,5 +6,5 @@ import System.Environment
 main :: IO ()
 main = do
   [expectedFilePath, outFilePath] <- getArgs
-  result <- geval expectedFilePath outFilePath
+  result <- gevalCore MSE expectedFilePath outFilePath
   print $ result

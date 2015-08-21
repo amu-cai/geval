@@ -7,7 +7,7 @@ main :: IO ()
 main = hspec $ do
   describe "mean square error" $ do
     it "simple test" $ do
-      geval "test/mse-simple/mse-simple/test-A/expected.tsv" "test/mse-simple/mse-simple-solution/test-A/out.tsv" `shouldReturnAlmost` 0.64549722436790
+      geval (defaultGEvalSpecification {gesExpectedDirectory=Just "test/mse-simple/mse-simple", gesOutDirectory="test/mse-simple/mse-simple-solution"}) `shouldReturnAlmost` 0.64549722436790
 
 class AEq a where
     (=~) :: a -> a -> Bool

@@ -1,5 +1,9 @@
 module GEval
-    ( geval
+    ( geval,
+      gevalCore,
+      Metric(..),
+      GEvalSpecification(..),
+      defaultGEvalSpecification
     ) where
 
 import Data.Conduit
@@ -12,8 +16,48 @@ import Data.Text
 import Data.Text.Read as TR
 import Control.Applicative
 
-geval :: String -> String -> IO (Double)
-geval expectedFilePath outFilePath = do
+import System.FilePath
+import Data.Maybe
+
+data Metric = MSE | BLEU
+
+defaultOutDirectory = "."
+defaultTestName = "test-A"
+defaultOutFile = "out.tsv"
+defaultExpectedFile = "expected.tsv"
+
+defaultMetric :: Metric
+defaultMetric = MSE
+
+data GEvalSpecification = GEvalSpecification
+                          { gesOutDirectory :: String,
+                            gesExpectedDirectory :: Maybe String,
+                            gesTestName :: String,
+                            gesOutFile :: String,
+                            gesExpectedFile :: String,
+                            gesMetric :: Metric }
+
+
+defaultGEvalSpecification = GEvalSpecification {
+  gesOutDirectory = defaultOutDirectory,
+  gesExpectedDirectory = Nothing,
+  gesTestName = defaultTestName,
+  gesOutFile = defaultOutFile,
+  gesExpectedFile = defaultExpectedFile,
+  gesMetric = defaultMetric }
+
+
+geval :: GEvalSpecification -> IO (Double)
+geval gevalSpec = gevalCore metric expectedFilePath outFilePath
+   where expectedFilePath = expectedDirectory </> testName </> (gesExpectedFile gevalSpec)
+         outFilePath = outDirectory </> testName </> (gesOutFile gevalSpec)
+         expectedDirectory = fromMaybe outDirectory $ gesExpectedDirectory gevalSpec
+         outDirectory = gesOutDirectory gevalSpec
+         testName = gesTestName gevalSpec
+         metric = gesMetric gevalSpec
+
+gevalCore :: Metric -> String -> String -> IO (Double)
+gevalCore MSE expectedFilePath outFilePath = do
   mse <- runResourceT $
     (getZipSource $ (,)
        <$> ZipSource (items expectedFilePath)
