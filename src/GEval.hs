@@ -3,7 +3,13 @@ module GEval
       gevalCore,
       Metric(..),
       GEvalSpecification(..),
-      defaultGEvalSpecification
+      GEvalOptions(..),
+      defaultGEvalSpecification,
+      defaultOutDirectory,
+      defaultTestName,
+      defaultOutFile,
+      defaultExpectedFile,
+      defaultMetric
     ) where
 
 import Data.Conduit
@@ -20,6 +26,7 @@ import System.FilePath
 import Data.Maybe
 
 data Metric = MSE | BLEU
+              deriving (Show, Read)
 
 defaultOutDirectory = "."
 defaultTestName = "test-A"
@@ -29,6 +36,7 @@ defaultExpectedFile = "expected.tsv"
 defaultMetric :: Metric
 defaultMetric = MSE
 
+
 data GEvalSpecification = GEvalSpecification
                           { gesOutDirectory :: String,
                             gesExpectedDirectory :: Maybe String,
@@ -36,6 +44,10 @@ data GEvalSpecification = GEvalSpecification
                             gesOutFile :: String,
                             gesExpectedFile :: String,
                             gesMetric :: Metric }
+
+data GEvalOptions = GEvalOptions
+                    { geoInit :: Bool,
+                      geoSpec :: GEvalSpecification }
 
 
 defaultGEvalSpecification = GEvalSpecification {
