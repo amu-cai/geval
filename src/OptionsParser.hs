@@ -57,7 +57,7 @@ metricReader = option auto
                  <> metavar "METRIC"
                  <> help "Metric to be used" )
 
-runGEval :: [String] -> IO (Either (ParserResult GEvalOptions) (Maybe Double))
+runGEval :: [String] -> IO (Either (ParserResult GEvalOptions) (Maybe MetricValue))
 runGEval args =
   case parserResult of
     Success opts -> do

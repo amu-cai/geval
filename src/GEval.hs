@@ -2,6 +2,7 @@ module GEval
     ( geval,
       gevalCore,
       Metric(..),
+      MetricValue,
       GEvalSpecification(..),
       GEvalOptions(..),
       defaultGEvalSpecification,
@@ -27,6 +28,8 @@ import qualified System.Directory as D
 
 import System.FilePath
 import Data.Maybe
+
+type MetricValue = Double
 
 data Metric = RMSE | MSE | BLEU
               deriving (Show, Read)
@@ -84,7 +87,7 @@ defaultGEvalSpecification = GEvalSpecification {
   gesMetric = defaultMetric }
 
 
-geval :: GEvalSpecification -> IO (Double)
+geval :: GEvalSpecification -> IO (MetricValue)
 geval gevalSpec = do
   unlessM (D.doesDirectoryExist outDirectory) $ throwM $ NoOutDirectory outDirectory
   unlessM (D.doesDirectoryExist expectedDirectory) $ throwM $ NoExpectedDirectory expectedDirectory
@@ -100,7 +103,7 @@ geval gevalSpec = do
          testName = gesTestName gevalSpec
          metric = gesMetric gevalSpec
 
-gevalCore :: Metric -> String -> String -> IO (Double)
+gevalCore :: Metric -> String -> String -> IO (MetricValue)
 gevalCore MSE expectedFilePath outFilePath = do
   unlessM (D.doesFileExist expectedFilePath) $ throwM $ NoExpectedFile expectedFilePath
   unlessM (D.doesFileExist outFilePath) $ throwM $ NoOutFile outFilePath
