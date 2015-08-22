@@ -17,9 +17,11 @@ library
   hs-source-dirs:      src
   exposed-modules:     GEval
   build-depends:       base >= 4.7 && < 5
+                     , cond
                      , conduit
                      , conduit-combinators
                      , conduit-extra
+                     , directory
                      , filepath
                      , resourcet
                      , text

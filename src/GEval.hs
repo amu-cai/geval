@@ -21,6 +21,9 @@ import qualified Data.Conduit.List as CL
 import Data.Text
 import Data.Text.Read as TR
 import Control.Applicative
+import Control.Exception
+import Control.Conditional (unlessM)
+import qualified System.Directory as D
 
 import System.FilePath
 import Data.Maybe
@@ -50,6 +53,28 @@ data GEvalOptions = GEvalOptions
                       geoSpec :: GEvalSpecification }
 
 
+data GEvalException = NoExpectedFile FilePath
+                      | NoOutFile FilePath
+                      | NoExpectedDirectory FilePath
+                      | NoOutDirectory FilePath
+                      | NoExpectedTestDirectory FilePath
+                      | NoOutTestDirectory FilePath
+
+instance Exception GEvalException
+
+instance Show GEvalException where
+  show (NoExpectedFile filePath) = somethingWrongWithFilesMessage "No file with the expected results" filePath
+  show (NoOutFile filePath) = somethingWrongWithFilesMessage "No file with the test results" filePath
+  show (NoExpectedDirectory filePath) = somethingWrongWithFilesMessage "No directory with the expected results" filePath
+  show (NoOutDirectory filePath) = somethingWrongWithFilesMessage "No directory with the test results" filePath
+  show (NoExpectedTestDirectory filePath) = somethingWrongWithFilesMessage "No test subdirectory with the expected results" filePath
+  show (NoOutTestDirectory filePath) = somethingWrongWithFilesMessage "No test subdirectory with the results obtained" filePath
+
+
+somethingWrongWithFilesMessage :: String -> FilePath -> String
+somethingWrongWithFilesMessage msg filePath = Prelude.concat
+                                [ msg, ": `", filePath, "`" ]
+
 defaultGEvalSpecification = GEvalSpecification {
   gesOutDirectory = defaultOutDirectory,
   gesExpectedDirectory = Nothing,
@@ -60,9 +85,16 @@ defaultGEvalSpecification = GEvalSpecification {
 
 
 geval :: GEvalSpecification -> IO (Double)
-geval gevalSpec = gevalCore metric expectedFilePath outFilePath
-   where expectedFilePath = expectedDirectory </> testName </> (gesExpectedFile gevalSpec)
-         outFilePath = outDirectory </> testName </> (gesOutFile gevalSpec)
+geval gevalSpec = do
+  unlessM (D.doesDirectoryExist outDirectory) $ throwM $ NoOutDirectory outDirectory
+  unlessM (D.doesDirectoryExist expectedDirectory) $ throwM $ NoExpectedDirectory expectedDirectory
+  unlessM (D.doesDirectoryExist outTestDirectory) $ throwM $ NoOutTestDirectory outTestDirectory
+  unlessM (D.doesDirectoryExist expectedTestDirectory) $ throwM $ NoExpectedTestDirectory expectedTestDirectory
+  gevalCore metric expectedFilePath outFilePath
+   where expectedFilePath = expectedTestDirectory </> (gesExpectedFile gevalSpec)
+         outFilePath = outTestDirectory </> (gesOutFile gevalSpec)
+         expectedTestDirectory = expectedDirectory </> testName
+         outTestDirectory = outDirectory </> testName
          expectedDirectory = fromMaybe outDirectory $ gesExpectedDirectory gevalSpec
          outDirectory = gesOutDirectory gevalSpec
          testName = gesTestName gevalSpec
@@ -70,6 +102,8 @@ geval gevalSpec = gevalCore metric expectedFilePath outFilePath
 
 gevalCore :: Metric -> String -> String -> IO (Double)
 gevalCore MSE expectedFilePath outFilePath = do
+  unlessM (D.doesFileExist expectedFilePath) $ throwM $ NoExpectedFile expectedFilePath
+  unlessM (D.doesFileExist outFilePath) $ throwM $ NoOutFile outFilePath
   mse <- runResourceT $
     (getZipSource $ (,)
        <$> ZipSource (items expectedFilePath)
