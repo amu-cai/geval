@@ -5,8 +5,8 @@ description:         Please see README.md
 homepage:            http://github.com/name/project
 license:             Apache
 license-file:        LICENSE
-author:              Your name here
-maintainer:          your.address@example.com
+author:              Filip Gralinski
+maintainer:          filipg@amu.edu.pl
 -- copyright:
 category:            Web
 build-type:          Simple
@@ -16,6 +16,7 @@ cabal-version:       >=1.10
 library
   hs-source-dirs:      src
   exposed-modules:     GEval
+                     , OptionsParser
   build-depends:       base >= 4.7 && < 5
                      , cond
                      , conduit
@@ -23,6 +24,7 @@ library
                      , conduit-extra
                      , directory
                      , filepath
+                     , optparse-applicative
                      , resourcet
                      , text
   default-language:    Haskell2010
