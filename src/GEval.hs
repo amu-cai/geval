@@ -28,7 +28,7 @@ import qualified System.Directory as D
 import System.FilePath
 import Data.Maybe
 
-data Metric = MSE | BLEU
+data Metric = RMSE | MSE | BLEU
               deriving (Show, Read)
 
 defaultOutDirectory = "."
@@ -37,7 +37,7 @@ defaultOutFile = "out.tsv"
 defaultExpectedFile = "expected.tsv"
 
 defaultMetric :: Metric
-defaultMetric = MSE
+defaultMetric = RMSE
 
 
 data GEvalSpecification = GEvalSpecification
@@ -104,12 +104,15 @@ gevalCore :: Metric -> String -> String -> IO (Double)
 gevalCore MSE expectedFilePath outFilePath = do
   unlessM (D.doesFileExist expectedFilePath) $ throwM $ NoExpectedFile expectedFilePath
   unlessM (D.doesFileExist outFilePath) $ throwM $ NoOutFile outFilePath
-  mse <- runResourceT $
+  runResourceT $
     (getZipSource $ (,)
        <$> ZipSource (items expectedFilePath)
        <*> ZipSource (items outFilePath))
      $$ (CL.map itemError
          =$ averageC)
+
+gevalCore RMSE expectedFilePath outFilePath = do
+  mse <- gevalCore MSE expectedFilePath outFilePath
   return $ mse ** 0.5
 
 averageC :: MonadResource m => Sink Double m Double
