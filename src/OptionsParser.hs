@@ -1,5 +1,6 @@
 module OptionsParser
-       (fullOptionsParser) where
+       (fullOptionsParser,
+        runGEval) where
 
 import Options.Applicative
 import GEval
@@ -55,3 +56,12 @@ metricReader = option auto
                  <> showDefault
                  <> metavar "METRIC"
                  <> help "Metric to be used" )
+
+runGEval :: [String] -> IO (Either (ParserResult GEvalOptions) (Maybe Double))
+runGEval args =
+  case parserResult of
+    Success opts -> do
+      val <- geval $ geoSpec opts
+      return $ Right $ Just val
+    otherwise -> return $ Left parserResult
+  where parserResult = execParserPure (prefs idm) fullOptionsParser args

@@ -8,6 +8,9 @@ import OptionsParser
 
 main :: IO ()
 main = do
-  opts <- execParser fullOptionsParser
-  result <- geval $ geoSpec opts
-  print $ result
+  args <- getArgs
+  result <- runGEval args
+  case result of
+    Left parseResult -> handleParseResult parseResult >> return ()
+    Right (Just result) -> print $ result
+    Right Nothing -> return ()
