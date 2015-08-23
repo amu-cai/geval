@@ -91,6 +91,15 @@ attemptToReadOptsFromConfigFile args opts = do
 
 
 runGEval'' :: GEvalOptions -> IO (Maybe MetricValue)
-runGEval'' opts = do
-  val <- geval $ geoSpec opts
+runGEval'' opts = runGEval''' (geoInit opts) (geoSpec opts)
+
+runGEval''' :: Bool -> GEvalSpecification -> IO (Maybe MetricValue)
+runGEval''' True spec = do
+  initChallange spec
+  return Nothing
+runGEval''' False spec = do
+  val <- geval spec
   return $ Just val
+
+initChallange :: GEvalSpecification -> IO ()
+initChallange spec = print "will init a challange"
