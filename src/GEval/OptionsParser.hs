@@ -1,3 +1,5 @@
+{-# LANGUAGE QuasiQuotes #-}
+
 module GEval.OptionsParser
        (fullOptionsParser,
         runGEval) where
@@ -5,8 +7,10 @@ module GEval.OptionsParser
 import Options.Applicative
 import qualified System.Directory as D
 import System.FilePath
+import System.Exit
 import Data.Maybe
 import System.IO
+import Data.String.Here
 
 import GEval.Core
 
@@ -102,4 +106,18 @@ runGEval''' False spec = do
   return $ Just val
 
 initChallange :: GEvalSpecification -> IO ()
-initChallange spec = print "will init a challange"
+initChallange spec = case gesExpectedDirectory spec of
+  Nothing -> showInitInstructions
+  Just expectedDirectory -> initChallange' expectedDirectory spec
+
+initChallange' :: FilePath -> GEvalSpecification -> IO ()
+initChallange' expectedDirectory spec = putStrLn "init running..."
+
+showInitInstructions = do
+  putStrLn [here|
+Run:
+    geval --init --expected-directory CHALLANGE
+to create a directory CHALLANGE representing a Gonito challange.
+(Note that `--out-directory` option is not taken into account with `--init` option.)
+|]
+  exitFailure

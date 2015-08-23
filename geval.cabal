@@ -24,6 +24,7 @@ library
                      , conduit-extra
                      , directory
                      , filepath
+                     , here
                      , optparse-applicative
                      , resourcet
                      , text
