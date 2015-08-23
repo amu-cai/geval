@@ -5,6 +5,7 @@ module GEval.Core
       MetricValue,
       GEvalSpecification(..),
       GEvalOptions(..),
+      GEvalException(..),
       defaultGEvalSpecification,
       defaultOutDirectory,
       defaultTestName,
@@ -67,6 +68,7 @@ data GEvalException = NoExpectedFile FilePath
                       | NoOutDirectory FilePath
                       | NoExpectedTestDirectory FilePath
                       | NoOutTestDirectory FilePath
+                      | FileAlreadyThere FilePath
 
 instance Exception GEvalException
 
@@ -77,7 +79,7 @@ instance Show GEvalException where
   show (NoOutDirectory filePath) = somethingWrongWithFilesMessage "No directory with the test results" filePath
   show (NoExpectedTestDirectory filePath) = somethingWrongWithFilesMessage "No test subdirectory with the expected results" filePath
   show (NoOutTestDirectory filePath) = somethingWrongWithFilesMessage "No test subdirectory with the results obtained" filePath
-
+  show (FileAlreadyThere filePath) = somethingWrongWithFilesMessage "File already there" filePath
 
 somethingWrongWithFilesMessage :: String -> FilePath -> String
 somethingWrongWithFilesMessage msg filePath = Prelude.concat
