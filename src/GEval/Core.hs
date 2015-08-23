@@ -1,4 +1,4 @@
-module GEval
+module GEval.Core
     ( geval,
       gevalCore,
       Metric(..),

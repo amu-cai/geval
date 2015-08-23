@@ -1,4 +1,4 @@
-module OptionsParser
+module GEval.OptionsParser
        (fullOptionsParser,
         runGEval) where
 
@@ -8,7 +8,7 @@ import System.FilePath
 import Data.Maybe
 import System.IO
 
-import GEval
+import GEval.Core
 
 fullOptionsParser = info (helper <*> optionsParser)
        (fullDesc

@@ -1,7 +1,7 @@
 import Test.Hspec
 
-import GEval
-import OptionsParser
+import GEval.Core
+import GEval.OptionsParser
 import Options.Applicative
 import qualified Test.HUnit as HU
 

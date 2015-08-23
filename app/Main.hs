@@ -1,10 +1,10 @@
 module Main where
 
-import GEval
-import System.Environment
+import GEval.Core
+import GEval.OptionsParser
 
+import System.Environment
 import Options.Applicative
-import OptionsParser
 
 main :: IO ()
 main = do

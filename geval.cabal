@@ -15,8 +15,8 @@ cabal-version:       >=1.10
 
 library
   hs-source-dirs:      src
-  exposed-modules:     GEval
-                     , OptionsParser
+  exposed-modules:     GEval.Core
+                     , GEval.OptionsParser
   build-depends:       base >= 4.7 && < 5
                      , cond
                      , conduit
