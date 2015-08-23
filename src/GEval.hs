@@ -10,7 +10,8 @@ module GEval
       defaultTestName,
       defaultOutFile,
       defaultExpectedFile,
-      defaultMetric
+      defaultMetric,
+      getExpectedDirectory
     ) where
 
 import Data.Conduit
@@ -50,6 +51,10 @@ data GEvalSpecification = GEvalSpecification
                             gesOutFile :: String,
                             gesExpectedFile :: String,
                             gesMetric :: Metric }
+
+getExpectedDirectory :: GEvalSpecification -> FilePath
+getExpectedDirectory spec = fromMaybe outDirectory $ gesExpectedDirectory spec
+                            where outDirectory = gesOutDirectory spec
 
 data GEvalOptions = GEvalOptions
                     { geoInit :: Bool,
@@ -98,7 +103,7 @@ geval gevalSpec = do
          outFilePath = outTestDirectory </> (gesOutFile gevalSpec)
          expectedTestDirectory = expectedDirectory </> testName
          outTestDirectory = outDirectory </> testName
-         expectedDirectory = fromMaybe outDirectory $ gesExpectedDirectory gevalSpec
+         expectedDirectory = getExpectedDirectory gevalSpec
          outDirectory = gesOutDirectory gevalSpec
          testName = gesTestName gevalSpec
          metric = gesMetric gevalSpec

@@ -3,6 +3,11 @@ module OptionsParser
         runGEval) where
 
 import Options.Applicative
+import qualified System.Directory as D
+import System.FilePath
+import Data.Maybe
+import System.IO
+
 import GEval
 
 fullOptionsParser = info (helper <*> optionsParser)
@@ -57,11 +62,35 @@ metricReader = option auto
                  <> metavar "METRIC"
                  <> help "Metric to be used" )
 
+configFileName :: FilePath
+configFileName = "config.txt"
+
+
 runGEval :: [String] -> IO (Either (ParserResult GEvalOptions) (Maybe MetricValue))
-runGEval args =
+runGEval = runGEval' True
+
+runGEval' :: Bool -> [String] -> IO (Either (ParserResult GEvalOptions) (Maybe MetricValue))
+runGEval' readOptsFromConfigFile args =
   case parserResult of
-    Success opts -> do
-      val <- geval $ geoSpec opts
-      return $ Right $ Just val
+    Success opts -> if readOptsFromConfigFile then
+                      attemptToReadOptsFromConfigFile args opts else
+                      Right <$> runGEval'' opts
     otherwise -> return $ Left parserResult
   where parserResult = execParserPure (prefs idm) fullOptionsParser args
+
+attemptToReadOptsFromConfigFile :: [String] -> GEvalOptions -> IO (Either (ParserResult GEvalOptions) (Maybe MetricValue))
+attemptToReadOptsFromConfigFile args opts = do
+  configExists <- D.doesFileExist configFilePath
+  if configExists then do
+      configH <- openFile configFilePath ReadMode
+      contents <- hGetContents configH
+      runGEval' False ((words contents) ++ args)
+    else
+      runGEval' False args
+  where configFilePath = (getExpectedDirectory $ geoSpec opts) </> configFileName
+
+
+runGEval'' :: GEvalOptions -> IO (Maybe MetricValue)
+runGEval'' opts = do
+  val <- geval $ geoSpec opts
+  return $ Just val
