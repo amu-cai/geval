@@ -67,10 +67,6 @@ metricReader = option auto
                  <> metavar "METRIC"
                  <> help "Metric to be used" )
 
-configFileName :: FilePath
-configFileName = "config.txt"
-
-
 runGEval :: [String] -> IO (Either (ParserResult GEvalOptions) (Maybe MetricValue))
 runGEval = runGEval' True
 
@@ -119,6 +115,6 @@ to create a directory CHALLANGE representing a Gonito challange.
 
 You can specify a metric with `--metric METRIC-NAME` option.
 
-(Note that `--out-directory` option is not taken into account with `--init` option.)
+Note that `--out-directory` option is not taken into account with `--init` option.
 |]
   exitFailure

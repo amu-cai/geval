@@ -12,7 +12,8 @@ module GEval.Core
       defaultOutFile,
       defaultExpectedFile,
       defaultMetric,
-      getExpectedDirectory
+      getExpectedDirectory,
+      configFileName
     ) where
 
 import Data.Conduit
@@ -44,10 +45,12 @@ defaultExpectedFile = "expected.tsv"
 defaultMetric :: Metric
 defaultMetric = RMSE
 
+configFileName :: FilePath
+configFileName = "config.txt"
 
 data GEvalSpecification = GEvalSpecification
-                          { gesOutDirectory :: String,
-                            gesExpectedDirectory :: Maybe String,
+                          { gesOutDirectory :: FilePath,
+                            gesExpectedDirectory :: Maybe FilePath,
                             gesTestName :: String,
                             gesOutFile :: String,
                             gesExpectedFile :: String,
