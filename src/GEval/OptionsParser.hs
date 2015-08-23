@@ -13,6 +13,7 @@ import System.IO
 import Data.String.Here
 
 import GEval.Core
+import GEval.CreateChallenge
 
 fullOptionsParser = info (helper <*> optionsParser)
        (fullDesc
@@ -108,16 +109,16 @@ runGEval''' False spec = do
 initChallange :: GEvalSpecification -> IO ()
 initChallange spec = case gesExpectedDirectory spec of
   Nothing -> showInitInstructions
-  Just expectedDirectory -> initChallange' expectedDirectory spec
-
-initChallange' :: FilePath -> GEvalSpecification -> IO ()
-initChallange' expectedDirectory spec = putStrLn "init running..."
+  Just expectedDirectory -> createChallenge expectedDirectory spec
 
 showInitInstructions = do
   putStrLn [here|
 Run:
     geval --init --expected-directory CHALLANGE
 to create a directory CHALLANGE representing a Gonito challange.
+
+You can specify a metric with `--metric METRIC-NAME` option.
+
 (Note that `--out-directory` option is not taken into account with `--init` option.)
 |]
   exitFailure
