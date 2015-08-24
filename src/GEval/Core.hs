@@ -114,9 +114,17 @@ geval gevalSpec = do
          metric = gesMetric gevalSpec
 
 gevalCore :: Metric -> String -> String -> IO (MetricValue)
-gevalCore MSE expectedFilePath outFilePath = do
+gevalCore RMSE expectedFilePath outFilePath = do
+  mse <- gevalCore MSE expectedFilePath outFilePath
+  return $ mse ** 0.5
+
+gevalCore metric expectedFilePath outFilePath = do
   unlessM (D.doesFileExist expectedFilePath) $ throwM $ NoExpectedFile expectedFilePath
   unlessM (D.doesFileExist outFilePath) $ throwM $ NoOutFile outFilePath
+  gevalCore' metric expectedFilePath outFilePath
+
+gevalCore' :: Metric -> String -> String -> IO (MetricValue)
+gevalCore' MSE expectedFilePath outFilePath =
   runResourceT $
     (getZipSource $ (,)
        <$> ZipSource (items expectedFilePath)
@@ -124,9 +132,6 @@ gevalCore MSE expectedFilePath outFilePath = do
      $$ (CL.map itemError
          =$ averageC)
 
-gevalCore RMSE expectedFilePath outFilePath = do
-  mse <- gevalCore MSE expectedFilePath outFilePath
-  return $ mse ** 0.5
 
 averageC :: MonadResource m => Sink Double m Double
 averageC = getZipSink
