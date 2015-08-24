@@ -18,6 +18,7 @@ library
   exposed-modules:     GEval.Core
                        GEval.CreateChallenge
                      , GEval.OptionsParser
+                     , GEval.BLEU
   build-depends:       base >= 4.7 && < 5
                      , cond
                      , conduit
@@ -26,6 +27,7 @@ library
                      , directory
                      , filepath
                      , here
+                     , multiset
                      , optparse-applicative
                      , resourcet
                      , text

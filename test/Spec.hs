@@ -2,6 +2,7 @@ import Test.Hspec
 
 import GEval.Core
 import GEval.OptionsParser
+import GEval.BLEU
 import Options.Applicative
 import qualified Test.HUnit as HU
 
@@ -16,6 +17,15 @@ main = hspec $ do
                   "test/mse-simple/mse-simple",
                   "--out-directory",
                   "test/mse-simple/mse-simple-solution"]) >>= extractVal) `shouldReturnAlmost` 0.4166666666666667
+  describe "precision count" $ do
+    it "simple test" $ do
+      precisionCount [["Alice", "has", "a", "cat" ]] ["Ala", "has", "cat"] `shouldBe` 2
+    it "none found" $ do
+      precisionCount [["Alice", "has", "a", "cat" ]] ["for", "bar", "baz"] `shouldBe` 0
+    it "multiple values" $ do
+      precisionCount [["bar", "bar", "bar", "bar", "foo", "xyz", "foo"]] ["foo", "bar", "foo", "baz", "bar", "foo"] `shouldBe` 4
+    it "multiple refs" $ do
+      precisionCount [["foo", "baz"], ["bar"], ["baz", "xyz"]]  ["foo", "bar", "foo"] `shouldBe` 2
 
 extractVal :: (Either (ParserResult GEvalOptions) (Maybe MetricValue)) -> IO MetricValue
 extractVal (Right (Just val)) = return val
