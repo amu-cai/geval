@@ -124,14 +124,17 @@ gevalCore metric expectedFilePath outFilePath = do
   gevalCore' metric expectedFilePath outFilePath
 
 gevalCore' :: Metric -> String -> String -> IO (MetricValue)
-gevalCore' MSE expectedFilePath outFilePath =
+gevalCore' MSE = gevalCore'' outParser outParser itemError averageC
+  where outParser = getValue . TR.double
+
+gevalCore'' :: (Text -> a) -> (Text -> b) -> ((a, b) -> c) -> (Sink c (ResourceT IO) Double) -> String -> String -> IO (MetricValue)
+gevalCore'' expParser outParser itemStep aggregator expectedFilePath outFilePath =
   runResourceT $
     (getZipSource $ (,)
-       <$> ZipSource (items expectedFilePath)
-       <*> ZipSource (items outFilePath))
-     $$ (CL.map itemError
-         =$ averageC)
-
+       <$> ZipSource (items expectedFilePath expParser)
+       <*> ZipSource (items outFilePath outParser))
+     $$ (CL.map itemStep
+         =$ aggregator)
 
 averageC :: MonadResource m => Sink Double m Double
 averageC = getZipSink
@@ -139,14 +142,12 @@ averageC = getZipSink
   <$> ZipSink CC.sum
   <*> ZipSink CC.length
 
-items :: MonadResource m => String -> Source m Double
-items filePath =
+items :: MonadResource m => String -> (Text -> a) -> Source m a
+items filePath parser =
   CB.sourceFile filePath
   $= (CT.decode CT.utf8
       =$= CT.lines
-      =$= CL.map TR.double
-      =$= CC.map getValue)
-
+      =$= CL.map parser)
 
 itemError :: (Double, Double) -> Double
 itemError (exp, out) = (exp-out)**2
