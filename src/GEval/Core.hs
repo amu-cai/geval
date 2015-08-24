@@ -32,6 +32,10 @@ import qualified System.Directory as D
 import System.FilePath
 import Data.Maybe
 
+import qualified Data.List.Split as DLS
+
+import GEval.BLEU
+
 type MetricValue = Double
 
 data Metric = RMSE | MSE | BLEU
@@ -124,17 +128,27 @@ gevalCore metric expectedFilePath outFilePath = do
   gevalCore' metric expectedFilePath outFilePath
 
 gevalCore' :: Metric -> String -> String -> IO (MetricValue)
-gevalCore' MSE = gevalCore'' outParser outParser itemError averageC
+gevalCore' MSE = gevalCore'' outParser outParser itemError averageC id
   where outParser = getValue . TR.double
 
-gevalCore'' :: (Text -> a) -> (Text -> b) -> ((a, b) -> c) -> (Sink c (ResourceT IO) Double) -> String -> String -> IO (MetricValue)
-gevalCore'' expParser outParser itemStep aggregator expectedFilePath outFilePath =
-  runResourceT $
+gevalCore' BLEU = gevalCore'' (DLS.splitOn "\t" . unpack) unpack bleuCombine bleuAgg bleuFinal
+  where bleuFinal (p1, p2, p3, p4, cl, l1, l2, l3, l4) = p1 /. l1
+        bleuCombine (refs, sen) = bleuStep refs sen
+        bleuAgg = CC.foldl bleuFuse (0, 0, 0, 0, 0,  0, 0, 0, 0)
+        bleuFuse (a1, a2, a3, a4, a5, a6, a7, a8, a9) (b1, b2, b3, b4, b5, b6, b7, b8, b9) = (a1+b1, a2+b2, a3+b3, a4+b4, a5+b5, a6+b6, a7+b7, a8+b8, a9+b9)
+
+(/.) :: Int -> Int -> Double
+x /. y = (fromIntegral x) / (fromIntegral y)
+
+gevalCore'' :: (Text -> a) -> (Text -> b) -> ((a, b) -> c) -> (Sink c (ResourceT IO) d) -> (d -> Double ) -> String -> String -> IO (MetricValue)
+gevalCore'' expParser outParser itemStep aggregator finalStep expectedFilePath outFilePath = do
+  v <- runResourceT $
     (getZipSource $ (,)
        <$> ZipSource (items expectedFilePath expParser)
        <*> ZipSource (items outFilePath outParser))
      $$ (CL.map itemStep
          =$ aggregator)
+  return $ finalStep v
 
 averageC :: MonadResource m => Sink Double m Double
 averageC = getZipSink

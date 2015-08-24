@@ -1,5 +1,5 @@
 module GEval.BLEU
-       (precisionCount)
+       (precisionCount, bleuStep)
        where
 
 import qualified Data.MultiSet as MS

@@ -17,6 +17,12 @@ main = hspec $ do
                   "test/mse-simple/mse-simple",
                   "--out-directory",
                   "test/mse-simple/mse-simple-solution"]) >>= extractVal) `shouldReturnAlmost` 0.4166666666666667
+  describe "BLEU" $ do
+    it "trivial example from Wikipedia" $ do
+      ((runGEval ["--expected-directory",
+                  "test/bleu-trivial/bleu-trivial",
+                  "--out-directory",
+                  "test/bleu-trivial/bleu-trivial-solution"]) >>= extractVal) `shouldReturnAlmost` 0.0
   describe "precision count" $ do
     it "simple test" $ do
       precisionCount [["Alice", "has", "a", "cat" ]] ["Ala", "has", "cat"] `shouldBe` 2
