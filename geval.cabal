@@ -1,11 +1,11 @@
 name:                geval
 version:             0.1.0.0
-synopsis:            Initial project template from stack
+synopsis:            Machine learning evaluation tools
 description:         Please see README.md
 homepage:            http://github.com/name/project
 license:             Apache
 license-file:        LICENSE
-author:              Filip Gralinski
+author:              Filip Graliński
 maintainer:          filipg@amu.edu.pl
 -- copyright:
 category:            Web
@@ -57,4 +57,4 @@ test-suite geval-test
 
 source-repository head
   type:     git
-  location: https://github.com/name/project
+  location: https://github.com/filipg/geval
