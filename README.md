@@ -63,11 +63,83 @@ have the following structure:
 
 You can use `geval` to initiate a Gonito challenge:
 
-   geval --init --expected-directory my-challenge
+    geval --init --expected-directory my-challenge
 
 (This will generate a sample toy challenge with guessing the mass of a planet).
 
 A metric (other than the default root-mean-square error) can be given
 to generate another type of a toy challenge:
 
-   geval --init --expected-directory my-mt-challenge --metric BLEU
+    geval --init --expected-directory my-mt-challenge --metric BLEU
+
+### Preparing a Git repository
+
+Gonito platform expects a Git repository with a challenge to be
+submitted. The suggested way to do this is as follows:
+
+1. Prepare a branch with all the files _without_
+   `test-A/expected.tsv`. This branch will be cloned by people taking
+   up the challenge.
+2. Prepare a separate branch (or even a repo) with
+   `test-A/expected.tsv` added. This branch should be accessible by
+   Gonito platform, but should be kept "hidden" for regular users (or
+   at least they should be kindly asked not to peek there). It is
+   recommended (though not obligatory) that this branch contain all the
+   source codes and data used to generate the train/dev/test sets.
+
+Branch (1) should be the parent of the branch (2), for instance, the
+repos (for the toy "planets" challenge) could be created as follows:
+
+    geval --init --expected-directory planets
+    cd planets
+    git init
+    git add .gitignore config.txt README.md train/train.tsv dev-0/{in,expected}.tsv test-A/in.tsv
+    git commit -m 'init challenge'
+    git remote add origin git@github.com:filipg/planets
+    git push origin master
+    git add test-A/expected.tsv
+    git commit -m 'with expected results'
+    git push origin dont-peek-here
+
+## Taking up a Gonito challenge
+
+Clone the repo with a challenge, as given on the Gonito web-site, e.g.
+for the toy "planets" challenge (as generated with `geval --init`):
+
+    git clone https://github.com/filipg/planets
+
+Now use the train data and whatever machine learning tools you like to
+guess the values for the dev set and the test set, put them,
+respectively, as:
+
+* `dev-0/out.tsv`
+* `test-A/out.tsv`
+
+(These files must have exactly the same number of lines as,
+respectively, `dev-0/in.tsv` and `test-0/in.tsv`.)
+
+Check the result for the dev set with `geval`:
+
+    geval --test-name dev-0
+
+(the current directory is assumed for `--out-directory` and `--expected-directory`).
+
+If you'd like and if you have access to the test set results, you can
+"cheat" and check the results for the test set:
+
+    cd ..
+    git clone https://github.com/filipg/planets planets-secret --branch secret
+    cd planets
+    geval --expected-directory ../planets-secret
+
+### Uploading your results to Gonito platform
+
+Uploading is via Git — commit your "out" files and push the commit to
+your own repo.
+
+    git remote add mine git@github.com:johnsmith/planets-johnsmith
+    git add {dev-0,test-A}/out.tsv
+    git commit -m 'my solution to the challenge'
+    git push mine master
+
+Then let Gonito pull them and evaluate your results.
