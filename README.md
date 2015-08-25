@@ -10,20 +10,22 @@ machine learning algorithms are available here.
 ## Installing
 
 You need [Haskell Stack](https://github.com/commercialhaskell/stack),
-then install with:
+then install GEval with:
 
     git clone https://github.com/filipg/geval
     cd geval
     stack setup
     stack install
 
-By default `geval` library is installed in `$HOME/.local/bin`, so to
-run `geval` you need to either add `$HOME/.local/bin` to `$PATH` or to
-type:
+By default `geval` library is installed in `$HOME/.local/bin`, so in
+order to run `geval` you need to either add `$HOME/.local/bin` to
+`$PATH` or to type:
 
     PATH="$HOME/.local/bin" geval
 
-## Directory structure of a Gonito challenge
+## Preparing a Gonito challenge
+
+### Directory structure of a Gonito challenge
 
 A definition of a Gonito challenge should be put in a separate
 directory (preferably as a separate Git repo). Such a directory should
@@ -38,8 +40,8 @@ have the following structure:
 * `train/` — subdirectory with training data (if training data are
   supplied for a given Gonito challenge at all)
 * `train/train.tsv` — the usual name of training data (this name is
-  not required and could be more than file), the first column is the
-  target (predicted value), the other columns represent features, no
+  not required and could be more than one file), the first column is the
+  target (predicted) value, the other columns represent features, no
   header is assumed
 * `dev-0/` — subdirectory with a development set (a sample test set,
   which won't be used for the final evaluation)
@@ -56,3 +58,16 @@ have the following structure:
   organizers of a Gonito challenge, see notes on the structure of
   commits below
 * `test-B`, `test-C`, ... — other alternative test sets (if supplied)
+
+### Initiating a Gonito challenge with geval
+
+You can use `geval` to initiate a Gonito challenge:
+
+   geval --init --expected-directory my-challenge
+
+(This will generate a sample toy challenge with guessing the mass of a planet).
+
+A metric (other than the default root-mean-square error) can be given
+to generate another type of a toy challenge:
+
+   geval --init --expected-directory my-mt-challenge --metric BLEU
