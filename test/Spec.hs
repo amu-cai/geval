@@ -23,6 +23,16 @@ main = hspec $ do
                   "test/bleu-trivial/bleu-trivial",
                   "--out-directory",
                   "test/bleu-trivial/bleu-trivial-solution"]) >>= extractVal) `shouldReturnAlmost` 0.0
+    it "complex example" $ do
+      ((runGEval ["--expected-directory",
+                  "test/bleu-complex/bleu-complex",
+                  "--out-directory",
+                  "test/bleu-complex/bleu-complex-solution"]) >>= extractVal) `shouldReturnAlmost` 0.6211
+    it "perfect translation" $ do
+      ((runGEval ["--expected-directory",
+                  "test/bleu-perfect/bleu-perfect",
+                  "--out-directory",
+                  "test/bleu-perfect/bleu-perfect-solution"]) >>= extractVal) `shouldReturnAlmost` 1.0000
   describe "precision count" $ do
     it "simple test" $ do
       precisionCount [["Alice", "has", "a", "cat" ]] ["Ala", "has", "cat"] `shouldBe` 2
@@ -40,7 +50,7 @@ class AEq a where
     (=~) :: a -> a -> Bool
 
 instance AEq Double where
-    x =~ y = abs ( x - y ) < (1.0e-8 :: Double)
+    x =~ y = abs ( x - y ) < (1.0e-4 :: Double)
 
 (@=~?) :: (Show a, AEq a) => a -> a -> HU.Assertion
 (@=~?) expected actual  = expected =~ actual HU.@? assertionMsg

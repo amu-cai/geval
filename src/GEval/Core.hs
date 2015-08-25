@@ -131,13 +131,17 @@ gevalCore' :: Metric -> String -> String -> IO (MetricValue)
 gevalCore' MSE = gevalCore'' outParser outParser itemError averageC id
   where outParser = getValue . TR.double
 
-gevalCore' BLEU = gevalCore'' (DLS.splitOn "\t" . unpack) unpack bleuCombine bleuAgg bleuFinal
-  where bleuFinal (p1, p2, p3, p4, cl, l1, l2, l3, l4) = p1 /. l1
+gevalCore' BLEU = gevalCore'' (Prelude.map Prelude.words . DLS.splitOn "\t" . unpack) (Prelude.words . unpack) bleuCombine bleuAgg bleuFinal
+  where bleuFinal (p1, p2, p3, p4, rl, l1, l2, l3, l4) = ((p1 /. l1) * (p2 /. l2) * (p3 /. l3) * (p4 /. l4)) ** 0.25 * (brevityPenalty l1 rl)
         bleuCombine (refs, sen) = bleuStep refs sen
         bleuAgg = CC.foldl bleuFuse (0, 0, 0, 0, 0,  0, 0, 0, 0)
         bleuFuse (a1, a2, a3, a4, a5, a6, a7, a8, a9) (b1, b2, b3, b4, b5, b6, b7, b8, b9) = (a1+b1, a2+b2, a3+b3, a4+b4, a5+b5, a6+b6, a7+b7, a8+b8, a9+b9)
+        brevityPenalty c r
+          | c >= r = 1.0
+          | otherwise = exp (1.0 - (r /. c))
 
 (/.) :: Int -> Int -> Double
+x /. 0 = 1.0
 x /. y = (fromIntegral x) / (fromIntegral y)
 
 gevalCore'' :: (Text -> a) -> (Text -> b) -> ((a, b) -> c) -> (Sink c (ResourceT IO) d) -> (d -> Double ) -> String -> String -> IO (MetricValue)
