@@ -27,6 +27,7 @@ createChallenge expectedDirectory spec = do
   D.createDirectoryIfMissing False testDirectory
   createFile (testDirectory </> "in.tsv") $ testInContents metric
   createFile (testDirectory </> expectedFile) $ testExpectedContents metric
+  createFile (expectedDirectory </> ".gitignore") $ gitignoreContents
   where metric = gesMetric spec
         testName = gesTestName spec
         trainDirectory = expectedDirectory </> "train"
@@ -112,3 +113,6 @@ a ko te ahiahi , ko te ata , he ra kotahi
 testExpectedContents _ = [hereLit|0.11
 17.2
 |]
+
+gitignoreContents :: String
+gitignoreContents = "*~\n"
