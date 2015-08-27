@@ -17,7 +17,7 @@ import Data.String.Here
 createChallenge :: FilePath -> GEvalSpecification -> IO ()
 createChallenge expectedDirectory spec = do
   D.createDirectoryIfMissing False expectedDirectory
-  createFile (expectedDirectory </> "README.md") readmeMDContents
+  createFile (expectedDirectory </> "README.md") $ readmeMDContents metric testName
   createFile (expectedDirectory </> configFileName) $ configContents metric testName
   D.createDirectoryIfMissing False trainDirectory
   createFile (trainDirectory </> "train.tsv") $ trainContents metric
@@ -40,12 +40,13 @@ createFile filePath contents = do
   whenM (D.doesFileExist filePath) $ throwM $ FileAlreadyThere filePath
   writeFile filePath contents
 
-readmeMDContents :: String
-readmeMDContents = [here|
+readmeMDContents :: Metric -> String -> String
+readmeMDContents _ testName = [i|
 GEval — sample challenge
 ========================
 
-This is a sample challenge for Gonito framework. Replace it with
+This is a sample challenge for Gonito framework (guessing the mass of a planet using its
+orbital period, orbital eccentricity and the number of its moons). Replace it with
 the description of your challenge.
 
 Directory structure
@@ -58,9 +59,9 @@ Directory structure
 * `dev-0/` — directory with dev (test) data
 * `dev-0/in.tsv` — input data for the dev set
 * `dev-0/expected.tsv` — expected (reference) data for the dev set
-* `test-A` — directory with test data
-* `test-A/in.tsv` — input data for the test set
-* `test-A/expected.tsv` — expected (reference) data for the test set
+* `${testName}` — directory with test data
+* `${testName}/in.tsv` — input data for the test set
+* `${testName}/expected.tsv` — expected (reference) data for the test set
 |]
 
 configContents :: Metric -> String -> String
