@@ -98,6 +98,8 @@ repo (for the toy “planets” challenge) could be created as follows:
     git commit -m 'init challenge'
     git remote add origin git@github.com:filipg/planets
     git push origin master
+    git branch dont-peek-here
+    git checkout dont-peek-here
     git add test-A/expected.tsv
     git commit -m 'with expected results'
     git push origin dont-peek-here
