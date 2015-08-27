@@ -1,7 +1,7 @@
 # GEval
 
 GEval is a library (and a stand-alone tool) for evaluating the results
-of solutions to machine learning challenges as defined in the Gonito
+of solutions to machine learning challenges as defined on the Gonito
 platform.
 
 Note that GEval is only about machine learning evaluation. No actual
@@ -17,32 +17,32 @@ then install GEval with:
     stack setup
     stack install
 
-By default `geval` library is installed in `$HOME/.local/bin`, so in
+By default, `geval` library is installed in `$HOME/.local/bin`, so in
 order to run `geval` you need to either add `$HOME/.local/bin` to
 `$PATH` or to type:
 
-    PATH="$HOME/.local/bin" geval
+    PATH="$HOME/.local/bin" geval ...
 
 ## Preparing a Gonito challenge
 
 ### Directory structure of a Gonito challenge
 
 A definition of a Gonito challenge should be put in a separate
-directory (preferably as a separate Git repo). Such a directory should
+directory. Such a directory should
 have the following structure:
 
+* `README.md` — description of a challenge in Markdown
 * `config.txt` — simple configuration file with options the same as
   the ones accepted by `geval` binary (see below), usually just a
   metric is specified here (e.g. `--metric BLEU`), also non-default
   file names could be given here (e.g. `--test-name test-B` for a
   non-standard test subdirectory)
-* `README.md` — description of a challenge in Markdown
 * `train/` — subdirectory with training data (if training data are
   supplied for a given Gonito challenge at all)
-* `train/train.tsv` — the usual name of training data (this name is
-  not required and could be more than one file), the first column is the
-  target (predicted) value, the other columns represent features, no
-  header is assumed
+* `train/train.tsv` — the usual name of the training data file (this
+  name is not required and could be more than one file), the first
+  column is the target (predicted) value, the other columns represent
+  features, no header is assumed
 * `dev-0/` — subdirectory with a development set (a sample test set,
   which won't be used for the final evaluation)
 * `dev-0/in.tsv` — input data (the same format as `train/train.tsv`,
@@ -54,8 +54,8 @@ have the following structure:
 * `test-A/` — subdirectory with the test set
 * `test-A/in.tsv` — test input (the same format as `dev-0/in.tsv`)
 * `test-A/expected.tsv` — values to be guessed (the same format as
-  `dev-0/expected.tsv`), note that this file should be "hidden" by the
-  organizers of a Gonito challenge, see notes on the structure of
+  `dev-0/expected.tsv`), note that this file should be “hidden” by the
+  organisers of a Gonito challenge, see notes on the structure of
   commits below
 * `test-B`, `test-C`, ... — other alternative test sets (if supplied)
 
@@ -65,10 +65,10 @@ You can use `geval` to initiate a Gonito challenge:
 
     geval --init --expected-directory my-challenge
 
-(This will generate a sample toy challenge with guessing the mass of a planet).
+(This will generate a sample toy challenge about guessing planet masses).
 
-A metric (other than the default root-mean-square error) can be given
-to generate another type of a toy challenge:
+A metric (other than the default `RMSE` — root-mean-square error) can
+be given to generate another type of toy challenge:
 
     geval --init --expected-directory my-mt-challenge --metric BLEU
 
@@ -82,13 +82,14 @@ submitted. The suggested way to do this is as follows:
    up the challenge.
 2. Prepare a separate branch (or even a repo) with
    `test-A/expected.tsv` added. This branch should be accessible by
-   Gonito platform, but should be kept "hidden" for regular users (or
+   Gonito platform, but should be kept “hidden” for regular users (or
    at least they should be kindly asked not to peek there). It is
-   recommended (though not obligatory) that this branch contain all the
-   source codes and data used to generate the train/dev/test sets.
+   recommended (though not obligatory) that this branch contain all
+   the source codes and data used to generate the train/dev/test sets.
+   (Use [git-annex](https://git-annex.branchable.com/) if you have really big files there.)
 
 Branch (1) should be the parent of the branch (2), for instance, the
-repos (for the toy "planets" challenge) could be created as follows:
+repo (for the toy “planets” challenge) could be created as follows:
 
     geval --init --expected-directory planets
     cd planets
@@ -104,7 +105,7 @@ repos (for the toy "planets" challenge) could be created as follows:
 ## Taking up a Gonito challenge
 
 Clone the repo with a challenge, as given on the Gonito web-site, e.g.
-for the toy "planets" challenge (as generated with `geval --init`):
+for the toy “planets” challenge (as generated with `geval --init`):
 
     git clone https://github.com/filipg/planets
 
@@ -116,7 +117,8 @@ respectively, as:
 * `test-A/out.tsv`
 
 (These files must have exactly the same number of lines as,
-respectively, `dev-0/in.tsv` and `test-0/in.tsv`.)
+respectively, `dev-0/in.tsv` and `test-0/in.tsv`. They should contain
+only the predicted values.)
 
 Check the result for the dev set with `geval`:
 
@@ -125,20 +127,22 @@ Check the result for the dev set with `geval`:
 (the current directory is assumed for `--out-directory` and `--expected-directory`).
 
 If you'd like and if you have access to the test set results, you can
-"cheat" and check the results for the test set:
+“cheat” and check the results for the test set:
 
     cd ..
-    git clone https://github.com/filipg/planets planets-secret --branch secret
+    git clone https://github.com/filipg/planets planets-secret --branch dont-peek-here
     cd planets
     geval --expected-directory ../planets-secret
 
 ### Uploading your results to Gonito platform
 
-Uploading is via Git — commit your "out" files and push the commit to
-your own repo.
+Uploading is via Git — commit your “out” files and push the commit to
+your own repo. On Gonito you are encouraged to share your code, so
+be nice and commit also your source codes.
 
     git remote add mine git@github.com:johnsmith/planets-johnsmith
     git add {dev-0,test-A}/out.tsv
+    git add Makefile magic-bullet.py ... # whatever scripts/source codes you have
     git commit -m 'my solution to the challenge'
     git push mine master
 
