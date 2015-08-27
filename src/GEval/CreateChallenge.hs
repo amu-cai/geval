@@ -41,6 +41,28 @@ createFile filePath contents = do
   writeFile filePath contents
 
 readmeMDContents :: Metric -> String -> String
+readmeMDContents BLEU testName = [i|
+GEval — sample machine translation challenge
+============================================
+
+This is a sample challenge (translating from Finnish to Māori) for Gonito framework. Replace it with
+the description of your challenge.
+
+Directory structure
+-------------------
+
+* `README.md` — this file
+* `config.txt` — configuration file
+* `train/` — directory with training data
+* `train/train.tsv` — sample parallel corpus (Finnish text in the first column, Māori text in the second one)
+* `dev-0/` — directory with dev (test) data
+* `dev-0/in.tsv` — Finnish input text for the dev set
+* `dev-0/expected.tsv` — Māori reference translation for the dev set
+* `${testName}` — directory with test data
+* `${testName}/in.tsv` — Finnish input data for the test set
+* `${testName}/expected.tsv` — Māori reference translation for the test set
+|]
+
 readmeMDContents _ testName = [i|
 GEval — sample challenge
 ========================

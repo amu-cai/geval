@@ -150,8 +150,6 @@ Then let Gonito pull them and evaluate your results.
 
 ## `geval` options
 
-geval - stand-alone evaluation tool for tests in Gonito platform
-
     geval [--init] [--out-directory OUT-DIRECTORY]
           [--expected-directory EXPECTED-DIRECTORY] [--test-name NAME]
           [--out-file OUT] [--expected-file EXPECTED] [--metric METRIC]
@@ -172,3 +170,5 @@ geval - stand-alone evaluation tool for tests in Gonito platform
     --expected-file EXPECTED The name of the file with expected
                              results (default: "expected.tsv")
     --metric METRIC          Metric to be used - RMSE, MSE or BLEU (default: RMSE)
+
+If you need another metric, let me know, or do it yourself!
