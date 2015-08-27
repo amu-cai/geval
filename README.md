@@ -70,7 +70,7 @@ You can use `geval` to initiate a Gonito challenge:
 A metric (other than the default `RMSE` — root-mean-square error) can
 be given to generate another type of toy challenge:
 
-    geval --init --expected-directory my-mt-challenge --metric BLEU
+    geval --init --expected-directory my-machine-translation-challenge --metric BLEU
 
 ### Preparing a Git repository
 
@@ -147,3 +147,28 @@ be nice and commit also your source codes.
     git push mine master
 
 Then let Gonito pull them and evaluate your results.
+
+## `geval` options
+
+geval - stand-alone evaluation tool for tests in Gonito platform
+
+    geval [--init] [--out-directory OUT-DIRECTORY]
+          [--expected-directory EXPECTED-DIRECTORY] [--test-name NAME]
+          [--out-file OUT] [--expected-file EXPECTED] [--metric METRIC]
+
+    -h,--help                Show this help text
+    --init                   Init a sample Gonito challenge rather than run an
+                             evaluation
+    --out-directory OUT-DIRECTORY
+                             Directory with test results to be
+                             evaluated (default: ".")
+    --expected-directory EXPECTED-DIRECTORY
+                             Directory with expected test results (the same as
+                             OUT-DIRECTORY, if not given)
+    --test-name NAME         Test name (i.e. subdirectory with results or expected
+                             results) (default: "test-A")
+    --out-file OUT           The name of the file to be
+                             evaluated (default: "out.tsv")
+    --expected-file EXPECTED The name of the file with expected
+                             results (default: "expected.tsv")
+    --metric METRIC          Metric to be used - RMSE, MSE or BLEU (default: RMSE)

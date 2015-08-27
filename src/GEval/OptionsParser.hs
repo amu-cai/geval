@@ -24,7 +24,7 @@ optionsParser :: Parser GEvalOptions
 optionsParser = GEvalOptions
    <$> switch
       ( long "init"
-         <> help "Init a sample Gonito challange rather than run an evaluation" )
+         <> help "Init a sample Gonito challenge rather than run an evaluation" )
    <*> specParser
 
 specParser :: Parser GEvalSpecification
@@ -38,7 +38,7 @@ specParser = GEvalSpecification
   <*> optional (strOption
                 ( long "expected-directory"
                   <> metavar "EXPECTED-DIRECTORY"
-                  <> help "Directory with expected test results (if not specified the same as OUT-DIRECTORY)" ))
+                  <> help "Directory with expected test results (the same as OUT-DIRECTORY, if not given)" ))
   <*> strOption
   ( long "test-name"
     <> value defaultTestName
@@ -65,7 +65,7 @@ metricReader = option auto
                  <> value defaultMetric
                  <> showDefault
                  <> metavar "METRIC"
-                 <> help "Metric to be used" )
+                 <> help "Metric to be used - RMSE, MSE or BLEU" )
 
 runGEval :: [String] -> IO (Either (ParserResult GEvalOptions) (Maybe MetricValue))
 runGEval = runGEval' True
@@ -96,22 +96,22 @@ runGEval'' opts = runGEval''' (geoInit opts) (geoSpec opts)
 
 runGEval''' :: Bool -> GEvalSpecification -> IO (Maybe MetricValue)
 runGEval''' True spec = do
-  initChallange spec
+  initChallenge spec
   return Nothing
 runGEval''' False spec = do
   val <- geval spec
   return $ Just val
 
-initChallange :: GEvalSpecification -> IO ()
-initChallange spec = case gesExpectedDirectory spec of
+initChallenge :: GEvalSpecification -> IO ()
+initChallenge spec = case gesExpectedDirectory spec of
   Nothing -> showInitInstructions
   Just expectedDirectory -> createChallenge expectedDirectory spec
 
 showInitInstructions = do
   putStrLn [here|
 Run:
-    geval --init --expected-directory CHALLANGE
-to create a directory CHALLANGE representing a Gonito challange.
+    geval --init --expected-directory CHALLENGE
+to create a directory CHALLENGE representing a Gonito challenge.
 
 You can specify a metric with `--metric METRIC-NAME` option.
 
