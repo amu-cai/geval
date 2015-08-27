@@ -42,8 +42,10 @@ createFile filePath contents = do
 
 readmeMDContents :: Metric -> String -> String
 readmeMDContents BLEU testName = [i|
-GEval — sample machine translation challenge
-============================================
+GEval sample machine translation challenge
+==========================================
+
+Translate from Finnish to Māori.
 
 This is a sample challenge (translating from Finnish to Māori) for Gonito framework. Replace it with
 the description of your challenge.
@@ -64,8 +66,10 @@ Directory structure
 |]
 
 readmeMDContents _ testName = [i|
-GEval — sample challenge
-========================
+GEval sample challenge
+======================
+
+Guess the mass of a planet.
 
 This is a sample challenge for Gonito framework (guessing the mass of a planet using its
 orbital period, orbital eccentricity and the number of its moons). Replace it with

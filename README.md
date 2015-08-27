@@ -31,7 +31,9 @@ A definition of a Gonito challenge should be put in a separate
 directory. Such a directory should
 have the following structure:
 
-* `README.md` — description of a challenge in Markdown
+* `README.md` — description of a challenge in Markdown, the first header
+  will be used as the challenge title, the first paragraph — as its short
+  description
 * `config.txt` — simple configuration file with options the same as
   the ones accepted by `geval` binary (see below), usually just a
   metric is specified here (e.g. `--metric BLEU`), also non-default
