@@ -2,7 +2,8 @@
 
 module GEval.OptionsParser
        (fullOptionsParser,
-        runGEval) where
+        runGEval,
+        runGEvalGetOptions) where
 
 import Options.Applicative
 import qualified System.Directory as D
@@ -25,7 +26,14 @@ optionsParser = GEvalOptions
    <$> switch
       ( long "init"
          <> help "Init a sample Gonito challenge rather than run an evaluation" )
+   <*> optional precisionArgParser
    <*> specParser
+
+precisionArgParser :: Parser Int
+precisionArgParser = option auto
+    ( long "precision"
+      <> metavar "PRECISION"
+      <> help "Precision with which the evaluation results should be shown" )
 
 specParser :: Parser GEvalSpecification
 specParser = GEvalSpecification
@@ -68,18 +76,28 @@ metricReader = option auto
                  <> help "Metric to be used - RMSE, MSE or BLEU" )
 
 runGEval :: [String] -> IO (Either (ParserResult GEvalOptions) (Maybe MetricValue))
-runGEval = runGEval' True
+runGEval args = do
+  ret <- runGEvalGetOptions args
+  case ret of
+    Left e -> return $ Left e
+    Right (_, mmv) -> return $ Right mmv
 
-runGEval' :: Bool -> [String] -> IO (Either (ParserResult GEvalOptions) (Maybe MetricValue))
+runGEvalGetOptions :: [String] -> IO (Either (ParserResult GEvalOptions) (GEvalOptions, Maybe MetricValue))
+runGEvalGetOptions = runGEval' True
+
+-- the first argument: whether to try to read from the config file
+runGEval' :: Bool -> [String] -> IO (Either (ParserResult GEvalOptions) (GEvalOptions, Maybe MetricValue))
 runGEval' readOptsFromConfigFile args =
   case parserResult of
     Success opts -> if readOptsFromConfigFile then
                       attemptToReadOptsFromConfigFile args opts else
-                      Right <$> runGEval'' opts
+                        do
+                          mmv <- runGEval'' opts
+                          return $ Right $ (opts, mmv)
     otherwise -> return $ Left parserResult
   where parserResult = execParserPure (prefs idm) fullOptionsParser args
 
-attemptToReadOptsFromConfigFile :: [String] -> GEvalOptions -> IO (Either (ParserResult GEvalOptions) (Maybe MetricValue))
+attemptToReadOptsFromConfigFile :: [String] -> GEvalOptions -> IO (Either (ParserResult GEvalOptions) (GEvalOptions, Maybe MetricValue))
 attemptToReadOptsFromConfigFile args opts = do
   configExists <- D.doesFileExist configFilePath
   if configExists then do

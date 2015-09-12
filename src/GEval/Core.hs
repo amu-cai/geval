@@ -66,6 +66,7 @@ getExpectedDirectory spec = fromMaybe outDirectory $ gesExpectedDirectory spec
 
 data GEvalOptions = GEvalOptions
                     { geoInit :: Bool,
+                      geoPrecision :: Maybe Int,
                       geoSpec :: GEvalSpecification }
 
 
