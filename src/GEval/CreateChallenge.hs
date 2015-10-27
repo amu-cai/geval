@@ -91,9 +91,14 @@ Directory structure
 |]
 
 configContents :: Metric -> String -> String
-configContents metric testName = [i|
---metric ${show metric} --test-name ${testName}
-|]
+configContents metric testName = "--metric " ++
+                                 (show metric) ++
+                                 (if testName /= defaultTestName
+                                     then
+                                        " --test-name " ++ testName
+                                     else
+                                        "")
+
 
 trainContents :: Metric -> String
 trainContents BLEU = [hereLit|alussa loi jumala taivaan ja maan	he mea hanga na te atua i te timatanga te rangi me te whenua

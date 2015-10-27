@@ -9,8 +9,8 @@ machine learning algorithms are available here.
 
 ## Installing
 
-You need [Haskell Stack](https://github.com/commercialhaskell/stack),
-then install GEval with:
+You need [Haskell Stack](https://github.com/commercialhaskell/stack).
+When you've got Haskell Stack, install GEval with:
 
     git clone https://github.com/filipg/geval
     cd geval
@@ -100,11 +100,11 @@ repo (for the toy “planets” challenge) could be created as follows:
     git commit -m 'init challenge'
     git remote add origin git@github.com:filipg/planets
     git push origin master
-    git branch dont-peek-here
-    git checkout dont-peek-here
+    git branch dont-peek
+    git checkout dont-peek
     git add test-A/expected.tsv
     git commit -m 'with expected results'
-    git push origin dont-peek-here
+    git push origin dont-peek
 
 ## Taking up a Gonito challenge
 
@@ -134,7 +134,7 @@ If you'd like and if you have access to the test set results, you can
 “cheat” and check the results for the test set:
 
     cd ..
-    git clone https://github.com/filipg/planets planets-secret --branch dont-peek-here
+    git clone https://github.com/filipg/planets planets-secret --branch dont-peek
     cd planets
     geval --expected-directory ../planets-secret
 
