@@ -38,7 +38,7 @@ import GEval.BLEU
 
 type MetricValue = Double
 
-data Metric = RMSE | MSE | BLEU
+data Metric = RMSE | MSE | BLEU | Accuracy
               deriving (Show, Read)
 
 defaultOutDirectory = "."
@@ -140,6 +140,9 @@ gevalCore' BLEU = gevalCore'' (Prelude.map Prelude.words . DLS.splitOn "\t" . un
         brevityPenalty c r
           | c >= r = 1.0
           | otherwise = exp (1.0 - (r /. c))
+
+gevalCore' Accuracy = gevalCore'' strip strip hitOrMiss averageC id
+                      where hitOrMiss (x,y) = if x == y then 1.0 else 0.0
 
 (/.) :: Int -> Int -> Double
 x /. 0 = 1.0

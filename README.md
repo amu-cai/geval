@@ -173,6 +173,6 @@ Then let Gonito pull them and evaluate your results.
                              evaluated (default: "out.tsv")
     --expected-file EXPECTED The name of the file with expected
                              results (default: "expected.tsv")
-    --metric METRIC          Metric to be used - RMSE, MSE or BLEU (default: RMSE)
+    --metric METRIC          Metric to be used - RMSE, MSE, Accuracy or BLEU (default: RMSE)
 
 If you need another metric, let me know, or do it yourself!

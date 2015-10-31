@@ -33,6 +33,12 @@ main = hspec $ do
                   "test/bleu-perfect/bleu-perfect",
                   "--out-directory",
                   "test/bleu-perfect/bleu-perfect-solution"]) >>= extractVal) `shouldReturnAlmost` 1.0000
+  describe "Accuracy" $ do
+    it "simple example" $ do
+      ((runGEval ["--expected-directory",
+                  "test/accuracy-simple/accuracy-simple",
+                  "--out-directory",
+                  "test/accuracy-simple/accuracy-simple-solution"]) >>= extractVal) `shouldReturnAlmost` 0.6
   describe "precision count" $ do
     it "simple test" $ do
       precisionCount [["Alice", "has", "a", "cat" ]] ["Ala", "has", "cat"] `shouldBe` 2
