@@ -48,9 +48,21 @@ main = hspec $ do
       precisionCount [["bar", "bar", "bar", "bar", "foo", "xyz", "foo"]] ["foo", "bar", "foo", "baz", "bar", "foo"] `shouldBe` 4
     it "multiple refs" $ do
       precisionCount [["foo", "baz"], ["bar"], ["baz", "xyz"]]  ["foo", "bar", "foo"] `shouldBe` 2
+  describe "error handling" $ do
+    it "too few lines are handled" $ do
+      runGEvalTest "error-too-few-lines" `shouldThrow` (== TooFewLines)
+    it "too many lines are handled" $ do
+      runGEvalTest "error-too-many-lines" `shouldThrow` (== TooManyLines)
+
 
 extractVal :: (Either (ParserResult GEvalOptions) (Maybe MetricValue)) -> IO MetricValue
 extractVal (Right (Just val)) = return val
+
+runGEvalTest testName = (runGEval [
+  "--expected-directory",
+  "test/" ++ testName ++ "/" ++ testName,
+  "--out-directory",
+  "test/" ++ testName ++ "/" ++ testName ++ "-solution"]) >>= extractVal
 
 class AEq a where
     (=~) :: a -> a -> Bool

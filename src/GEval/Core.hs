@@ -77,6 +77,9 @@ data GEvalException = NoExpectedFile FilePath
                       | NoExpectedTestDirectory FilePath
                       | NoOutTestDirectory FilePath
                       | FileAlreadyThere FilePath
+                      | TooFewLines
+                      | TooManyLines
+                      deriving (Eq)
 
 instance Exception GEvalException
 
@@ -88,6 +91,8 @@ instance Show GEvalException where
   show (NoExpectedTestDirectory filePath) = somethingWrongWithFilesMessage "No test subdirectory with the expected results" filePath
   show (NoOutTestDirectory filePath) = somethingWrongWithFilesMessage "No test subdirectory with the results obtained" filePath
   show (FileAlreadyThere filePath) = somethingWrongWithFilesMessage "File already there" filePath
+  show TooFewLines = "Too few lines in the output file"
+  show TooManyLines = "Too many lines in the output file"
 
 somethingWrongWithFilesMessage :: String -> FilePath -> String
 somethingWrongWithFilesMessage msg filePath = Prelude.concat
@@ -148,15 +153,25 @@ gevalCore' Accuracy = gevalCore'' strip strip hitOrMiss averageC id
 x /. 0 = 1.0
 x /. y = (fromIntegral x) / (fromIntegral y)
 
+data SourceItem a = Got a | Done
+
 gevalCore'' :: (Text -> a) -> (Text -> b) -> ((a, b) -> c) -> (Sink c (ResourceT IO) d) -> (d -> Double ) -> String -> String -> IO (MetricValue)
 gevalCore'' expParser outParser itemStep aggregator finalStep expectedFilePath outFilePath = do
   v <- runResourceT $
     (getZipSource $ (,)
        <$> ZipSource (items expectedFilePath expParser)
        <*> ZipSource (items outFilePath outParser))
-     $$ (CL.map itemStep
+     $$ (CL.map (checkStep itemStep)
+         =$= CL.catMaybes
          =$ aggregator)
   return $ finalStep v
+
+checkStep :: ((a, b) -> c) -> (SourceItem a, SourceItem b) -> Maybe c
+checkStep step (Got expectedItem, Got outItem) = Just $ step (expectedItem, outItem)
+checkStep _ (Got _, Done) = throw TooFewLines
+checkStep _ (Done, Got _) = throw TooManyLines
+checkStep _ (Done, Done) = Nothing
+
 
 averageC :: MonadResource m => Sink Double m Double
 averageC = getZipSink
@@ -164,12 +179,12 @@ averageC = getZipSink
   <$> ZipSink CC.sum
   <*> ZipSink CC.length
 
-items :: MonadResource m => String -> (Text -> a) -> Source m a
+items :: MonadResource m => String -> (Text -> a) -> Source m (SourceItem a)
 items filePath parser =
-  CB.sourceFile filePath
-  $= (CT.decode CT.utf8
-      =$= CT.lines
-      =$= CL.map parser)
+  (CB.sourceFile filePath
+   $= (CT.decode CT.utf8
+       =$= CT.lines
+       =$= CL.map ((\x -> Got x) . parser))) >> yield Done
 
 itemError :: (Double, Double) -> Double
 itemError (exp, out) = (exp-out)**2
