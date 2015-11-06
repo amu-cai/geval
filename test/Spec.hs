@@ -12,33 +12,18 @@ main = hspec $ do
     it "simple test" $ do
       geval (defaultGEvalSpecification {gesExpectedDirectory=Just "test/rmse-simple/rmse-simple", gesOutDirectory="test/rmse-simple/rmse-simple-solution"}) `shouldReturnAlmost` 0.64549722436790
   describe "mean square error" $ do
-    it "simple test with arguments" $ do
-      ((runGEval ["--expected-directory",
-                  "test/mse-simple/mse-simple",
-                  "--out-directory",
-                  "test/mse-simple/mse-simple-solution"]) >>= extractVal) `shouldReturnAlmost` 0.4166666666666667
+    it "simple test with arguments" $
+      runGEvalTest "mse-simple" `shouldReturnAlmost` 0.4166666666666667
   describe "BLEU" $ do
-    it "trivial example from Wikipedia" $ do
-      ((runGEval ["--expected-directory",
-                  "test/bleu-trivial/bleu-trivial",
-                  "--out-directory",
-                  "test/bleu-trivial/bleu-trivial-solution"]) >>= extractVal) `shouldReturnAlmost` 0.0
-    it "complex example" $ do
-      ((runGEval ["--expected-directory",
-                  "test/bleu-complex/bleu-complex",
-                  "--out-directory",
-                  "test/bleu-complex/bleu-complex-solution"]) >>= extractVal) `shouldReturnAlmost` 0.6211
-    it "perfect translation" $ do
-      ((runGEval ["--expected-directory",
-                  "test/bleu-perfect/bleu-perfect",
-                  "--out-directory",
-                  "test/bleu-perfect/bleu-perfect-solution"]) >>= extractVal) `shouldReturnAlmost` 1.0000
+    it "trivial example from Wikipedia" $
+      runGEvalTest "bleu-trivial" `shouldReturnAlmost` 0.0
+    it "complex example" $
+      runGEvalTest "bleu-complex" `shouldReturnAlmost` 0.6211
+    it "perfect translation" $
+      runGEvalTest "bleu-perfect" `shouldReturnAlmost` 1.0000
   describe "Accuracy" $ do
-    it "simple example" $ do
-      ((runGEval ["--expected-directory",
-                  "test/accuracy-simple/accuracy-simple",
-                  "--out-directory",
-                  "test/accuracy-simple/accuracy-simple-solution"]) >>= extractVal) `shouldReturnAlmost` 0.6
+    it "simple example" $
+      runGEvalTest "accuracy-simple" `shouldReturnAlmost` 0.6
   describe "precision count" $ do
     it "simple test" $ do
       precisionCount [["Alice", "has", "a", "cat" ]] ["Ala", "has", "cat"] `shouldBe` 2
