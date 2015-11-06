@@ -82,6 +82,7 @@ data GEvalException = NoExpectedFile FilePath
                       | TooFewLines
                       | TooManyLines
                       | EmptyOutput
+                      | UnexpectedData String
                       deriving (Eq)
 
 instance Exception GEvalException
@@ -97,6 +98,7 @@ instance Show GEvalException where
   show TooFewLines = "Too few lines in the output file"
   show TooManyLines = "Too many lines in the output file"
   show EmptyOutput = "The output file is empty"
+  show (UnexpectedData message) = "Unexpected data [" ++ message ++ "]"
 
 somethingWrongWithFilesMessage :: String -> FilePath -> String
 somethingWrongWithFilesMessage msg filePath = Prelude.concat
@@ -200,3 +202,4 @@ itemError (exp, out) = (exp-out)**2
 
 getValue :: Either String (Double, Text) -> Double
 getValue (Right (x, _)) = x
+getValue (Left s) = throw $ UnexpectedData s

@@ -40,6 +40,8 @@ main = hspec $ do
       runGEvalTest "error-too-many-lines" `shouldThrow` (== TooManyLines)
     it "empty output is handled" $ do
       runGEvalTest "empty-output" `shouldThrow` (== EmptyOutput)
+    it "unexpected data is handled" $
+      runGEvalTest "unexpected-data" `shouldThrow` (== UnexpectedData "input does not start with a digit")
 
 extractVal :: (Either (ParserResult GEvalOptions) (Maybe MetricValue)) -> IO MetricValue
 extractVal (Right (Just val)) = return val
