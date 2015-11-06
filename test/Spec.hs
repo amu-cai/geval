@@ -42,6 +42,9 @@ main = hspec $ do
       runGEvalTest "empty-output" `shouldThrow` (== EmptyOutput)
     it "unexpected data is handled" $
       runGEvalTest "unexpected-data" `shouldThrow` (== UnexpectedData "input does not start with a digit")
+    it "unwanted data is handled" $
+      runGEvalTest "unwanted-data" `shouldThrow` (== UnexpectedData "number expected")
+
 
 extractVal :: (Either (ParserResult GEvalOptions) (Maybe MetricValue)) -> IO MetricValue
 extractVal (Right (Just val)) = return val

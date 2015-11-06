@@ -201,5 +201,8 @@ itemError :: (Double, Double) -> Double
 itemError (exp, out) = (exp-out)**2
 
 getValue :: Either String (Double, Text) -> Double
-getValue (Right (x, _)) = x
+getValue (Right (x, reminder)) =
+  if Data.Text.null reminder || Data.Text.head reminder == '\t'
+  then x
+  else throw $ UnexpectedData "number expected"
 getValue (Left s) = throw $ UnexpectedData s
