@@ -38,7 +38,8 @@ main = hspec $ do
       runGEvalTest "error-too-few-lines" `shouldThrow` (== TooFewLines)
     it "too many lines are handled" $ do
       runGEvalTest "error-too-many-lines" `shouldThrow` (== TooManyLines)
-
+    it "empty output is handled" $ do
+      runGEvalTest "empty-output" `shouldThrow` (== EmptyOutput)
 
 extractVal :: (Either (ParserResult GEvalOptions) (Maybe MetricValue)) -> IO MetricValue
 extractVal (Right (Just val)) = return val

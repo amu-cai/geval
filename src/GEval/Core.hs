@@ -26,8 +26,10 @@ import Data.Text
 import Data.Text.Read as TR
 import Control.Applicative
 import Control.Exception
-import Control.Conditional (unlessM)
+import Control.Conditional (unlessM, whenM)
 import qualified System.Directory as D
+
+import System.Posix
 
 import System.FilePath
 import Data.Maybe
@@ -79,6 +81,7 @@ data GEvalException = NoExpectedFile FilePath
                       | FileAlreadyThere FilePath
                       | TooFewLines
                       | TooManyLines
+                      | EmptyOutput
                       deriving (Eq)
 
 instance Exception GEvalException
@@ -93,6 +96,7 @@ instance Show GEvalException where
   show (FileAlreadyThere filePath) = somethingWrongWithFilesMessage "File already there" filePath
   show TooFewLines = "Too few lines in the output file"
   show TooManyLines = "Too many lines in the output file"
+  show EmptyOutput = "The output file is empty"
 
 somethingWrongWithFilesMessage :: String -> FilePath -> String
 somethingWrongWithFilesMessage msg filePath = Prelude.concat
@@ -106,6 +110,10 @@ defaultGEvalSpecification = GEvalSpecification {
   gesExpectedFile = defaultExpectedFile,
   gesMetric = defaultMetric }
 
+isEmptyFile :: FilePath -> IO (Bool)
+isEmptyFile path = do
+    stat <- getFileStatus path
+    return ((fileSize stat) == 0)
 
 geval :: GEvalSpecification -> IO (MetricValue)
 geval gevalSpec = do
@@ -131,6 +139,7 @@ gevalCore RMSE expectedFilePath outFilePath = do
 gevalCore metric expectedFilePath outFilePath = do
   unlessM (D.doesFileExist expectedFilePath) $ throwM $ NoExpectedFile expectedFilePath
   unlessM (D.doesFileExist outFilePath) $ throwM $ NoOutFile outFilePath
+  whenM (isEmptyFile outFilePath) $ throwM $ EmptyOutput
   gevalCore' metric expectedFilePath outFilePath
 
 gevalCore' :: Metric -> String -> String -> IO (MetricValue)
