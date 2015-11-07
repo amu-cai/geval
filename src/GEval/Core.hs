@@ -166,7 +166,7 @@ x /. y = (fromIntegral x) / (fromIntegral y)
 
 data SourceItem a = Got a | Done
 
-gevalCore'' :: (Text -> a) -> (Text -> b) -> ((a, b) -> c) -> (Sink c (ResourceT IO) d) -> (d -> Double ) -> String -> String -> IO (MetricValue)
+gevalCore'' :: (Text -> a) -> (Text -> b) -> ((a, b) -> c) -> (Sink c (ResourceT IO) d) -> (d -> Double) -> String -> String -> IO (MetricValue)
 gevalCore'' expParser outParser itemStep aggregator finalStep expectedFilePath outFilePath = do
   v <- runResourceT $
     (getZipSource $ (,)
