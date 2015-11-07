@@ -28,12 +28,9 @@ import Control.Applicative
 import Control.Exception
 import Control.Conditional (unlessM, whenM)
 import qualified System.Directory as D
-
 import System.Posix
-
 import System.FilePath
 import Data.Maybe
-
 import qualified Data.List.Split as DLS
 
 import GEval.BLEU
