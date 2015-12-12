@@ -2,6 +2,8 @@ module GEval.Core
     ( geval,
       gevalCore,
       Metric(..),
+      MetricOrdering(..),
+      getMetricOrdering,
       MetricValue,
       GEvalSpecification(..),
       GEvalOptions(..),
