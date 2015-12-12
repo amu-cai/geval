@@ -40,6 +40,14 @@ type MetricValue = Double
 data Metric = RMSE | MSE | BLEU | Accuracy
               deriving (Show, Read)
 
+data MetricOrdering = TheLowerTheBetter | TheHigherTheBetter
+
+getMetricOrdering :: Metric -> MetricOrdering
+getMetricOrdering RMSE     = TheLowerTheBetter
+getMetricOrdering MSE      = TheLowerTheBetter
+getMetricOrdering BLEU     = TheHigherTheBetter
+getMetricOrdering Accuracy = TheHigherTheBetter
+
 defaultOutDirectory = "."
 defaultTestName = "test-A"
 defaultOutFile = "out.tsv"
