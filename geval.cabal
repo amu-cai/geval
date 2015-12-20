@@ -58,4 +58,4 @@ test-suite geval-test
 
 source-repository head
   type:     git
-  location: https://github.com/filipg/geval
+  location: git://gonito.net/geval

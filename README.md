@@ -12,7 +12,7 @@ machine learning algorithms are available here.
 You need [Haskell Stack](https://github.com/commercialhaskell/stack).
 When you've got Haskell Stack, install GEval with:
 
-    git clone https://github.com/filipg/geval
+    git clone git://gonito.net/geval
     cd geval
     stack setup
     stack install
@@ -98,7 +98,7 @@ repo (for the toy “planets” challenge) could be created as follows:
     git init
     git add .gitignore config.txt README.md train/train.tsv dev-0/{in,expected}.tsv test-A/in.tsv
     git commit -m 'init challenge'
-    git remote add origin git@github.com:filipg/planets
+    git remote add origin ssh://gitolite@gonito.net/filipg/planets
     git push origin master
     git branch dont-peek
     git checkout dont-peek
@@ -111,7 +111,7 @@ repo (for the toy “planets” challenge) could be created as follows:
 Clone the repo with a challenge, as given on the Gonito web-site, e.g.
 for the toy “planets” challenge (as generated with `geval --init`):
 
-    git clone https://github.com/filipg/planets
+    git clone git://gonito.net/planets
 
 Now use the train data and whatever machine learning tools you like to
 guess the values for the dev set and the test set, put them,
@@ -134,7 +134,7 @@ If you'd like and if you have access to the test set results, you can
 “cheat” and check the results for the test set:
 
     cd ..
-    git clone https://github.com/filipg/planets planets-secret --branch dont-peek
+    git clone git://gonito.net/planets planets-secret --branch dont-peek
     cd planets
     geval --expected-directory ../planets-secret
 
@@ -144,7 +144,7 @@ Uploading is via Git — commit your “out” files and push the commit to
 your own repo. On Gonito you are encouraged to share your code, so
 be nice and commit also your source codes.
 
-    git remote add mine git@github.com:johnsmith/planets-johnsmith
+    git remote add mine git@github.com/johnsmith/planets-johnsmith
     git add {dev-0,test-A}/out.tsv
     git add Makefile magic-bullet.py ... # whatever scripts/source codes you have
     git commit -m 'my solution to the challenge'
