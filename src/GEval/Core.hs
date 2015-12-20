@@ -40,7 +40,7 @@ import GEval.BLEU
 type MetricValue = Double
 
 data Metric = RMSE | MSE | BLEU | Accuracy
-              deriving (Show, Read)
+              deriving (Show, Read, Eq)
 
 data MetricOrdering = TheLowerTheBetter | TheHigherTheBetter
 

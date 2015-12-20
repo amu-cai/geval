@@ -3,7 +3,8 @@
 module GEval.OptionsParser
        (fullOptionsParser,
         runGEval,
-        runGEvalGetOptions) where
+        runGEvalGetOptions,
+        getOptions) where
 
 import Options.Applicative
 import qualified System.Directory as D
@@ -83,29 +84,37 @@ runGEval args = do
     Right (_, mmv) -> return $ Right mmv
 
 runGEvalGetOptions :: [String] -> IO (Either (ParserResult GEvalOptions) (GEvalOptions, Maybe MetricValue))
-runGEvalGetOptions = runGEval' True
+runGEvalGetOptions args = do
+  optionExtractionResult <- getOptions args
+  case optionExtractionResult of
+    Left parserResult -> return $ Left parserResult
+    Right opts -> do
+      mmv <- runGEval'' opts
+      return $ Right (opts, mmv)
+
+getOptions :: [String] -> IO (Either (ParserResult GEvalOptions) GEvalOptions)
+getOptions = getOptions' True
 
 -- the first argument: whether to try to read from the config file
-runGEval' :: Bool -> [String] -> IO (Either (ParserResult GEvalOptions) (GEvalOptions, Maybe MetricValue))
-runGEval' readOptsFromConfigFile args =
+getOptions' :: Bool -> [String] -> IO (Either (ParserResult GEvalOptions) GEvalOptions)
+getOptions' readOptsFromConfigFile args =
   case parserResult of
     Success opts -> if readOptsFromConfigFile then
                       attemptToReadOptsFromConfigFile args opts else
                         do
-                          mmv <- runGEval'' opts
-                          return $ Right $ (opts, mmv)
+                          return $ Right opts
     otherwise -> return $ Left parserResult
   where parserResult = execParserPure (prefs idm) fullOptionsParser args
 
-attemptToReadOptsFromConfigFile :: [String] -> GEvalOptions -> IO (Either (ParserResult GEvalOptions) (GEvalOptions, Maybe MetricValue))
+attemptToReadOptsFromConfigFile :: [String] -> GEvalOptions -> IO (Either (ParserResult GEvalOptions) GEvalOptions)
 attemptToReadOptsFromConfigFile args opts = do
   configExists <- D.doesFileExist configFilePath
   if configExists then do
       configH <- openFile configFilePath ReadMode
       contents <- hGetContents configH
-      runGEval' False ((words contents) ++ args)
+      getOptions' False ((words contents) ++ args)
     else
-      runGEval' False args
+      getOptions' False args
   where configFilePath = (getExpectedDirectory $ geoSpec opts) </> configFileName
 
 

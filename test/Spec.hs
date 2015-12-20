@@ -33,6 +33,9 @@ main = hspec $ do
       precisionCount [["bar", "bar", "bar", "bar", "foo", "xyz", "foo"]] ["foo", "bar", "foo", "baz", "bar", "foo"] `shouldBe` 4
     it "multiple refs" $ do
       precisionCount [["foo", "baz"], ["bar"], ["baz", "xyz"]]  ["foo", "bar", "foo"] `shouldBe` 2
+  describe "reading options" $ do
+    it "can get the metric" $ do
+      extractMetric "bleu-complex" `shouldReturn` (Just BLEU)
   describe "error handling" $ do
     it "too few lines are handled" $ do
       runGEvalTest "error-too-few-lines" `shouldThrow` (== TooFewLines)
@@ -54,6 +57,13 @@ runGEvalTest testName = (runGEval [
   "test/" ++ testName ++ "/" ++ testName,
   "--out-directory",
   "test/" ++ testName ++ "/" ++ testName ++ "-solution"]) >>= extractVal
+
+extractMetric :: String -> IO (Maybe Metric)
+extractMetric testName = do
+  result <- getOptions ["--expected-directory", "test/" ++ testName ++ "/" ++ testName]
+  return $ case result of
+   Left _ -> Nothing
+   Right opts -> Just $ gesMetric $ geoSpec opts
 
 class AEq a where
     (=~) :: a -> a -> Bool
