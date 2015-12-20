@@ -1,8 +1,8 @@
 # GEval
 
-GEval is a library (and a stand-alone tool) for evaluating the results
-of solutions to machine learning challenges as defined on the Gonito
-platform.
+GEval is a Haskell library (and a stand-alone tool) for evaluating the
+results of solutions to machine learning challenges as defined on the
+[Gonito](http://gonito.net) platform.
 
 Note that GEval is only about machine learning evaluation. No actual
 machine learning algorithms are available here.
@@ -17,7 +17,7 @@ When you've got Haskell Stack, install GEval with:
     stack setup
     stack install
 
-By default, `geval` library is installed in `$HOME/.local/bin`, so in
+By default, `geval` binary is installed in `$HOME/.local/bin`, so in
 order to run `geval` you need to either add `$HOME/.local/bin` to
 `$PATH` or to type:
 
@@ -27,7 +27,7 @@ order to run `geval` you need to either add `$HOME/.local/bin` to
 
 ### Directory structure of a Gonito challenge
 
-A definition of a Gonito challenge should be put in a separate
+A definition of a [Gonito](http://gonito.net) challenge should be put in a separate
 directory. Such a directory should
 have the following structure:
 
@@ -63,7 +63,7 @@ have the following structure:
 
 ### Initiating a Gonito challenge with geval
 
-You can use `geval` to initiate a Gonito challenge:
+You can use `geval` to initiate a [Gonito](http://gonito.net) challenge:
 
     geval --init --expected-directory my-challenge
 
@@ -76,7 +76,7 @@ be given to generate another type of toy challenge:
 
 ### Preparing a Git repository
 
-Gonito platform expects a Git repository with a challenge to be
+[Gonito](http://gonito.net) platform expects a Git repository with a challenge to be
 submitted. The suggested way to do this is as follows:
 
 1. Prepare a branch with all the files _without_
@@ -108,7 +108,7 @@ repo (for the toy “planets” challenge) could be created as follows:
 
 ## Taking up a Gonito challenge
 
-Clone the repo with a challenge, as given on the Gonito web-site, e.g.
+Clone the repo with a challenge, as given on the [Gonito](http://gonito.net) web-site, e.g.
 for the toy “planets” challenge (as generated with `geval --init`):
 
     git clone git://gonito.net/planets
@@ -141,7 +141,7 @@ If you'd like and if you have access to the test set results, you can
 ### Uploading your results to Gonito platform
 
 Uploading is via Git — commit your “out” files and push the commit to
-your own repo. On Gonito you are encouraged to share your code, so
+your own repo. On [Gonito](http://gonito.net) you are encouraged to share your code, so
 be nice and commit also your source codes.
 
     git remote add mine git@github.com/johnsmith/planets-johnsmith
@@ -154,13 +154,15 @@ Then let Gonito pull them and evaluate your results.
 
 ## `geval` options
 
-    geval [--init] [--out-directory OUT-DIRECTORY]
+    geval [--init] [--precision PRECISION] [--out-directory OUT-DIRECTORY]
           [--expected-directory EXPECTED-DIRECTORY] [--test-name NAME]
           [--out-file OUT] [--expected-file EXPECTED] [--metric METRIC]
 
     -h,--help                Show this help text
     --init                   Init a sample Gonito challenge rather than run an
                              evaluation
+    --precision PRECISION    Precision with which the evaluation results should be
+                             shown
     --out-directory OUT-DIRECTORY
                              Directory with test results to be
                              evaluated (default: ".")
@@ -173,6 +175,15 @@ Then let Gonito pull them and evaluate your results.
                              evaluated (default: "out.tsv")
     --expected-file EXPECTED The name of the file with expected
                              results (default: "expected.tsv")
-    --metric METRIC          Metric to be used - RMSE, MSE, Accuracy or BLEU (default: RMSE)
+    --metric METRIC          Metric to be used - RMSE, MSE, Accuracy or
+                             BLEU (default: RMSE)
 
 If you need another metric, let me know, or do it yourself!
+
+## Licence
+
+Apache License 2.0
+
+## Authors
+
+Filip Graliński
