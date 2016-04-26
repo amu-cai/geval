@@ -3,4 +3,4 @@ packages:
 - '.'
 extra-deps: [cond-0.4.1.1]
 compiler-check: newer-minor
-resolver: nightly-2015-12-19
+resolver: lts-5.9
