@@ -19,6 +19,7 @@ library
                        GEval.CreateChallenge
                      , GEval.OptionsParser
                      , GEval.BLEU
+                     , GEval.PrecisionRecall
   build-depends:       base >= 4.7 && < 5
                      , cond
                      , conduit
@@ -33,6 +34,7 @@ library
                      , split
                      , text
                      , unix
+                     , fgl
   default-language:    Haskell2010
 
 executable geval
@@ -42,6 +44,7 @@ executable geval
   build-depends:       base
                      , geval
                      , optparse-applicative
+                     , fgl
   default-language:    Haskell2010
 
 test-suite geval-test

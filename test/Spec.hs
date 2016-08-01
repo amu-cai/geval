@@ -3,6 +3,7 @@ import Test.Hspec
 import GEval.Core
 import GEval.OptionsParser
 import GEval.BLEU
+import GEval.PrecisionRecall
 import Options.Applicative
 import qualified Test.HUnit as HU
 
@@ -47,7 +48,26 @@ main = hspec $ do
       runGEvalTest "unexpected-data" `shouldThrow` (== UnexpectedData "input does not start with a digit")
     it "unwanted data is handled" $
       runGEvalTest "unwanted-data" `shouldThrow` (== UnexpectedData "number expected")
+  describe "precision and recall" $ do
+    it "null test" $ do
+      precision neverMatch ['a', 'b', 'c'] [0, 1, 2, 3, 4, 5] `shouldBeAlmost` 0.0
+      recall neverMatch ['a', 'b', 'c'] [0, 1, 2, 3, 4, 5] `shouldBeAlmost` 0.0
+      f1Measure neverMatch ['a', 'b', 'c'] [0, 1, 2, 3, 4, 5] `shouldBeAlmost` 0.0
+    it "basic test" $ do
+      precision testMatchFun ['a', 'b', 'c'] [0, 1, 2, 3, 4, 5] `shouldBeAlmost` 0.3333333333333333
+      recall testMatchFun ['a', 'b', 'c'] [0, 1, 2, 3, 4, 5] `shouldBeAlmost` 0.66666666666666666
+      f1Measure testMatchFun ['a', 'b', 'c'] [0, 1, 2, 3, 4, 5] `shouldBeAlmost` 0.444444444444444
 
+neverMatch :: Char -> Int -> Bool
+neverMatch _ _ = False
+
+testMatchFun :: Char -> Int -> Bool
+testMatchFun 'a' 1 = True
+testMatchFun 'a' 2 = True
+testMatchFun 'a' 3 = True
+testMatchFun 'b' 1 = True
+testMatchFun 'c' 1 = True
+testMatchFun _ _ = False
 
 extractVal :: (Either (ParserResult GEvalOptions) (Maybe MetricValue)) -> IO MetricValue
 extractVal (Right (Just val)) = return val
@@ -72,10 +92,12 @@ instance AEq Double where
     x =~ y = abs ( x - y ) < (1.0e-4 :: Double)
 
 (@=~?) :: (Show a, AEq a) => a -> a -> HU.Assertion
-(@=~?) expected actual  = expected =~ actual HU.@? assertionMsg
+(@=~?) actual expected = expected =~ actual HU.@? assertionMsg
     where
       assertionMsg = "Expected : " ++ show expected ++
                      "\nActual   : " ++ show actual
+
+shouldBeAlmost got expected = got @=~? expected
 
 shouldReturnAlmost :: (AEq a, Show a, Eq a) => IO a -> a -> Expectation
 shouldReturnAlmost action expected = action >>= (@=~? expected)
