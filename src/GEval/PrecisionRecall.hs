@@ -5,6 +5,8 @@ module GEval.PrecisionRecall(fMeasure, f1Measure, f2Measure, precision, recall,
                              precisionAndRecall, precisionAndRecallFromCounts)
        where
 
+import GEval.Common
+
 import Data.Graph.Inductive
 import Data.Graph.Inductive.Query.MaxFlow
 
@@ -39,18 +41,7 @@ precisionAndRecall matchFun expected got
 
 precisionAndRecallFromCounts :: (Int, Int, Int) -> (Double, Double)
 precisionAndRecallFromCounts (tp, nbExpected, nbGot) =
-  (tp `safeDiv` nbGot, tp `safeDiv` nbExpected)
-
--- division with possible zero
-safeDiv :: Int -> Int -> Double
-safeDiv _ 0 = 1.0
-safeDiv x y = (fromIntegral x) / (fromIntegral y)
-
-safeDoubleDiv :: Double -> Double -> Double
-safeDoubleDiv _ 0.0 = 0.0
-safeDoubleDiv x y = x / y
-
-
+  (tp /. nbGot, tp /. nbExpected)
 
 precision :: (a -> b -> Bool) -> [a] -> [b] -> Double
 precision matchFun expected got = fst $ precisionAndRecall matchFun expected got

@@ -36,6 +36,7 @@ import Data.Maybe
 import qualified Data.List.Split as DLS
 
 import GEval.BLEU
+import GEval.Common
 
 type MetricValue = Double
 
@@ -166,10 +167,6 @@ gevalCore' BLEU = gevalCore'' (Prelude.map Prelude.words . DLS.splitOn "\t" . un
 
 gevalCore' Accuracy = gevalCore'' strip strip hitOrMiss averageC id
                       where hitOrMiss (x,y) = if x == y then 1.0 else 0.0
-
-(/.) :: Int -> Int -> Double
-x /. 0 = 1.0
-x /. y = (fromIntegral x) / (fromIntegral y)
 
 data SourceItem a = Got a | Done
 
