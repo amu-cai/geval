@@ -35,12 +35,16 @@ import System.FilePath
 import Data.Maybe
 import qualified Data.List.Split as DLS
 
+import Data.Attoparsec.Text (parseOnly)
+
 import GEval.BLEU
 import GEval.Common
+import GEval.ClippEU
+import GEval.PrecisionRecall
 
 type MetricValue = Double
 
-data Metric = RMSE | MSE | BLEU | Accuracy
+data Metric = RMSE | MSE | BLEU | Accuracy | ClippEU
               deriving (Show, Read, Eq)
 
 data MetricOrdering = TheLowerTheBetter | TheHigherTheBetter
@@ -50,6 +54,7 @@ getMetricOrdering RMSE     = TheLowerTheBetter
 getMetricOrdering MSE      = TheLowerTheBetter
 getMetricOrdering BLEU     = TheHigherTheBetter
 getMetricOrdering Accuracy = TheHigherTheBetter
+getMetricOrdering ClippEU  = TheHigherTheBetter
 
 defaultOutDirectory = "."
 defaultTestName = "test-A"
@@ -168,6 +173,17 @@ gevalCore' BLEU = gevalCore'' (Prelude.map Prelude.words . DLS.splitOn "\t" . un
 gevalCore' Accuracy = gevalCore'' strip strip hitOrMiss averageC id
                       where hitOrMiss (x,y) = if x == y then 1.0 else 0.0
 
+gevalCore' ClippEU = gevalCore'' parseClippingSpecs parseClippings matchStep clippeuAgg finalStep
+  where
+    parseClippings = controlledParse lineClippingsParser
+    parseClippingSpecs = controlledParse lineClippingSpecsParser
+    matchStep (clippingSpecs, clippings) = (maxMatch matchClippingToSpec clippingSpecs clippings,
+                                            Prelude.length clippingSpecs,
+                                            Prelude.length clippings)
+    clippeuAgg = CC.foldl clippeuFuse (0, 0, 0)
+    clippeuFuse (a1, a2, a3) (b1, b2, b3) = (a1+b1, a2+b2, a3+b3)
+    finalStep counts = f2MeasureOnCounts counts
+
 data SourceItem a = Got a | Done
 
 gevalCore'' :: (Text -> a) -> (Text -> b) -> ((a, b) -> c) -> (Sink c (ResourceT IO) d) -> (d -> Double) -> String -> String -> IO (MetricValue)
@@ -210,3 +226,8 @@ getValue (Right (x, reminder)) =
   then x
   else throw $ UnexpectedData "number expected"
 getValue (Left s) = throw $ UnexpectedData s
+
+controlledParse parser t =
+  case parseOnly parser t of
+    (Right v) -> v
+    (Left _) -> throw $ UnexpectedData "cannot parse line"

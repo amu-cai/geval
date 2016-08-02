@@ -84,11 +84,12 @@ main = hspec $ do
       r `shouldBe` []
     it "parsing specs" $ do
       let (Right r) = parseOnly lineClippingSpecsParser  " 2/0,0,2,3/5  10/20,30,40,50/10"
-      r `shouldBe` [ClippingSpec (PageNumber 2) (Rectangle (Point 0 0) (Point 2 3))
+      r `shouldBe` [ClippingSpec (PageNumber 2) (Rectangle (Point 5 5) (Point 0 0))
                                                 (Rectangle (Point 0 0) (Point 7 8)),
-                    ClippingSpec (PageNumber 10) (Rectangle (Point 20 30) (Point 40 50))
+                    ClippingSpec (PageNumber 10) (Rectangle (Point 30 40) (Point 30 40))
                                                  (Rectangle (Point 10 20) (Point 50 60))]
-
+    it "full test" $ do
+      runGEvalTest "clippeu-simple" `shouldReturnAlmost` 0.399999999999
 
 neverMatch :: Char -> Int -> Bool
 neverMatch _ _ = False

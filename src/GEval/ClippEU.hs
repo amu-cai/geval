@@ -54,7 +54,7 @@ clippingSpecParser = do
   rectangle <- rectangleParser
   char '/'
   margin <- decimal
-  return $ ClippingSpec pageNo rectangle (extendedRectangle margin rectangle)
+  return $ ClippingSpec pageNo (smallerRectangle margin rectangle) (extendedRectangle margin rectangle)
 
 possibleWhitespace = many' (satisfy isHorizontalSpace)
 
@@ -64,6 +64,13 @@ extendedRectangle :: Int -> Rectangle -> Rectangle
 extendedRectangle margin (Rectangle (Point x0 y0) (Point x1 y1)) =
   Rectangle (Point (x0 `nonNegativeDiff` margin) (y0 `nonNegativeDiff` margin))
             (Point (x1 + margin) (y1 + margin))
+
+smallerRectangle :: Int -> Rectangle -> Rectangle
+smallerRectangle margin (Rectangle (Point x0 y0) (Point x1 y1)) =
+  Rectangle (Point (x0 + margin) (y0 + margin))
+            (Point (x1 `nonNegativeDiff` margin) (y1 `nonNegativeDiff` margin))
+
+
 
 nonNegativeDiff x y
   | x < y = 0

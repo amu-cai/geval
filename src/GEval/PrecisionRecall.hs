@@ -2,7 +2,7 @@
 
 module GEval.PrecisionRecall(fMeasure, f1Measure, f2Measure, precision, recall,
                              fMeasureOnCounts, f1MeasureOnCounts, f2MeasureOnCounts,
-                             precisionAndRecall, precisionAndRecallFromCounts)
+                             precisionAndRecall, precisionAndRecallFromCounts, maxMatch)
        where
 
 import GEval.Common
