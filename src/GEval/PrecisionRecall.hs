@@ -8,8 +8,6 @@ module GEval.PrecisionRecall(fMeasure, f1Measure, f2Measure, precision, recall,
 import Data.Graph.Inductive
 import Data.Graph.Inductive.Query.MaxFlow
 
-import Debug.Trace
-
 f2Measure :: (a -> b -> Bool) -> [a] -> [b] -> Double
 f2Measure = fMeasure 2.0
 

@@ -5,10 +5,6 @@ module GEval.BLEU
 import qualified Data.MultiSet as MS
 import Data.List (minimumBy, zip, zip3, zip4)
 
-import Debug.Trace
-
-
-
 bleuStep :: Ord a => [[a]] -> [a] -> (Int, Int, Int, Int,  Int,  Int, Int, Int, Int)
 bleuStep refs trans = (prec1, prec2, prec3, prec4,  closestLen, len1, len2, len3, len4)
   where prec1 = precisionCountForNgrams id

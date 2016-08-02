@@ -19,6 +19,7 @@ library
                        GEval.CreateChallenge
                      , GEval.OptionsParser
                      , GEval.BLEU
+                     , GEval.ClippEU
                      , GEval.PrecisionRecall
   build-depends:       base >= 4.7 && < 5
                      , cond
@@ -35,6 +36,7 @@ library
                      , text
                      , unix
                      , fgl
+                     , attoparsec
   default-language:    Haskell2010
 
 executable geval
@@ -56,6 +58,8 @@ test-suite geval-test
                      , hspec
                      , HUnit
                      , optparse-applicative
+                     , text
+                     , attoparsec
   ghc-options:         -threaded -rtsopts -with-rtsopts=-N
   default-language:    Haskell2010
 

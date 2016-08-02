@@ -1,10 +1,15 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 import Test.Hspec
 
 import GEval.Core
 import GEval.OptionsParser
 import GEval.BLEU
+import GEval.ClippEU
 import GEval.PrecisionRecall
+import Data.Attoparsec.Text
 import Options.Applicative
+import Data.Text
 import qualified Test.HUnit as HU
 
 main :: IO ()
@@ -65,6 +70,24 @@ main = hspec $ do
       precision alwaysMatch ['a', 'b', 'c'] [0, 1, 2, 3, 4, 5] `shouldBeAlmost` 0.5
       recall alwaysMatch ['a', 'b', 'c'] [0, 1, 2, 3, 4, 5] `shouldBeAlmost` 1.0
       f1Measure alwaysMatch ['a', 'b', 'c'] [0, 1, 2, 3 , 4, 5] `shouldBeAlmost` 0.66666666666666
+  describe "ClippEU" $ do
+    it "parsing rectangles" $ do
+      let (Right r) = parseOnly (lineClippingsParser <* endOfInput) "2/0,0,2,3 10/20,30,40,50 18/0,1,500,3 "
+      r `shouldBe` [Clipping (PageNumber 2) (Rectangle (Point 0 0) (Point 2 3)),
+                    Clipping (PageNumber 10) (Rectangle (Point 20 30) (Point 40 50)),
+                    Clipping (PageNumber 18) (Rectangle (Point 0 1) (Point 500 3))]
+    it "no rectangles" $ do
+      let (Right r) = parseOnly (lineClippingsParser <* endOfInput) ""
+      r `shouldBe` []
+    it "just spaces" $ do
+      let (Right r) = parseOnly lineClippingsParser "     "
+      r `shouldBe` []
+    it "parsing specs" $ do
+      let (Right r) = parseOnly lineClippingSpecsParser  " 2/0,0,2,3/5  10/20,30,40,50/10"
+      r `shouldBe` [ClippingSpec (PageNumber 2) (Rectangle (Point 0 0) (Point 2 3))
+                                                (Rectangle (Point 0 0) (Point 7 8)),
+                    ClippingSpec (PageNumber 10) (Rectangle (Point 20 30) (Point 40 50))
+                                                 (Rectangle (Point 10 20) (Point 50 60))]
 
 
 neverMatch :: Char -> Int -> Bool
