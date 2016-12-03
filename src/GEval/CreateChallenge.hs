@@ -85,6 +85,10 @@ https://archive.ics.uci.edu/ml/machine-learning-databases/00266/seismic-bumps.ar
 
 This is a sample/toy classification challenge for Gonito framework with F-measure as the metric.
 Replace it with the description of your challenge.
+
+For F-measure the expected value is either 1 or 0 (1 means something you are expected to detect occurred).
+The output value could a probability where value greater than or equal to 0.5 is interpreted
+as 1.
 |] ++ (commonReadmeMDContents testName)
 
 readmeMDContents _ testName = [i|
