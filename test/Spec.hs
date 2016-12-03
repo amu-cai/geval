@@ -30,6 +30,17 @@ main = hspec $ do
   describe "Accuracy" $ do
     it "simple example" $
       runGEvalTest "accuracy-simple" `shouldReturnAlmost` 0.6
+  describe "F-measure" $ do
+    it "simple example" $
+      runGEvalTest "f-measure-simple" `shouldReturnAlmost` 0.57142857
+    it "perfect classifier" $
+      runGEvalTest "f-measure-perfect" `shouldReturnAlmost` 1.0
+    it "stupid classifier" $
+      runGEvalTest "f-measure-stupid" `shouldReturnAlmost` 0.0
+    it "all false" $
+      runGEvalTest "f-measure-all-false" `shouldReturnAlmost` 1.0
+    it "F2-measure" $
+      runGEvalTest "f2-simple" `shouldReturnAlmost` 0.714285714
   describe "precision count" $ do
     it "simple test" $ do
       precisionCount [["Alice", "has", "a", "cat" ]] ["Ala", "has", "cat"] `shouldBe` 2
@@ -90,6 +101,16 @@ main = hspec $ do
                                                  (Rectangle (Point 10 20) (Point 50 60))]
     it "full test" $ do
       runGEvalTest "clippeu-simple" `shouldReturnAlmost` 0.399999999999
+  describe "evaluation metric specification is parsed" $ do
+    it "for simple names" $ do
+      let metrics = [RMSE, MSE, BLEU, Accuracy, ClippEU]
+      let parsedMetrics = Prelude.map (read . show) metrics
+      metrics `shouldBe` parsedMetrics
+    it "for F-Measure" $ do
+      read "F2" `shouldBe` (FMeasure 2.0)
+      read "F1" `shouldBe` (FMeasure 1.0)
+      read "F0.5" `shouldBe` (FMeasure 0.5)
+
 
 neverMatch :: Char -> Int -> Bool
 neverMatch _ _ = False

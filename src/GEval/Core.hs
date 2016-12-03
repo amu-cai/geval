@@ -44,8 +44,27 @@ import GEval.PrecisionRecall
 
 type MetricValue = Double
 
-data Metric = RMSE | MSE | BLEU | Accuracy | ClippEU
-              deriving (Show, Read, Eq)
+data Metric = RMSE | MSE | BLEU | Accuracy | ClippEU | FMeasure Double
+              deriving (Eq)
+
+instance Show Metric where
+  show RMSE = "RMSE"
+  show MSE  = "MSE"
+  show BLEU = "BLEU"
+  show Accuracy = "Accuracy"
+  show ClippEU = "ClippEU"
+  show (FMeasure beta) = "F" ++ (show beta)
+
+instance Read Metric where
+  readsPrec _ ('R':'M':'S':'E':theRest) = [(RMSE, theRest)]
+  readsPrec _ ('M':'S':'E':theRest) = [(MSE, theRest)]
+  readsPrec _ ('B':'L':'E':'U':theRest) = [(BLEU, theRest)]
+  readsPrec _ ('A':'c':'c':'u':'r':'a':'c':'y':theRest) = [(Accuracy, theRest)]
+  readsPrec _ ('C':'l':'i':'p':'p':'E':'U':theRest) = [(ClippEU, theRest)]
+  readsPrec p ('F':theRest) = case readsPrec p theRest of
+    [(beta, theRest)] -> [(FMeasure beta, theRest)]
+    _ -> []
+
 
 data MetricOrdering = TheLowerTheBetter | TheHigherTheBetter
 
@@ -55,6 +74,7 @@ getMetricOrdering MSE      = TheLowerTheBetter
 getMetricOrdering BLEU     = TheHigherTheBetter
 getMetricOrdering Accuracy = TheHigherTheBetter
 getMetricOrdering ClippEU  = TheHigherTheBetter
+getMetricOrdering (FMeasure _) = TheHigherTheBetter
 
 defaultOutDirectory = "."
 defaultTestName = "test-A"
@@ -173,6 +193,24 @@ gevalCore' BLEU = gevalCore'' (Prelude.map Prelude.words . DLS.splitOn "\t" . un
 gevalCore' Accuracy = gevalCore'' strip strip hitOrMiss averageC id
                       where hitOrMiss (x,y) = if x == y then 1.0 else 0.0
 
+gevalCore' (FMeasure beta) = gevalCore'' outParser outParser getCount countAgg (fMeasureOnCounts beta)
+  where outParser = detected . getValue . TR.double
+        expParser = expected . getValue . TR.decimal
+        expected 1 = True
+        expected 0 = False
+        expected _ = throw $ UnexpectedData "expected 0 or 1"
+        -- output value could be a probability (for compatibility with other measures)
+        detected prob
+          | prob >= 0.0 && prob < detectionThreshold = False
+          | prob >= detectionThreshold && prob <= 1.0 = True
+          | otherwise = throw $ UnexpectedData "expected probability"
+        detectionThreshold = 0.5
+        getCount (True, True)   = (1, 1, 1)
+        getCount (True, False)  = (0, 1, 0)
+        getCount (False, True)  = (0, 0, 1)
+        getCount (False, False) = (0, 0, 0)
+        countAgg = CC.foldl countFolder (0, 0, 0)
+
 gevalCore' ClippEU = gevalCore'' parseClippingSpecs parseClippings matchStep clippeuAgg finalStep
   where
     parseClippings = controlledParse lineClippingsParser
@@ -180,8 +218,7 @@ gevalCore' ClippEU = gevalCore'' parseClippingSpecs parseClippings matchStep cli
     matchStep (clippingSpecs, clippings) = (maxMatch matchClippingToSpec clippingSpecs clippings,
                                             Prelude.length clippingSpecs,
                                             Prelude.length clippings)
-    clippeuAgg = CC.foldl clippeuFuse (0, 0, 0)
-    clippeuFuse (a1, a2, a3) (b1, b2, b3) = (a1+b1, a2+b2, a3+b3)
+    clippeuAgg = CC.foldl countFolder (0, 0, 0)
     finalStep counts = f2MeasureOnCounts counts
 
 data SourceItem a = Got a | Done
@@ -220,7 +257,7 @@ items filePath parser =
 itemError :: (Double, Double) -> Double
 itemError (exp, out) = (exp-out)**2
 
-getValue :: Either String (Double, Text) -> Double
+getValue :: Num a => Either String (a, Text) -> a
 getValue (Right (x, reminder)) =
   if Data.Text.null reminder || Data.Text.head reminder == '\t'
   then x

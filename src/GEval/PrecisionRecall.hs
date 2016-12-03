@@ -1,7 +1,7 @@
 {-# LANGUAGE PartialTypeSignatures #-}
 
 module GEval.PrecisionRecall(fMeasure, f1Measure, f2Measure, precision, recall,
-                             fMeasureOnCounts, f1MeasureOnCounts, f2MeasureOnCounts,
+                             fMeasureOnCounts, f1MeasureOnCounts, f2MeasureOnCounts, countFolder,
                              precisionAndRecall, precisionAndRecallFromCounts, maxMatch)
        where
 
@@ -33,6 +33,9 @@ fMeasureOnCounts beta (tp, nbExpected, nbGot) =
   (1 + betaSquared) * p * r `safeDoubleDiv` (betaSquared * p + r)
   where betaSquared = beta ^ 2
         (p, r) = precisionAndRecallFromCounts (tp, nbExpected, nbGot)
+
+countFolder :: (Int, Int, Int) -> (Int, Int, Int) -> (Int, Int, Int)
+countFolder (a1, a2, a3) (b1, b2, b3) = (a1+b1, a2+b2, a3+b3)
 
 precisionAndRecall :: (a -> b -> Bool) -> [a] -> [b] -> (Double, Double)
 precisionAndRecall matchFun expected got
