@@ -250,7 +250,7 @@ averageC = getZipSink
 items :: MonadResource m => String -> (Text -> a) -> Source m (SourceItem a)
 items filePath parser =
   (CB.sourceFile filePath
-   $= (CT.decode CT.utf8
+   $= (CT.decodeUtf8Lenient
        =$= CT.lines
        =$= CL.map ((\x -> Got x) . parser))) >> yield Done
 
