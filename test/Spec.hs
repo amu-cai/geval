@@ -7,7 +7,7 @@ import GEval.OptionsParser
 import GEval.BLEU
 import GEval.ClippEU
 import GEval.PrecisionRecall
-import GEval.Purity
+import GEval.ClusteringMetrics
 import Data.Attoparsec.Text
 import Options.Applicative
 import Data.Text
@@ -53,10 +53,10 @@ main = hspec $ do
       precisionCount [["foo", "baz"], ["bar"], ["baz", "xyz"]]  ["foo", "bar", "foo"] `shouldBe` 2
   describe "purity (in flat clustering)" $ do
     it "the example from Information Retrieval Book" $ do
-      purity [(2, "o") :: (Int, String), (2, "o"), (2, "d"), (3, "x"), (3, "d"),
-              (1, "x"), (1, "o"), (1, "x"), (1, "x"), (1, "x"), (1, "x"),
-              (2, "x"), (2, "o"), (2, "o"),
-              (3, "x"), (3, "d"), (3, "d")] `shouldBeAlmost` 0.70588
+      purity [("o", 2) :: (String, Int), ("o", 2), ("d", 2), ("x", 3), ("d", 3),
+              ("x", 1), ("o", 1), ("x", 1), ( "x", 1), ("x", 1), ("x", 1),
+              ("x", 2), ("o", 2), ("o", 2),
+              ("x", 3), ("d", 3), ("d", 3)] `shouldBeAlmost` 0.70588
 
   describe "reading options" $ do
     it "can get the metric" $ do

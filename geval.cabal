@@ -21,7 +21,7 @@ library
                      , GEval.BLEU
                      , GEval.ClippEU
                      , GEval.PrecisionRecall
-                     , GEval.Purity
+                     , GEval.ClusteringMetrics
                      , GEval.Common
   build-depends:       base >= 4.7 && < 5
                      , cond
