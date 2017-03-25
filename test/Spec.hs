@@ -13,6 +13,24 @@ import Options.Applicative
 import Data.Text
 import qualified Test.HUnit as HU
 
+informationRetrievalBookExample :: [(String, Int)]
+informationRetrievalBookExample = [("o", 2), ("o", 2), ("d", 2), ("x", 3), ("d", 3),
+                                   ("x", 1), ("o", 1), ("x", 1), ( "x", 1), ("x", 1), ("x", 1),
+                                   ("x", 2), ("o", 2), ("o", 2),
+                                   ("x", 3), ("d", 3), ("d", 3)]
+
+perfectClustering :: [(Int, Char)]
+perfectClustering = [(0, 'a'), (2, 'b'), (3, 'c'), (2, 'b'), (2, 'b'), (1, 'd'), (0, 'a')]
+
+stupidClusteringOneBigCluster :: [(Int, Int)]
+stupidClusteringOneBigCluster = [(0, 2), (2, 2), (1, 2), (2, 2), (0, 2), (0, 2), (0, 2), (0, 2), (1, 2), (1, 2)]
+
+stupidClusteringManySmallClusters :: [(Int, Int)]
+stupidClusteringManySmallClusters = [(0, 0), (2, 1), (1, 2), (2, 3), (0, 4), (0, 5), (0, 6), (0, 7), (1, 8), (1, 9)]
+
+
+
+
 main :: IO ()
 main = hspec $ do
   describe "root mean square error" $ do
@@ -53,11 +71,16 @@ main = hspec $ do
       precisionCount [["foo", "baz"], ["bar"], ["baz", "xyz"]]  ["foo", "bar", "foo"] `shouldBe` 2
   describe "purity (in flat clustering)" $ do
     it "the example from Information Retrieval Book" $ do
-      purity [("o", 2) :: (String, Int), ("o", 2), ("d", 2), ("x", 3), ("d", 3),
-              ("x", 1), ("o", 1), ("x", 1), ( "x", 1), ("x", 1), ("x", 1),
-              ("x", 2), ("o", 2), ("o", 2),
-              ("x", 3), ("d", 3), ("d", 3)] `shouldBeAlmost` 0.70588
-
+      purity informationRetrievalBookExample `shouldBeAlmost` 0.70588
+  describe "NMI (in flat clustering)" $ do
+    it "the example from Information Retrieval Book" $ do
+      normalizedMutualInformation informationRetrievalBookExample `shouldBeAlmost` 0.36456
+    it "perfect clustering" $ do
+      normalizedMutualInformation perfectClustering `shouldBeAlmost` 1.0
+    it "stupid clustering with one big cluster" $ do
+      normalizedMutualInformation stupidClusteringOneBigCluster `shouldBeAlmost` 0.0
+    it "stupid clustering with many small clusters" $ do
+      normalizedMutualInformation stupidClusteringManySmallClusters `shouldBeAlmost` 0.61799
   describe "reading options" $ do
     it "can get the metric" $ do
       extractMetric "bleu-complex" `shouldReturn` (Just BLEU)
