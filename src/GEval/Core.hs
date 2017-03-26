@@ -41,10 +41,13 @@ import GEval.BLEU
 import GEval.Common
 import GEval.ClippEU
 import GEval.PrecisionRecall
+import GEval.ClusteringMetrics
+
+import qualified Data.HashMap.Strict as M
 
 type MetricValue = Double
 
-data Metric = RMSE | MSE | BLEU | Accuracy | ClippEU | FMeasure Double
+data Metric = RMSE | MSE | BLEU | Accuracy | ClippEU | FMeasure Double | NMI
               deriving (Eq)
 
 instance Show Metric where
@@ -54,6 +57,7 @@ instance Show Metric where
   show Accuracy = "Accuracy"
   show ClippEU = "ClippEU"
   show (FMeasure beta) = "F" ++ (show beta)
+  show NMI = "NMI"
 
 instance Read Metric where
   readsPrec _ ('R':'M':'S':'E':theRest) = [(RMSE, theRest)]
@@ -61,6 +65,7 @@ instance Read Metric where
   readsPrec _ ('B':'L':'E':'U':theRest) = [(BLEU, theRest)]
   readsPrec _ ('A':'c':'c':'u':'r':'a':'c':'y':theRest) = [(Accuracy, theRest)]
   readsPrec _ ('C':'l':'i':'p':'p':'E':'U':theRest) = [(ClippEU, theRest)]
+  readsPrec _ ('N':'M':'I':theRest) = [(NMI, theRest)]
   readsPrec p ('F':theRest) = case readsPrec p theRest of
     [(beta, theRest)] -> [(FMeasure beta, theRest)]
     _ -> []
@@ -75,6 +80,7 @@ getMetricOrdering BLEU     = TheHigherTheBetter
 getMetricOrdering Accuracy = TheHigherTheBetter
 getMetricOrdering ClippEU  = TheHigherTheBetter
 getMetricOrdering (FMeasure _) = TheHigherTheBetter
+getMetricOrdering NMI = TheHigherTheBetter
 
 defaultOutDirectory = "."
 defaultTestName = "test-A"
@@ -220,6 +226,8 @@ gevalCore' ClippEU = gevalCore'' parseClippingSpecs parseClippings matchStep cli
                                             Prelude.length clippings)
     clippeuAgg = CC.foldl countFolder (0, 0, 0)
     finalStep counts = f2MeasureOnCounts counts
+
+gevalCore' NMI = gevalCore'' id id id (CC.foldl updateConfusionMatrix M.empty) normalizedMutualInformationFromConfusionMatrix
 
 data SourceItem a = Got a | Done
 

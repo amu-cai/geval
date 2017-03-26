@@ -81,6 +81,9 @@ main = hspec $ do
       normalizedMutualInformation stupidClusteringOneBigCluster `shouldBeAlmost` 0.0
     it "stupid clustering with many small clusters" $ do
       normalizedMutualInformation stupidClusteringManySmallClusters `shouldBeAlmost` 0.61799
+  describe "NMI challenge" $ do
+    it "complex test" $ do
+      runGEvalTest "nmi-complex" `shouldReturnAlmost` 0.36456
   describe "reading options" $ do
     it "can get the metric" $ do
       extractMetric "bleu-complex" `shouldReturn` (Just BLEU)
