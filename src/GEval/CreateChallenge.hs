@@ -91,6 +91,15 @@ The output value could a probability where value greater than or equal to 0.5 is
 as 1.
 |] ++ (commonReadmeMDContents testName)
 
+readmeMDContents NMI testName = [i|
+Cluster proverbs
+================
+
+Cluster proverbs for languages.
+
+This is a sample challenge for flat clustering (unsupervised learning challenge).
+|] ++ (commonReadmeMDContents testName)
+
 readmeMDContents _ testName = [i|
 GEval sample challenge
 ======================
@@ -154,6 +163,11 @@ trainContents (FMeasure _) = [hereLit|0	b	b	W	289580	1986	-38	2	a	2	0	1	1	0	0	0	
 1	a	a	W	268170	1352	-41	-35	a	1	1	0	0	0	0	0	0	400	400
 |]
 
+trainContents NMI = [hereLit|pl	Kto pod kim dołki kopie, ten sam w nie wpada.
+en	The pen is mightier than the sword.
+pl	Baba z wozu, koniom lżej.
+|]
+
 trainContents _ = [hereLit|0.06	0.39	0	0.206
 1.00	1.00	1	0.017
 317.8	5.20	67	0.048
@@ -166,6 +180,10 @@ ja jumala näki , että valkeus oli hyvä ; ja jumala erotti valkeuden pimeydest
 |]
 devInContents Accuracy = [hereLit|-8	none	no
 1	mild	no
+|]
+devInContents NMI = [hereLit|When in Rome, do as the Romans.
+Każda pliszka swój ogonek chwali.
+When the going gets tough, the tough get going.
 |]
 devInContents (FMeasure _) = [hereLit|b	b	W	29520	779	-28	-32	a	0	0	0	0	0	0	0	0	0	0
 b	b	W	55200	1259	35	9	a	1	0	1	0	0	0	0	0	4000	4000
@@ -185,6 +203,10 @@ Y
 devExpectedContents (FMeasure _) = [hereLit|0
 1
 |]
+devExpectedContents NMI = [hereLit|en
+pl
+en
+|]
 devExpectedContents _ = [hereLit|0.82
 95.2
 |]
@@ -199,6 +221,12 @@ testInContents Accuracy = [hereLit|2	mild	yes
 testInContents (FMeasure _) = [hereLit|b	b	W	15210	527	-64	-56	a	0	0	0	0	0	0	0	0	0	0
 b	b	N	38060	486	357	189	b	0	0	0	0	0	0	0	0	0	0
 |]
+testInContents NMI = [hereLit|Fortune favors the bold.
+People who live in glass houses should not throw stones.
+W marcu, jak w garncu.
+A cada necio agrada su porrada.
+Kwiecień plecień, bo przeplata trochę zimy, trochę lata.
+|]
 testInContents _ = [hereLit|1.52	2	0.093
 30.06	14	0.009
 |]
@@ -212,6 +240,12 @@ Y
 |]
 testExpectedContents (FMeasure _) = [hereLit|0
 0
+|]
+testExpectedContents NMI = [hereLit|en
+en
+pl
+es
+pl
 |]
 testExpectedContents _ = [hereLit|0.11
 17.2
