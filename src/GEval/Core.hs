@@ -53,9 +53,6 @@ type MetricValue = Double
 defaultLogLossHashedSize :: Word32
 defaultLogLossHashedSize = 12
 
-defaultLogLossSeed :: Word32
-defaultLogLossSeed = 0
-
 data Metric = RMSE | MSE | BLEU | Accuracy | ClippEU | FMeasure Double | NMI | LogLossHashed Word32
               deriving (Eq)
 
@@ -248,8 +245,10 @@ gevalCore' ClippEU = gevalCore'' parseClippingSpecs parseClippings matchStep cli
 
 gevalCore' NMI = gevalCore'' id id id (CC.foldl updateConfusionMatrix M.empty) normalizedMutualInformationFromConfusionMatrix
 
+
 gevalCore' (LogLossHashed nbOfBits) =
-  gevalCore'' id (parseDistributionWrapper nbOfBits defaultLogLossSeed) (\(t,d) -> calculateLogLoss nbOfBits defaultLogLossSeed t d) averageC negate
+  -- for LogLossHashed we "salt" each hash with the line number
+  gevalCore''' id id (\(lineNo, (t,d)) -> calculateLogLoss nbOfBits lineNo t (parseDistributionWrapper nbOfBits lineNo d)) averageC negate
 
 parseDistributionWrapper :: Word32 -> Word32 -> Text -> HashedDistribution
 parseDistributionWrapper nbOfBits seed distroSpec = case parseDistribution nbOfBits seed distroSpec of
@@ -258,22 +257,32 @@ parseDistributionWrapper nbOfBits seed distroSpec = case parseDistribution nbOfB
 
 data SourceItem a = Got a | Done
 
+skipLineNumber :: ((a, b) -> c) -> ((Word32, (a, b)) -> c)
+skipLineNumber fun = fun . snd
+
 gevalCore'' :: (Text -> a) -> (Text -> b) -> ((a, b) -> c) -> (Sink c (ResourceT IO) d) -> (d -> Double) -> String -> String -> IO (MetricValue)
-gevalCore'' expParser outParser itemStep aggregator finalStep expectedFilePath outFilePath = do
+gevalCore'' expParser outParser itemStep aggregator finalStep expectedFilePath outFilePath =
+  gevalCore''' expParser outParser (skipLineNumber itemStep) aggregator finalStep expectedFilePath outFilePath
+
+gevalCore''' :: (Text -> a) -> (Text -> b) -> ((Word32, (a, b)) -> c) -> (Sink c (ResourceT IO) d) -> (d -> Double) -> String -> String -> IO (MetricValue)
+gevalCore''' expParser outParser itemStep aggregator finalStep expectedFilePath outFilePath = do
   v <- runResourceT $
     (getZipSource $ (,)
-       <$> ZipSource (items expectedFilePath expParser)
-       <*> ZipSource (items outFilePath outParser))
+      <$> ZipSource (CL.sourceList [1..])
+      <*> (ZipSource $ getZipSource $ (,)
+                        <$> ZipSource (items expectedFilePath expParser)
+                        <*> ZipSource (items outFilePath outParser)))
      $$ (CL.map (checkStep itemStep)
          =$= CL.catMaybes
          =$ aggregator)
   return $ finalStep v
 
-checkStep :: ((a, b) -> c) -> (SourceItem a, SourceItem b) -> Maybe c
-checkStep step (Got expectedItem, Got outItem) = Just $ step (expectedItem, outItem)
-checkStep _ (Got _, Done) = throw TooFewLines
-checkStep _ (Done, Got _) = throw TooManyLines
-checkStep _ (Done, Done) = Nothing
+checkStep :: ((Word32, (a, b)) -> c) -> (Word32, (SourceItem a, SourceItem b)) -> Maybe c
+checkStep step (lineNo, (Got expectedItem, Got outItem)) = Just $ step (lineNo, (expectedItem, outItem))
+checkStep _ (_, (Got _, Done)) = throw TooFewLines
+checkStep _ (_, (Done, Got _)) = throw TooManyLines
+checkStep _ (_, (Done, Done)) = Nothing
+
 
 
 averageC :: MonadResource m => Sink Double m Double
