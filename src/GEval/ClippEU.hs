@@ -7,6 +7,8 @@ import Data.Text
 import Control.Applicative
 import Control.Exception
 
+import GEval.Common
+
 newtype PageNumber = PageNumber Int
         deriving (Eq, Show)
 
@@ -44,9 +46,6 @@ clippingParser = do
 lineClippingSpecsParser :: Parser [ClippingSpec]
 lineClippingSpecsParser = sepByWhitespaces clippingSpecParser
 
-sepByWhitespaces :: Parser a -> Parser [a]
-sepByWhitespaces parser = possibleWhitespace *> parser `sepBy` whitespace <* possibleWhitespace <* endOfInput
-
 clippingSpecParser :: Parser ClippingSpec
 clippingSpecParser = do
   pageNo <- PageNumber <$> decimal
@@ -55,10 +54,6 @@ clippingSpecParser = do
   char '/'
   margin <- decimal
   return $ ClippingSpec pageNo (smallerRectangle margin rectangle) (extendedRectangle margin rectangle)
-
-possibleWhitespace = many' (satisfy isHorizontalSpace)
-
-whitespace = many1 (satisfy isHorizontalSpace)
 
 extendedRectangle :: Int -> Rectangle -> Rectangle
 extendedRectangle margin (Rectangle (Point x0 y0) (Point x1 y1)) =

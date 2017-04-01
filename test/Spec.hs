@@ -84,6 +84,9 @@ main = hspec $ do
   describe "NMI challenge" $ do
     it "complex test" $ do
       runGEvalTest "nmi-complex" `shouldReturnAlmost` 0.36456
+  describe "LogLossHashed challenge" $ do
+    it "simple example" $ do
+      runGEvalTest "log-loss-hashed-simple" `shouldReturnAlmost` 2.398479083333333
   describe "reading options" $ do
     it "can get the metric" $ do
       extractMetric "bleu-complex" `shouldReturn` (Just BLEU)

@@ -42,12 +42,21 @@ import GEval.Common
 import GEval.ClippEU
 import GEval.PrecisionRecall
 import GEval.ClusteringMetrics
+import GEval.LogLossHashed
 
 import qualified Data.HashMap.Strict as M
 
+import Data.Word
+
 type MetricValue = Double
 
-data Metric = RMSE | MSE | BLEU | Accuracy | ClippEU | FMeasure Double | NMI
+defaultLogLossHashedSize :: Word32
+defaultLogLossHashedSize = 12
+
+defaultLogLossSeed :: Word32
+defaultLogLossSeed = 0
+
+data Metric = RMSE | MSE | BLEU | Accuracy | ClippEU | FMeasure Double | NMI | LogLossHashed Word32
               deriving (Eq)
 
 instance Show Metric where
@@ -58,6 +67,12 @@ instance Show Metric where
   show ClippEU = "ClippEU"
   show (FMeasure beta) = "F" ++ (show beta)
   show NMI = "NMI"
+  show (LogLossHashed nbOfBits) = "LogLossHashed" ++ (if
+                                                       nbOfBits == defaultLogLossHashedSize
+                                                      then
+                                                       ""
+                                                      else
+                                                       (show nbOfBits))
 
 instance Read Metric where
   readsPrec _ ('R':'M':'S':'E':theRest) = [(RMSE, theRest)]
@@ -69,6 +84,9 @@ instance Read Metric where
   readsPrec p ('F':theRest) = case readsPrec p theRest of
     [(beta, theRest)] -> [(FMeasure beta, theRest)]
     _ -> []
+  readsPrec p ('L':'o':'g':'L':'o':'s':'s':'H':'a':'s':'h':'e':'d':theRest) = case readsPrec p theRest of
+    [(nbOfBits, theRest)] -> [(LogLossHashed nbOfBits, theRest)]
+    _ -> [(LogLossHashed defaultLogLossHashedSize, theRest)]
 
 
 data MetricOrdering = TheLowerTheBetter | TheHigherTheBetter
@@ -81,6 +99,7 @@ getMetricOrdering Accuracy = TheHigherTheBetter
 getMetricOrdering ClippEU  = TheHigherTheBetter
 getMetricOrdering (FMeasure _) = TheHigherTheBetter
 getMetricOrdering NMI = TheHigherTheBetter
+getMetricOrdering (LogLossHashed _) = TheLowerTheBetter
 
 defaultOutDirectory = "."
 defaultTestName = "test-A"
@@ -228,6 +247,14 @@ gevalCore' ClippEU = gevalCore'' parseClippingSpecs parseClippings matchStep cli
     finalStep counts = f2MeasureOnCounts counts
 
 gevalCore' NMI = gevalCore'' id id id (CC.foldl updateConfusionMatrix M.empty) normalizedMutualInformationFromConfusionMatrix
+
+gevalCore' (LogLossHashed nbOfBits) =
+  gevalCore'' id (parseDistributionWrapper nbOfBits defaultLogLossSeed) (\(t,d) -> calculateLogLoss nbOfBits defaultLogLossSeed t d) averageC negate
+
+parseDistributionWrapper :: Word32 -> Word32 -> Text -> HashedDistribution
+parseDistributionWrapper nbOfBits seed distroSpec = case parseDistribution nbOfBits seed distroSpec of
+  Right distro -> distro
+  Left m -> throw $ UnexpectedData m
 
 data SourceItem a = Got a | Done
 
