@@ -51,7 +51,7 @@ import Data.Word
 type MetricValue = Double
 
 defaultLogLossHashedSize :: Word32
-defaultLogLossHashedSize = 12
+defaultLogLossHashedSize = 10
 
 data Metric = RMSE | MSE | BLEU | Accuracy | ClippEU | FMeasure Double | NMI | LogLossHashed Word32
               deriving (Eq)
