@@ -100,6 +100,21 @@ Cluster proverbs for languages.
 This is a sample challenge for flat clustering (unsupervised learning challenge).
 |] ++ (commonReadmeMDContents testName)
 
+readmeMDContents (LogLossHashed _) testName = [i|
+GEval sample challenge — language model evaluation
+==================================================
+
+Give a probability distribution for words.
+
+This is a sample challenge for evaluating language models.
+The metric is average log-loss calculated for 10-bit hashes.
+
+Train file is a just text file (one utterance per line).
+In an input file, left and right contexts (TAB-separated) are given.
+In an expected file, the word to be guessed is given.
+|] ++ (commonReadmeMDContents testName)
+
+
 readmeMDContents _ testName = [i|
 GEval sample challenge
 ======================
@@ -168,6 +183,11 @@ en	The pen is mightier than the sword.
 pl	Baba z wozu, koniom lżej.
 |]
 
+trainContents (LogLossHashed _) = [hereLit|Ala ma psa i kota
+Basia ma psa
+Nie kupujemy kota w worku
+Czesia ma kota
+|]
 trainContents _ = [hereLit|0.06	0.39	0	0.206
 1.00	1.00	1	0.017
 317.8	5.20	67	0.048
@@ -189,6 +209,9 @@ devInContents (FMeasure _) = [hereLit|b	b	W	29520	779	-28	-32	a	0	0	0	0	0	0	0	0	
 b	b	W	55200	1259	35	9	a	1	0	1	0	0	0	0	0	4000	4000
 |]
 
+devInContents (LogLossHashed _) = [hereLit|Nie kupuj	w worku
+Ona	psa
+|]
 devInContents _ = [hereLit|0.72	0	0.007
 9.54	62	0.054
 |]
@@ -206,6 +229,9 @@ devExpectedContents (FMeasure _) = [hereLit|0
 devExpectedContents NMI = [hereLit|en
 pl
 en
+|]
+devExpectedContents (LogLossHashed _) = [hereLit|kota
+ma
 |]
 devExpectedContents _ = [hereLit|0.82
 95.2
@@ -227,6 +253,9 @@ W marcu, jak w garncu.
 A cada necio agrada su porrada.
 Kwiecień plecień, bo przeplata trochę zimy, trochę lata.
 |]
+testInContents (LogLossHashed _) = [hereLit|Ala	ma
+Ona ma kota	worku
+|]
 testInContents _ = [hereLit|1.52	2	0.093
 30.06	14	0.009
 |]
@@ -246,6 +275,9 @@ en
 pl
 es
 pl
+|]
+testExpectedContents (LogLossHashed _) = [hereLit|ma
+w
 |]
 testExpectedContents _ = [hereLit|0.11
 17.2
