@@ -30,11 +30,21 @@ murmurSeedValue = 0
 parseDistribution :: Word32 -> Word32 -> T.Text -> Either String HashedDistribution
 parseDistribution nbOfBits seed distroSpec =
   -- distribution spec is either...
-  if T.any (== ':') distroSpec
-   -- a space-separated list of words with their log probs
-   then parseDistributionFromWordList nbOfBits seed distroSpec
-   -- a direct list of 2^nbOfBits log probs
-   else parseDistributionFromLogProbList nbOfBits distroSpec
+  normalizeDistribution <$> if T.any (== ':') distroSpec
+                            -- a space-separated list of words with their log probs
+                            then parseDistributionFromWordList nbOfBits seed distroSpec
+                            -- a direct list of 2^nbOfBits log probs
+                            else parseDistributionFromLogProbList nbOfBits distroSpec
+
+normalizeDistribution :: HashedDistribution -> HashedDistribution
+normalizeDistribution distro =
+  -- we do softmax (if needed)
+  if probSum > 1.0 || probSum < (1.0 - epsilon)
+  then normalized
+  else distro
+  where probSum = V.foldl' (\s l -> (s + exp l)) 0.0 distro
+        normalized = V.map (\v -> log ((exp v) / probSum)) distro
+        epsilon = 0.00000001
 
 type DistroMonad s = ReaderT (VM.MVector s Double) (ST s)
 

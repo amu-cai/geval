@@ -87,6 +87,8 @@ main = hspec $ do
   describe "LogLossHashed challenge" $ do
     it "simple example" $ do
       runGEvalTest "log-loss-hashed-simple" `shouldReturnAlmost` 2.398479083333333
+    it "example with unnormalized values" $ do
+      runGEvalTest "log-loss-hashed-not-normalized" `shouldReturnAlmost` 1.0468455186722887
   describe "reading options" $ do
     it "can get the metric" $ do
       extractMetric "bleu-complex" `shouldReturn` (Just BLEU)
