@@ -66,6 +66,12 @@ specParser = GEvalSpecification
     <> showDefault
     <> metavar "EXPECTED"
     <> help "The name of the file with expected results" )
+  <*> strOption
+  ( long "input-file"
+    <> value defaultInputFile
+    <> showDefault
+    <> metavar "INPUT"
+    <> help "The name of the file with the input (applicable only for some metrics)" )
   <*> metricReader
 
 metricReader :: Parser Metric

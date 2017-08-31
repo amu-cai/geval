@@ -1,3 +1,5 @@
+{-# LANGUAGE TypeFamilies #-}
+
 module GEval.Core
     ( geval,
       gevalCore,
@@ -13,6 +15,7 @@ module GEval.Core
       defaultTestName,
       defaultOutFile,
       defaultExpectedFile,
+      defaultInputFile,
       defaultMetric,
       getExpectedDirectory,
       configFileName
@@ -43,6 +46,7 @@ import GEval.ClippEU
 import GEval.PrecisionRecall
 import GEval.ClusteringMetrics
 import GEval.LogLossHashed
+import GEval.CharMatch
 
 import qualified Data.HashMap.Strict as M
 
@@ -53,7 +57,7 @@ type MetricValue = Double
 defaultLogLossHashedSize :: Word32
 defaultLogLossHashedSize = 10
 
-data Metric = RMSE | MSE | BLEU | Accuracy | ClippEU | FMeasure Double | NMI | LogLossHashed Word32
+data Metric = RMSE | MSE | BLEU | Accuracy | ClippEU | FMeasure Double | NMI | LogLossHashed Word32 | CharMatch
               deriving (Eq)
 
 instance Show Metric where
@@ -70,6 +74,7 @@ instance Show Metric where
                                                        ""
                                                       else
                                                        (show nbOfBits))
+  show CharMatch = "CharMatch"
 
 instance Read Metric where
   readsPrec _ ('R':'M':'S':'E':theRest) = [(RMSE, theRest)]
@@ -84,7 +89,7 @@ instance Read Metric where
   readsPrec p ('L':'o':'g':'L':'o':'s':'s':'H':'a':'s':'h':'e':'d':theRest) = case readsPrec p theRest of
     [(nbOfBits, theRest)] -> [(LogLossHashed nbOfBits, theRest)]
     _ -> [(LogLossHashed defaultLogLossHashedSize, theRest)]
-
+  readsPrec p ('C':'h':'a':'r':'M':'a':'t':'c':'h':theRest) = [(CharMatch, theRest)]
 
 data MetricOrdering = TheLowerTheBetter | TheHigherTheBetter
 
@@ -97,11 +102,13 @@ getMetricOrdering ClippEU  = TheHigherTheBetter
 getMetricOrdering (FMeasure _) = TheHigherTheBetter
 getMetricOrdering NMI = TheHigherTheBetter
 getMetricOrdering (LogLossHashed _) = TheLowerTheBetter
+getMetricOrdering CharMatch = TheHigherTheBetter
 
 defaultOutDirectory = "."
 defaultTestName = "test-A"
 defaultOutFile = "out.tsv"
 defaultExpectedFile = "expected.tsv"
+defaultInputFile = "in.tsv"
 
 defaultMetric :: Metric
 defaultMetric = RMSE
@@ -115,6 +122,7 @@ data GEvalSpecification = GEvalSpecification
                             gesTestName :: String,
                             gesOutFile :: String,
                             gesExpectedFile :: String,
+                            gesInputFile :: String,
                             gesMetric :: Metric }
 
 getExpectedDirectory :: GEvalSpecification -> FilePath
@@ -133,9 +141,12 @@ data GEvalException = NoExpectedFile FilePath
                       | NoOutDirectory FilePath
                       | NoExpectedTestDirectory FilePath
                       | NoOutTestDirectory FilePath
+                      | NoInputFile FilePath
                       | FileAlreadyThere FilePath
                       | TooFewLines
                       | TooManyLines
+                      | TooFewLinesInInput
+                      | TooManyLinesInInput
                       | EmptyOutput
                       | UnexpectedData String
                       deriving (Eq)
@@ -149,9 +160,12 @@ instance Show GEvalException where
   show (NoOutDirectory filePath) = somethingWrongWithFilesMessage "No directory with the test results" filePath
   show (NoExpectedTestDirectory filePath) = somethingWrongWithFilesMessage "No test subdirectory with the expected results" filePath
   show (NoOutTestDirectory filePath) = somethingWrongWithFilesMessage "No test subdirectory with the results obtained" filePath
+  show (NoInputFile filePath) = somethingWrongWithFilesMessage "No file with the input" filePath
   show (FileAlreadyThere filePath) = somethingWrongWithFilesMessage "File already there" filePath
   show TooFewLines = "Too few lines in the output file"
   show TooManyLines = "Too many lines in the output file"
+  show TooFewLinesInInput = "Too few lines in the input file"
+  show TooManyLinesInInput = "Too many lines in the input file"
   show EmptyOutput = "The output file is empty"
   show (UnexpectedData message) = "Unexpected data [" ++ message ++ "]"
 
@@ -165,6 +179,7 @@ defaultGEvalSpecification = GEvalSpecification {
   gesTestName = defaultTestName,
   gesOutFile = defaultOutFile,
   gesExpectedFile = defaultExpectedFile,
+  gesInputFile = defaultInputFile,
   gesMetric = defaultMetric }
 
 isEmptyFile :: FilePath -> IO (Bool)
@@ -178,9 +193,10 @@ geval gevalSpec = do
   unlessM (D.doesDirectoryExist expectedDirectory) $ throwM $ NoExpectedDirectory expectedDirectory
   unlessM (D.doesDirectoryExist outTestDirectory) $ throwM $ NoOutTestDirectory outTestDirectory
   unlessM (D.doesDirectoryExist expectedTestDirectory) $ throwM $ NoExpectedTestDirectory expectedTestDirectory
-  gevalCore metric expectedFilePath outFilePath
+  gevalCore metric inputFilePath expectedFilePath outFilePath
    where expectedFilePath = expectedTestDirectory </> (gesExpectedFile gevalSpec)
          outFilePath = outTestDirectory </> (gesOutFile gevalSpec)
+         inputFilePath = expectedTestDirectory </> (gesInputFile gevalSpec)
          expectedTestDirectory = expectedDirectory </> testName
          outTestDirectory = outDirectory </> testName
          expectedDirectory = getExpectedDirectory gevalSpec
@@ -188,22 +204,22 @@ geval gevalSpec = do
          testName = gesTestName gevalSpec
          metric = gesMetric gevalSpec
 
-gevalCore :: Metric -> String -> String -> IO (MetricValue)
-gevalCore RMSE expectedFilePath outFilePath = do
-  mse <- gevalCore MSE expectedFilePath outFilePath
+gevalCore :: Metric -> String -> String -> String -> IO (MetricValue)
+gevalCore RMSE inputFilePath expectedFilePath outFilePath = do
+  mse <- gevalCore MSE inputFilePath expectedFilePath outFilePath
   return $ mse ** 0.5
 
-gevalCore metric expectedFilePath outFilePath = do
+gevalCore metric inputFilePath expectedFilePath outFilePath = do
   unlessM (D.doesFileExist expectedFilePath) $ throwM $ NoExpectedFile expectedFilePath
   unlessM (D.doesFileExist outFilePath) $ throwM $ NoOutFile outFilePath
   whenM (isEmptyFile outFilePath) $ throwM $ EmptyOutput
-  gevalCore' metric expectedFilePath outFilePath
+  gevalCore' metric inputFilePath expectedFilePath outFilePath
 
-gevalCore' :: Metric -> String -> String -> IO (MetricValue)
-gevalCore' MSE = gevalCore'' outParser outParser itemError averageC id
+gevalCore' :: Metric -> String -> String -> String -> IO (MetricValue)
+gevalCore' MSE _ = gevalCoreWithoutInput outParser outParser itemError averageC id
   where outParser = getValue . TR.double
 
-gevalCore' BLEU = gevalCore'' (Prelude.map Prelude.words . DLS.splitOn "\t" . unpack) (Prelude.words . unpack) bleuCombine bleuAgg bleuFinal
+gevalCore' BLEU _ = gevalCoreWithoutInput (Prelude.map Prelude.words . DLS.splitOn "\t" . unpack) (Prelude.words . unpack) bleuCombine bleuAgg bleuFinal
   where bleuFinal (p1, p2, p3, p4, rl, l1, l2, l3, l4) = ((p1 /. l1) * (p2 /. l2) * (p3 /. l3) * (p4 /. l4)) ** 0.25 * (brevityPenalty l1 rl)
         bleuCombine (refs, sen) = bleuStep refs sen
         bleuAgg = CC.foldl bleuFuse (0, 0, 0, 0, 0,  0, 0, 0, 0)
@@ -212,10 +228,10 @@ gevalCore' BLEU = gevalCore'' (Prelude.map Prelude.words . DLS.splitOn "\t" . un
           | c >= r = 1.0
           | otherwise = exp (1.0 - (r /. c))
 
-gevalCore' Accuracy = gevalCore'' strip strip hitOrMiss averageC id
+gevalCore' Accuracy _ = gevalCoreWithoutInput strip strip hitOrMiss averageC id
                       where hitOrMiss (x,y) = if x == y then 1.0 else 0.0
 
-gevalCore' (FMeasure beta) = gevalCore'' outParser outParser getCount countAgg (fMeasureOnCounts beta)
+gevalCore' (FMeasure beta) _ = gevalCoreWithoutInput outParser outParser getCount countAgg (fMeasureOnCounts beta)
   where outParser = detected . getValue . TR.double
         expParser = expected . getValue . TR.decimal
         expected 1 = True
@@ -233,7 +249,7 @@ gevalCore' (FMeasure beta) = gevalCore'' outParser outParser getCount countAgg (
         getCount (False, False) = (0, 0, 0)
         countAgg = CC.foldl countFolder (0, 0, 0)
 
-gevalCore' ClippEU = gevalCore'' parseClippingSpecs parseClippings matchStep clippeuAgg finalStep
+gevalCore' ClippEU _ = gevalCoreWithoutInput parseClippingSpecs parseClippings matchStep clippeuAgg finalStep
   where
     parseClippings = controlledParse lineClippingsParser
     parseClippingSpecs = controlledParse lineClippingSpecsParser
@@ -243,12 +259,20 @@ gevalCore' ClippEU = gevalCore'' parseClippingSpecs parseClippings matchStep cli
     clippeuAgg = CC.foldl countFolder (0, 0, 0)
     finalStep counts = f2MeasureOnCounts counts
 
-gevalCore' NMI = gevalCore'' id id id (CC.foldl updateConfusionMatrix M.empty) normalizedMutualInformationFromConfusionMatrix
+gevalCore' NMI _ = gevalCoreWithoutInput id id id (CC.foldl updateConfusionMatrix M.empty) normalizedMutualInformationFromConfusionMatrix
 
-
-gevalCore' (LogLossHashed nbOfBits) =
+gevalCore' (LogLossHashed nbOfBits) _ = helper nbOfBits
   -- for LogLossHashed we "salt" each hash with the line number
-  gevalCore''' id id (\(lineNo, (t,d)) -> calculateLogLoss nbOfBits lineNo t (parseDistributionWrapper nbOfBits lineNo d)) averageC negate
+  where helper nbOfBits expectedFilePath outFilePath =
+          gevalCore''' (ParserSpecWithoutInput id id) (\(lineNo, (t,d)) -> calculateLogLoss nbOfBits lineNo t (parseDistributionWrapper nbOfBits lineNo d)) averageC negate (WithoutInput expectedFilePath outFilePath)
+
+gevalCore' CharMatch inputFilePath = helper inputFilePath
+ where
+   helper inputFilePath expectedFilePath outFilePath = do
+     unlessM (D.doesFileExist inputFilePath) $ throwM $ NoInputFile inputFilePath
+     gevalCoreGeneralized (ParserSpecWithInput unpack unpack unpack) step countAgg (fMeasureOnCounts charMatchBeta) (WithInput inputFilePath expectedFilePath outFilePath)
+   step (ParsedRecordWithInput inp exp out) = getCharMatchCount inp exp out
+   countAgg = CC.foldl countFolder (0, 0, 0)
 
 parseDistributionWrapper :: Word32 -> Word32 -> Text -> HashedDistribution
 parseDistributionWrapper nbOfBits seed distroSpec = case parseDistribution nbOfBits seed distroSpec of
@@ -257,31 +281,84 @@ parseDistributionWrapper nbOfBits seed distroSpec = case parseDistribution nbOfB
 
 data SourceItem a = Got a | Done
 
-skipLineNumber :: ((a, b) -> c) -> ((Word32, (a, b)) -> c)
+skipLineNumber :: (x -> c) -> ((Word32, x) -> c)
 skipLineNumber fun = fun . snd
 
-gevalCore'' :: (Text -> a) -> (Text -> b) -> ((a, b) -> c) -> (Sink c (ResourceT IO) d) -> (d -> Double) -> String -> String -> IO (MetricValue)
-gevalCore'' expParser outParser itemStep aggregator finalStep expectedFilePath outFilePath =
-  gevalCore''' expParser outParser (skipLineNumber itemStep) aggregator finalStep expectedFilePath outFilePath
+gevalCoreWithoutInput :: (Text -> a) -> (Text -> b) -> ((a, b) -> c) -> (Sink c (ResourceT IO) d) -> (d -> Double) -> String -> String -> IO (MetricValue)
+gevalCoreWithoutInput expParser outParser itemStep aggregator finalStep expectedFilePath outFilePath =
+  gevalCoreGeneralized (ParserSpecWithoutInput expParser outParser) (trans itemStep) aggregator finalStep (WithoutInput expectedFilePath outFilePath)
+ where
+   trans :: ((a, b) -> c) -> ParsedRecord (WithoutInput a b) -> c
+   trans step (ParsedRecordWithoutInput x y) = step (x, y)
 
-gevalCore''' :: (Text -> a) -> (Text -> b) -> ((Word32, (a, b)) -> c) -> (Sink c (ResourceT IO) d) -> (d -> Double) -> String -> String -> IO (MetricValue)
-gevalCore''' expParser outParser itemStep aggregator finalStep expectedFilePath outFilePath = do
-  v <- runResourceT $
-    (getZipSource $ (,)
-      <$> ZipSource (CL.sourceList [1..])
-      <*> (ZipSource $ getZipSource $ (,)
-                        <$> ZipSource (items expectedFilePath expParser)
-                        <*> ZipSource (items outFilePath outParser)))
+gevalCore''' :: ParserSpec (WithoutInput a b) -> ((Word32, (a, b)) -> c) -> (Sink c (ResourceT IO) d) -> (d -> Double) -> WithoutInput a b -> IO (MetricValue)
+gevalCore''' parserSpec itemStep aggregator finalStep context =
+  gevalCoreGeneralized' parserSpec (trans itemStep) aggregator finalStep context
+ where
+   trans :: ((Word32, (a, b)) -> c) -> (Word32, ParsedRecord (WithoutInput a b)) -> c
+   trans step (n, ParsedRecordWithoutInput x y) = step (n, (x, y))
+
+gevalCoreGeneralized :: EvaluationContext ctxt => ParserSpec ctxt -> (ParsedRecord ctxt -> c) -> (Sink c (ResourceT IO) d) -> (d -> Double) -> ctxt -> IO (MetricValue)
+gevalCoreGeneralized parserSpec itemStep aggregator finalStep context =
+  gevalCoreGeneralized' parserSpec (skipLineNumber itemStep) aggregator finalStep context
+
+gevalCoreGeneralized' :: EvaluationContext ctxt => ParserSpec ctxt -> ((Word32, ParsedRecord ctxt) -> c) -> (Sink c (ResourceT IO) d) -> (d -> Double) -> ctxt -> IO (MetricValue)
+gevalCoreGeneralized' parserSpec itemStep aggregator finalStep context = do
+   v <- runResourceT $
+     (getZipSource $ (,)
+       <$> ZipSource (CL.sourceList [1..])
+       <*> (ZipSource $ recordSource context parserSpec))
      $$ (CL.map (checkStep itemStep)
-         =$= CL.catMaybes
-         =$ aggregator)
-  return $ finalStep v
+          =$= CL.catMaybes
+          =$ aggregator)
+   return $ finalStep v
 
-checkStep :: ((Word32, (a, b)) -> c) -> (Word32, (SourceItem a, SourceItem b)) -> Maybe c
-checkStep step (lineNo, (Got expectedItem, Got outItem)) = Just $ step (lineNo, (expectedItem, outItem))
-checkStep _ (_, (Got _, Done)) = throw TooFewLines
-checkStep _ (_, (Done, Got _)) = throw TooManyLines
-checkStep _ (_, (Done, Done)) = Nothing
+class EvaluationContext ctxt where
+  data ParserSpec ctxt :: *
+  data WrappedParsedRecord ctxt :: *
+  data ParsedRecord ctxt :: *
+  recordSource :: MonadResource m0 => ctxt -> ParserSpec ctxt -> Source m0 (WrappedParsedRecord ctxt)
+  getExpectedFilePath :: ctxt -> String
+  getOutFilePath :: ctxt -> String
+  checkStep :: ((Word32, ParsedRecord ctxt) -> c) -> (Word32, WrappedParsedRecord ctxt) -> Maybe c
+
+data WithoutInput e o = WithoutInput String String
+
+instance EvaluationContext (WithoutInput e o) where
+  data ParserSpec (WithoutInput e o) = ParserSpecWithoutInput (Text -> e) (Text -> o)
+  data WrappedParsedRecord (WithoutInput e o) = WrappedParsedRecordWithoutInput (SourceItem e) (SourceItem o)
+  data ParsedRecord (WithoutInput e o) = ParsedRecordWithoutInput e o
+  getExpectedFilePath (WithoutInput expectedFilePath _) = expectedFilePath
+  getOutFilePath (WithoutInput _ outFilePath) = outFilePath
+  recordSource (WithoutInput expectedFilePath outFilePath) (ParserSpecWithoutInput expParser outParser) = getZipSource $ WrappedParsedRecordWithoutInput
+                        <$> ZipSource (items expectedFilePath expParser)
+                        <*> ZipSource (items outFilePath outParser)
+  checkStep step (lineNo, WrappedParsedRecordWithoutInput (Got expectedItem) (Got outItem)) = Just $ step (lineNo, ParsedRecordWithoutInput expectedItem outItem)
+  checkStep _ (_, WrappedParsedRecordWithoutInput (Got _) Done) = throw TooFewLines
+  checkStep _ (_, WrappedParsedRecordWithoutInput Done (Got _)) = throw TooManyLines
+  checkStep _ (_, WrappedParsedRecordWithoutInput Done Done) = Nothing
+
+
+data WithInput i e o = WithInput String String String
+
+getInputFilePath (WithInput inputFilePath _ _) = inputFilePath
+
+instance EvaluationContext (WithInput i e o) where
+  data ParserSpec (WithInput i e o) = ParserSpecWithInput (Text -> i) (Text -> e) (Text -> o)
+  data WrappedParsedRecord (WithInput i e o) = WrappedParsedRecordWithInput (SourceItem i) (SourceItem e) (SourceItem o)
+  data ParsedRecord (WithInput i e o) = ParsedRecordWithInput i e o
+  getExpectedFilePath (WithInput _ expectedFilePath _) = expectedFilePath
+  getOutFilePath (WithInput _ _ outFilePath) = outFilePath
+  recordSource (WithInput inputFilePath expectedFilePath outFilePath) (ParserSpecWithInput inpParser expParser outParser) = getZipSource $ (\x (y,z) -> WrappedParsedRecordWithInput x y z)
+         <$> ZipSource (items inputFilePath inpParser)                                                                         <*> (ZipSource $ getZipSource $ (,)
+                        <$> ZipSource (items expectedFilePath expParser)
+                        <*> ZipSource (items outFilePath outParser))
+  checkStep step (lineNo, WrappedParsedRecordWithInput (Got inputItem) (Got expectedItem) (Got outItem)) = Just $ step (lineNo, ParsedRecordWithInput inputItem expectedItem outItem)
+  checkStep _ (_, WrappedParsedRecordWithInput _ (Got _) Done) = throw TooFewLines
+  checkStep _ (_, WrappedParsedRecordWithInput _ Done (Got _)) = throw TooManyLines
+  checkStep _ (_, WrappedParsedRecordWithInput Done (Got _) (Got _)) = throw TooFewLinesInInput
+  checkStep _ (_, WrappedParsedRecordWithInput (Got _) Done Done) = throw TooManyLinesInInput
+  checkStep _ (_, WrappedParsedRecordWithInput Done Done Done) = Nothing
 
 
 

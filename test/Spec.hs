@@ -11,6 +11,8 @@ import GEval.ClusteringMetrics
 import Data.Attoparsec.Text
 import Options.Applicative
 import Data.Text
+import Text.EditDistance
+
 import qualified Test.HUnit as HU
 
 informationRetrievalBookExample :: [(String, Int)]
@@ -149,6 +151,19 @@ main = hspec $ do
       read "F2" `shouldBe` (FMeasure 2.0)
       read "F1" `shouldBe` (FMeasure 1.0)
       read "F0.5" `shouldBe` (FMeasure 0.5)
+  describe "test edit-distance library" $ do
+    it "for handling UTF8" $ do
+      levenshteinDistance defaultEditCosts "źdźbło" "źd好bło" `shouldBe` 1
+      levenshteinDistance defaultEditCosts "źdźbło" "źdźcło" `shouldBe` 1
+  describe "CharMatch" $ do
+    it "simple test" $ do
+      runGEvalTest "charmatch-simple" `shouldReturnAlmost` 0.4
+    it "perfect solution" $ do
+      runGEvalTest "charmatch-perfect" `shouldReturnAlmost` 1.0
+    it "more complex test" $ do
+      runGEvalTest "charmatch-complex" `shouldReturnAlmost` 0.25
+    it "broken test without input" $ do
+      runGEvalTest "charmatch-no-input" `shouldThrow` (== NoInputFile "test/charmatch-no-input/charmatch-no-input/test-A/in.tsv")
 
 
 neverMatch :: Char -> Int -> Bool
