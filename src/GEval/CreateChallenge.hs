@@ -114,6 +114,33 @@ In an input file, left and right contexts (TAB-separated) are given.
 In an expected file, the word to be guessed is given.
 |] ++ (commonReadmeMDContents testName)
 
+readmeMDContents CharMatch testName = [i|
+GEval sample machine challenge for text transformation
+======================================================
+
+Transform from British English into American English.
+
+This is a sample challenge for Gonito framework for CharMarch metric. Replace it with
+the description of your challenge.
+
+CharMatch is F0.5-score (precision more important than recall)
+for expected corrections (i.e. changes between the input text
+and the expected output).
+
+Directory structure
+-------------------
+
+* `README.md` — this file
+* `config.txt` — configuration file
+* `train/` — directory with training data
+* `train/train.tsv` — just some test in American English
+* `dev-0/` — directory with dev (test) data
+* `dev-0/in.tsv` — British input text for the dev set
+* `dev-0/expected.tsv` — American reference text for the dev set
+* `${testName}` — directory with test data
+* `${testName}/in.tsv` — British input data for the test set
+* `${testName}/expected.tsv` — American reference text for the test set
+|]
 
 readmeMDContents _ testName = [i|
 GEval sample challenge
@@ -188,6 +215,11 @@ Basia ma psa
 Nie kupujemy kota w worku
 Czesia ma kota
 |]
+trainContents CharMatch = [hereLit|Camptown ladies sing dis song, Doo-dah! doo-dah!
+Camptown race-track five miles long, Oh, doo-dah day!
+I come down dah wid my hat caved in, Doo-dah! doo-dah!
+I go back home wid a pocket full of tin, Oh, doo-dah day!
+|]
 trainContents _ = [hereLit|0.06	0.39	0	0.206
 1.00	1.00	1	0.017
 317.8	5.20	67	0.048
@@ -208,9 +240,12 @@ When the going gets tough, the tough get going.
 devInContents (FMeasure _) = [hereLit|b	b	W	29520	779	-28	-32	a	0	0	0	0	0	0	0	0	0	0
 b	b	W	55200	1259	35	9	a	1	0	1	0	0	0	0	0	4000	4000
 |]
-
 devInContents (LogLossHashed _) = [hereLit|Nie kupuj	w worku
 Ona	psa
+|]
+devInContents CharMatch = [hereLit|honour to organise
+nothing to change
+time traveller
 |]
 devInContents _ = [hereLit|0.72	0	0.007
 9.54	62	0.054
@@ -232,6 +267,10 @@ en
 |]
 devExpectedContents (LogLossHashed _) = [hereLit|kota
 ma
+|]
+devExpectedContents CharMatch = [hereLit|honor to organize
+nothing to change
+time traveler
 |]
 devExpectedContents _ = [hereLit|0.82
 95.2
@@ -256,6 +295,10 @@ Kwiecień plecień, bo przeplata trochę zimy, trochę lata.
 testInContents (LogLossHashed _) = [hereLit|Ala	ma
 Ona ma kota	worku
 |]
+testInContents CharMatch = [hereLit|paralysed by practise
+recognise
+nothing
+|]
 testInContents _ = [hereLit|1.52	2	0.093
 30.06	14	0.009
 |]
@@ -278,6 +321,10 @@ pl
 |]
 testExpectedContents (LogLossHashed _) = [hereLit|ma
 w
+|]
+testExpectedContents CharMatch = [hereLit|paralyzed by practice
+recognize
+nothing
 |]
 testExpectedContents _ = [hereLit|0.11
 17.2

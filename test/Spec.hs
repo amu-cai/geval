@@ -157,11 +157,11 @@ main = hspec $ do
       levenshteinDistance defaultEditCosts "źdźbło" "źdźcło" `shouldBe` 1
   describe "CharMatch" $ do
     it "simple test" $ do
-      runGEvalTest "charmatch-simple" `shouldReturnAlmost` 0.4
+      runGEvalTest "charmatch-simple" `shouldReturnAlmost` 0.3571428571428571
     it "perfect solution" $ do
       runGEvalTest "charmatch-perfect" `shouldReturnAlmost` 1.0
     it "more complex test" $ do
-      runGEvalTest "charmatch-complex" `shouldReturnAlmost` 0.25
+      runGEvalTest "charmatch-complex" `shouldReturnAlmost` 0.1923076923076923
     it "broken test without input" $ do
       runGEvalTest "charmatch-no-input" `shouldThrow` (== NoInputFile "test/charmatch-no-input/charmatch-no-input/test-A/in.tsv")
 
