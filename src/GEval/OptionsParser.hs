@@ -14,6 +14,8 @@ import Data.Maybe
 import System.IO
 import Data.String.Here
 
+import Data.Monoid ((<>))
+
 import GEval.Core
 import GEval.CreateChallenge
 
