@@ -226,6 +226,7 @@ gevalCore' BLEU _ = gevalCoreWithoutInput (Prelude.map Prelude.words . DLS.split
         bleuFuse (a1, a2, a3, a4, a5, a6, a7, a8, a9) (b1, b2, b3, b4, b5, b6, b7, b8, b9) = (a1+b1, a2+b2, a3+b3, a4+b4, a5+b5, a6+b6, a7+b7, a8+b8, a9+b9)
         brevityPenalty c r
           | c >= r = 1.0
+          | c == 0 && r > 0 = 0.0
           | otherwise = exp (1.0 - (r /. c))
 
 gevalCore' Accuracy _ = gevalCoreWithoutInput strip strip hitOrMiss averageC id
