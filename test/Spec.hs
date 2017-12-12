@@ -166,7 +166,15 @@ main = hspec $ do
       runGEvalTest "charmatch-complex" `shouldReturnAlmost` 0.1923076923076923
     it "broken test without input" $ do
       runGEvalTest "charmatch-no-input" `shouldThrow` (== NoInputFile "test/charmatch-no-input/charmatch-no-input/test-A/in.tsv")
-
+  describe "MAP" $ do
+    it "one result" $ do
+      (calculateMAPForOneResult ["Berlin", "London", "Warsaw"]
+                                ["Warsaw", "Moscow", "Berlin", "Prague"]) `shouldBeAlmost` 0.55555555
+    it "check whether you cannot cheat with duplicated results" $ do
+      (calculateMAPForOneResult ["one", "two"]
+                                ["one", "one"]) `shouldBeAlmost` 0.5
+    it "simple test" $ do
+      runGEvalTest "map-simple" `shouldReturnAlmost` 0.444444444
 
 neverMatch :: Char -> Int -> Bool
 neverMatch _ _ = False

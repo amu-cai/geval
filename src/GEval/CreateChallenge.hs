@@ -142,6 +142,24 @@ Directory structure
 * `${testName}/expected.tsv` — American reference text for the test set
 |]
 
+readmeMDContents MAP testName = [i|
+English word for a Polish word
+================================================
+
+Give a (British or American) English equivalent of a Polish word.
+
+This is a sample challenge for MAP evaluation metric. MAP (Mean Average Precision)
+is used, mostly in information retrieval, for evaluation of ranked retrieval results.
+
+The relevant items are separated by TABs (could be just one item) and returned items
+should be separated by TABs.
+
+See Christopher D. Manning, Prabhakar Raghavan and Hinrich Schütze,
+"Introduction to Information Retrieval", Cambridge University Press, 2008 for
+more discussion of the metric.
+|] ++ (commonReadmeMDContents testName)
+
+
 readmeMDContents _ testName = [i|
 GEval sample challenge
 ======================
@@ -209,7 +227,6 @@ trainContents NMI = [hereLit|pl	Kto pod kim dołki kopie, ten sam w nie wpada.
 en	The pen is mightier than the sword.
 pl	Baba z wozu, koniom lżej.
 |]
-
 trainContents (LogLossHashed _) = [hereLit|Ala ma psa i kota
 Basia ma psa
 Nie kupujemy kota w worku
@@ -219,6 +236,11 @@ trainContents CharMatch = [hereLit|Camptown ladies sing dis song, Doo-dah! doo-d
 Camptown race-track five miles long, Oh, doo-dah day!
 I come down dah wid my hat caved in, Doo-dah! doo-dah!
 I go back home wid a pocket full of tin, Oh, doo-dah day!
+|]
+trainContents MAP = [hereLit|honor	US	honor
+honour	GB	honor
+titbit	GB	smakołyk
+tidbit	US	smakołyk
 |]
 trainContents _ = [hereLit|0.06	0.39	0	0.206
 1.00	1.00	1	0.017
@@ -247,6 +269,10 @@ devInContents CharMatch = [hereLit|honour to organise
 nothing to change
 time traveller
 |]
+devInContents MAP = [hereLit|US	noc
+GB	wózek dziecięcy
+GB	wizualizować
+|]
 devInContents _ = [hereLit|0.72	0	0.007
 9.54	62	0.054
 |]
@@ -271,6 +297,10 @@ ma
 devExpectedContents CharMatch = [hereLit|honor to organize
 nothing to change
 time traveler
+|]
+devExpectedContents MAP = [hereLit|night	nite
+pram
+visualise
 |]
 devExpectedContents _ = [hereLit|0.82
 95.2
@@ -299,6 +329,10 @@ testInContents CharMatch = [hereLit|paralysed by practise
 recognise
 nothing
 |]
+testInContents MAP = [hereLit|US	wózek dziecięcy
+GB	słoń
+US	słoń
+|]
 testInContents _ = [hereLit|1.52	2	0.093
 30.06	14	0.009
 |]
@@ -325,6 +359,10 @@ w
 testExpectedContents CharMatch = [hereLit|paralyzed by practice
 recognize
 nothing
+|]
+testExpectedContents MAP = [hereLit|trolley
+elephant
+elephant
 |]
 testExpectedContents _ = [hereLit|0.11
 17.2

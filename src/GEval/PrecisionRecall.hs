@@ -1,6 +1,7 @@
 {-# LANGUAGE PartialTypeSignatures #-}
 
-module GEval.PrecisionRecall(fMeasure, f1Measure, f2Measure, precision, recall,
+module GEval.PrecisionRecall(calculateMAPForOneResult,
+                             fMeasure, f1Measure, f2Measure, precision, recall,
                              fMeasureOnCounts, f1MeasureOnCounts, f2MeasureOnCounts, countFolder,
                              precisionAndRecall, precisionAndRecallFromCounts, maxMatch)
        where
@@ -9,6 +10,18 @@ import GEval.Common
 
 import Data.Graph.Inductive
 import Data.Graph.Inductive.Query.MaxFlow
+
+import Data.List (nub, foldl')
+
+calculateMAPForOneResult :: (Eq a) => [a] -> [a] -> Double
+calculateMAPForOneResult expected got = precisionSum / fromIntegral (length expected)
+  where (_, _, precisionSum) = calculateMAPForOneResultCore expected (nub got)
+        calculateMAPForOneResultCore expected got = foldl' (oneMAPStep expected) (0, 0, 0.0) got
+        oneMAPStep expected (gotCount, allCount, precisionSum) gotItem
+          | gotItem `elem` expected = (newGotCount, newAllCount, precisionSum + (newGotCount /. newAllCount))
+          | otherwise = (gotCount, newAllCount, precisionSum)
+         where newGotCount = gotCount + 1
+               newAllCount = allCount + 1
 
 f2Measure :: (a -> b -> Bool) -> [a] -> [b] -> Double
 f2Measure = fMeasure 2.0

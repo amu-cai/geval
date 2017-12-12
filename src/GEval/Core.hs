@@ -58,6 +58,7 @@ defaultLogLossHashedSize :: Word32
 defaultLogLossHashedSize = 10
 
 data Metric = RMSE | MSE | BLEU | Accuracy | ClippEU | FMeasure Double | NMI | LogLossHashed Word32 | CharMatch
+              | MAP
               deriving (Eq)
 
 instance Show Metric where
@@ -75,6 +76,7 @@ instance Show Metric where
                                                       else
                                                        (show nbOfBits))
   show CharMatch = "CharMatch"
+  show MAP = "MAP"
 
 instance Read Metric where
   readsPrec _ ('R':'M':'S':'E':theRest) = [(RMSE, theRest)]
@@ -90,6 +92,7 @@ instance Read Metric where
     [(nbOfBits, theRest)] -> [(LogLossHashed nbOfBits, theRest)]
     _ -> [(LogLossHashed defaultLogLossHashedSize, theRest)]
   readsPrec p ('C':'h':'a':'r':'M':'a':'t':'c':'h':theRest) = [(CharMatch, theRest)]
+  readsPrec _ ('M':'A':'P':theRest) = [(MAP, theRest)]
 
 data MetricOrdering = TheLowerTheBetter | TheHigherTheBetter
 
@@ -103,6 +106,7 @@ getMetricOrdering (FMeasure _) = TheHigherTheBetter
 getMetricOrdering NMI = TheHigherTheBetter
 getMetricOrdering (LogLossHashed _) = TheLowerTheBetter
 getMetricOrdering CharMatch = TheHigherTheBetter
+getMetricOrdering MAP = TheHigherTheBetter
 
 defaultOutDirectory = "."
 defaultTestName = "test-A"
@@ -261,6 +265,12 @@ gevalCore' ClippEU _ = gevalCoreWithoutInput parseClippingSpecs parseClippings m
     finalStep counts = f2MeasureOnCounts counts
 
 gevalCore' NMI _ = gevalCoreWithoutInput id id id (CC.foldl updateConfusionMatrix M.empty) normalizedMutualInformationFromConfusionMatrix
+
+gevalCore' MAP _ = gevalCoreWithoutInput (DLS.splitOn "\t" . unpack)
+                                         (DLS.splitOn "\t" . unpack)
+                                         (\(e,g) -> calculateMAPForOneResult e g)
+                                         averageC
+                                         id
 
 gevalCore' (LogLossHashed nbOfBits) _ = helper nbOfBits
   -- for LogLossHashed we "salt" each hash with the line number
