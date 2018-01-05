@@ -1,4 +1,9 @@
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE AllowAmbiguousTypes #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 module GEval.Core
     ( geval,
@@ -38,6 +43,8 @@ import System.FilePath
 import Data.Maybe
 import qualified Data.List.Split as DLS
 
+import Control.Monad.IO.Class
+
 import Data.Attoparsec.Text (parseOnly)
 
 import GEval.BLEU
@@ -49,6 +56,8 @@ import GEval.LogLossHashed
 import GEval.CharMatch
 
 import qualified Data.HashMap.Strict as M
+
+import Data.Proxy
 
 import Data.Word
 
@@ -191,12 +200,16 @@ isEmptyFile path = do
     stat <- getFileStatus path
     return ((fileSize stat) == 0)
 
+
+data LineSource m = LineSource (Source m Text) FilePath Int
+
 geval :: GEvalSpecification -> IO (MetricValue)
 geval gevalSpec = do
   unlessM (D.doesDirectoryExist outDirectory) $ throwM $ NoOutDirectory outDirectory
   unlessM (D.doesDirectoryExist expectedDirectory) $ throwM $ NoExpectedDirectory expectedDirectory
   unlessM (D.doesDirectoryExist outTestDirectory) $ throwM $ NoOutTestDirectory outTestDirectory
   unlessM (D.doesDirectoryExist expectedTestDirectory) $ throwM $ NoExpectedTestDirectory expectedTestDirectory
+  checkInputFileIfNeeded metric inputFilePath
   gevalCore metric inputFilePath expectedFilePath outFilePath
    where expectedFilePath = expectedTestDirectory </> (gesExpectedFile gevalSpec)
          outFilePath = outTestDirectory </> (gesOutFile gevalSpec)
@@ -208,18 +221,39 @@ geval gevalSpec = do
          testName = gesTestName gevalSpec
          metric = gesMetric gevalSpec
 
-gevalCore :: Metric -> String -> String -> String -> IO (MetricValue)
-gevalCore RMSE inputFilePath expectedFilePath outFilePath = do
-  mse <- gevalCore MSE inputFilePath expectedFilePath outFilePath
-  return $ mse ** 0.5
+checkInputFileIfNeeded :: Metric -> FilePath -> IO ()
+checkInputFileIfNeeded CharMatch inputFilePath = do
+  unlessM (D.doesFileExist inputFilePath) $ throwM $ NoInputFile inputFilePath
+  return ()
+checkInputFileIfNeeded _ _ = return ()
 
+fileAsLineSource :: FilePath -> LineSource (ResourceT IO)
+fileAsLineSource filePath =
+  LineSource (CB.sourceFile filePath $= CT.decodeUtf8Lenient =$= CT.lines) filePath 1
+
+gevalCore :: Metric -> String -> String -> String -> IO (MetricValue)
 gevalCore metric inputFilePath expectedFilePath outFilePath = do
   unlessM (D.doesFileExist expectedFilePath) $ throwM $ NoExpectedFile expectedFilePath
   unlessM (D.doesFileExist outFilePath) $ throwM $ NoOutFile outFilePath
   whenM (isEmptyFile outFilePath) $ throwM $ EmptyOutput
-  gevalCore' metric inputFilePath expectedFilePath outFilePath
+  gevalCoreOnSources metric
+                     (fileAsLineSource inputFilePath)
+                     (fileAsLineSource expectedFilePath)
+                     (fileAsLineSource outFilePath)
 
-gevalCore' :: Metric -> String -> String -> String -> IO (MetricValue)
+gevalCoreOnSources :: (MonadIO m, MonadThrow m, MonadBaseControl IO m) => Metric
+                     -> LineSource (ResourceT m)
+                     -> LineSource (ResourceT m)
+                     -> LineSource (ResourceT m)
+                     -> m (MetricValue)
+gevalCoreOnSources RMSE inputLineSource expectedLineSource outLineSource = do
+  mse <- gevalCoreOnSources MSE inputLineSource expectedLineSource outLineSource
+  return $ mse ** 0.5
+
+gevalCoreOnSources metric inputLineSource expectedLineSource outLineSource = do
+  gevalCore' metric inputLineSource expectedLineSource outLineSource
+
+gevalCore' :: (MonadIO m, MonadThrow m, MonadBaseControl IO m) => Metric -> LineSource (ResourceT m) -> LineSource (ResourceT m) -> LineSource (ResourceT m) -> m (MetricValue)
 gevalCore' MSE _ = gevalCoreWithoutInput outParser outParser itemError averageC id
   where outParser = getValue . TR.double
 
@@ -274,14 +308,13 @@ gevalCore' MAP _ = gevalCoreWithoutInput (DLS.splitOn "\t" . unpack)
 
 gevalCore' (LogLossHashed nbOfBits) _ = helper nbOfBits
   -- for LogLossHashed we "salt" each hash with the line number
-  where helper nbOfBits expectedFilePath outFilePath =
-          gevalCore''' (ParserSpecWithoutInput id id) (\(lineNo, (t,d)) -> calculateLogLoss nbOfBits lineNo t (parseDistributionWrapper nbOfBits lineNo d)) averageC negate (WithoutInput expectedFilePath outFilePath)
+  where helper nbOfBits expectedLineSource outLineSource =
+          gevalCore''' (ParserSpecWithoutInput id id) (\(lineNo, (t,d)) -> calculateLogLoss nbOfBits lineNo t (parseDistributionWrapper nbOfBits lineNo d)) averageC negate (WithoutInput expectedLineSource outLineSource)
 
-gevalCore' CharMatch inputFilePath = helper inputFilePath
+gevalCore' CharMatch inputLineSource = helper inputLineSource
  where
-   helper inputFilePath expectedFilePath outFilePath = do
-     unlessM (D.doesFileExist inputFilePath) $ throwM $ NoInputFile inputFilePath
-     gevalCoreGeneralized (ParserSpecWithInput unpack unpack unpack) step countAgg (fMeasureOnCounts charMatchBeta) (WithInput inputFilePath expectedFilePath outFilePath)
+   helper inputLineSource expectedLineSource outputLineSource = do
+     gevalCoreGeneralized (ParserSpecWithInput unpack unpack unpack) step countAgg (fMeasureOnCounts charMatchBeta) (WithInput inputLineSource expectedLineSource outputLineSource)
    step (ParsedRecordWithInput inp exp out) = getCharMatchCount inp exp out
    countAgg = CC.foldl countFolder (0, 0, 0)
 
@@ -295,81 +328,78 @@ data SourceItem a = Got a | Done
 skipLineNumber :: (x -> c) -> ((Word32, x) -> c)
 skipLineNumber fun = fun . snd
 
-gevalCoreWithoutInput :: (Text -> a) -> (Text -> b) -> ((a, b) -> c) -> (Sink c (ResourceT IO) d) -> (d -> Double) -> String -> String -> IO (MetricValue)
-gevalCoreWithoutInput expParser outParser itemStep aggregator finalStep expectedFilePath outFilePath =
-  gevalCoreGeneralized (ParserSpecWithoutInput expParser outParser) (trans itemStep) aggregator finalStep (WithoutInput expectedFilePath outFilePath)
+gevalCoreWithoutInput :: (MonadBaseControl IO m, MonadThrow m, MonadIO m) => (Text -> a) -> (Text -> b) -> ((a, b) -> c) -> (Sink c (ResourceT m) d) -> (d -> Double) -> LineSource (ResourceT m) -> LineSource (ResourceT m) -> m (MetricValue)
+gevalCoreWithoutInput expParser outParser itemStep aggregator finalStep expectedLineStream outLineStream =
+  gevalCoreGeneralized (ParserSpecWithoutInput expParser outParser) (trans itemStep) aggregator finalStep (WithoutInput expectedLineStream outLineStream)
  where
-   trans :: ((a, b) -> c) -> ParsedRecord (WithoutInput a b) -> c
+   trans :: ((a, b) -> c) -> ParsedRecord (WithoutInput m a b) -> c
    trans step (ParsedRecordWithoutInput x y) = step (x, y)
 
-gevalCore''' :: ParserSpec (WithoutInput a b) -> ((Word32, (a, b)) -> c) -> (Sink c (ResourceT IO) d) -> (d -> Double) -> WithoutInput a b -> IO (MetricValue)
+gevalCore''' :: (MonadBaseControl IO m, MonadThrow m, MonadIO m) => ParserSpec (WithoutInput m a b) -> ((Word32, (a, b)) -> c) -> (Sink c (ResourceT m) d) -> (d -> Double) -> WithoutInput m a b -> m (MetricValue)
 gevalCore''' parserSpec itemStep aggregator finalStep context =
   gevalCoreGeneralized' parserSpec (trans itemStep) aggregator finalStep context
  where
-   trans :: ((Word32, (a, b)) -> c) -> (Word32, ParsedRecord (WithoutInput a b)) -> c
+   trans :: ((Word32, (a, b)) -> c) -> (Word32, ParsedRecord (WithoutInput m a b)) -> c
    trans step (n, ParsedRecordWithoutInput x y) = step (n, (x, y))
 
-gevalCoreGeneralized :: EvaluationContext ctxt => ParserSpec ctxt -> (ParsedRecord ctxt -> c) -> (Sink c (ResourceT IO) d) -> (d -> Double) -> ctxt -> IO (MetricValue)
+gevalCoreGeneralized :: (EvaluationContext ctxt m, MonadBaseControl IO m, MonadThrow m, MonadIO m) => ParserSpec ctxt -> (ParsedRecord ctxt -> c) -> (Sink c (ResourceT m) d) -> (d -> Double) -> ctxt -> m (MetricValue)
 gevalCoreGeneralized parserSpec itemStep aggregator finalStep context =
   gevalCoreGeneralized' parserSpec (skipLineNumber itemStep) aggregator finalStep context
 
-gevalCoreGeneralized' :: EvaluationContext ctxt => ParserSpec ctxt -> ((Word32, ParsedRecord ctxt) -> c) -> (Sink c (ResourceT IO) d) -> (d -> Double) -> ctxt -> IO (MetricValue)
+gevalCoreGeneralized' :: forall m ctxt c d . (EvaluationContext ctxt m, MonadBaseControl IO m, MonadThrow m, MonadIO m) => ParserSpec ctxt -> ((Word32, ParsedRecord ctxt) -> c) -> (Sink c (ResourceT m) d) -> (d -> Double) -> ctxt -> m (MetricValue)
 gevalCoreGeneralized' parserSpec itemStep aggregator finalStep context = do
    v <- runResourceT $
-     (getZipSource $ (,)
+     (((getZipSource $ (,)
        <$> ZipSource (CL.sourceList [1..])
-       <*> (ZipSource $ recordSource context parserSpec))
-     $$ (CL.map (checkStep itemStep)
-          =$= CL.catMaybes
-          =$ aggregator)
+       <*> (ZipSource $ recordSource context parserSpec)) =$= CL.map (checkStep (Proxy :: Proxy m) itemStep)) $$ CL.catMaybes =$ aggregator)
    return $ finalStep v
 
-class EvaluationContext ctxt where
+class EvaluationContext ctxt m where
   data ParserSpec ctxt :: *
   data WrappedParsedRecord ctxt :: *
   data ParsedRecord ctxt :: *
-  recordSource :: MonadResource m0 => ctxt -> ParserSpec ctxt -> Source m0 (WrappedParsedRecord ctxt)
+  recordSource :: ctxt -> ParserSpec ctxt -> Source (ResourceT m) (WrappedParsedRecord ctxt)
   getExpectedFilePath :: ctxt -> String
   getOutFilePath :: ctxt -> String
-  checkStep :: ((Word32, ParsedRecord ctxt) -> c) -> (Word32, WrappedParsedRecord ctxt) -> Maybe c
+  checkStep :: Proxy m -> ((Word32, ParsedRecord ctxt) -> c) -> (Word32, WrappedParsedRecord ctxt) -> Maybe c
 
-data WithoutInput e o = WithoutInput String String
+data WithoutInput m e o = WithoutInput (LineSource (ResourceT m)) (LineSource (ResourceT m))
 
-instance EvaluationContext (WithoutInput e o) where
-  data ParserSpec (WithoutInput e o) = ParserSpecWithoutInput (Text -> e) (Text -> o)
-  data WrappedParsedRecord (WithoutInput e o) = WrappedParsedRecordWithoutInput (SourceItem e) (SourceItem o)
-  data ParsedRecord (WithoutInput e o) = ParsedRecordWithoutInput e o
-  getExpectedFilePath (WithoutInput expectedFilePath _) = expectedFilePath
-  getOutFilePath (WithoutInput _ outFilePath) = outFilePath
-  recordSource (WithoutInput expectedFilePath outFilePath) (ParserSpecWithoutInput expParser outParser) = getZipSource $ WrappedParsedRecordWithoutInput
-                        <$> ZipSource (items expectedFilePath expParser)
-                        <*> ZipSource (items outFilePath outParser)
-  checkStep step (lineNo, WrappedParsedRecordWithoutInput (Got expectedItem) (Got outItem)) = Just $ step (lineNo, ParsedRecordWithoutInput expectedItem outItem)
-  checkStep _ (_, WrappedParsedRecordWithoutInput (Got _) Done) = throw TooFewLines
-  checkStep _ (_, WrappedParsedRecordWithoutInput Done (Got _)) = throw TooManyLines
-  checkStep _ (_, WrappedParsedRecordWithoutInput Done Done) = Nothing
+instance (MonadBaseControl IO m, MonadIO m, MonadThrow m) => EvaluationContext (WithoutInput m e o) m where
+  data ParserSpec (WithoutInput m e o) = ParserSpecWithoutInput (Text -> e) (Text -> o)
+  data WrappedParsedRecord (WithoutInput m e o) = WrappedParsedRecordWithoutInput (SourceItem e) (SourceItem o)
+  data ParsedRecord (WithoutInput m e o) = ParsedRecordWithoutInput e o
+  getExpectedFilePath (WithoutInput (LineSource _ expectedFilePath _) _) = expectedFilePath
+  getOutFilePath (WithoutInput _ (LineSource _ outFilePath _)) = outFilePath
+  recordSource (WithoutInput expectedLineSource outLineSource) (ParserSpecWithoutInput expParser outParser) = getZipSource $ WrappedParsedRecordWithoutInput
+                        <$> ZipSource (items expectedLineSource expParser)
+                        <*> ZipSource (items outLineSource outParser)
+  checkStep _ step (lineNo, WrappedParsedRecordWithoutInput (Got expectedItem) (Got outItem)) = Just $ step (lineNo, ParsedRecordWithoutInput expectedItem outItem)
+  checkStep _ _ (_, WrappedParsedRecordWithoutInput (Got _) Done) = throw TooFewLines
+  checkStep _ _ (_, WrappedParsedRecordWithoutInput Done (Got _)) = throw TooManyLines
+  checkStep _ _ (_, WrappedParsedRecordWithoutInput Done Done) = Nothing
 
 
-data WithInput i e o = WithInput String String String
+data WithInput m i e o = WithInput (LineSource (ResourceT m)) (LineSource (ResourceT m)) (LineSource (ResourceT m))
 
-getInputFilePath (WithInput inputFilePath _ _) = inputFilePath
+getInputFilePath (WithInput (LineSource _ inputFilePath _) _ _) = inputFilePath
 
-instance EvaluationContext (WithInput i e o) where
-  data ParserSpec (WithInput i e o) = ParserSpecWithInput (Text -> i) (Text -> e) (Text -> o)
-  data WrappedParsedRecord (WithInput i e o) = WrappedParsedRecordWithInput (SourceItem i) (SourceItem e) (SourceItem o)
-  data ParsedRecord (WithInput i e o) = ParsedRecordWithInput i e o
-  getExpectedFilePath (WithInput _ expectedFilePath _) = expectedFilePath
-  getOutFilePath (WithInput _ _ outFilePath) = outFilePath
-  recordSource (WithInput inputFilePath expectedFilePath outFilePath) (ParserSpecWithInput inpParser expParser outParser) = getZipSource $ (\x (y,z) -> WrappedParsedRecordWithInput x y z)
-         <$> ZipSource (items inputFilePath inpParser)                                                                         <*> (ZipSource $ getZipSource $ (,)
-                        <$> ZipSource (items expectedFilePath expParser)
-                        <*> ZipSource (items outFilePath outParser))
-  checkStep step (lineNo, WrappedParsedRecordWithInput (Got inputItem) (Got expectedItem) (Got outItem)) = Just $ step (lineNo, ParsedRecordWithInput inputItem expectedItem outItem)
-  checkStep _ (_, WrappedParsedRecordWithInput _ (Got _) Done) = throw TooFewLines
-  checkStep _ (_, WrappedParsedRecordWithInput _ Done (Got _)) = throw TooManyLines
-  checkStep _ (_, WrappedParsedRecordWithInput Done (Got _) (Got _)) = throw TooFewLinesInInput
-  checkStep _ (_, WrappedParsedRecordWithInput (Got _) Done Done) = throw TooManyLinesInInput
-  checkStep _ (_, WrappedParsedRecordWithInput Done Done Done) = Nothing
+instance (MonadBaseControl IO m, MonadIO m, MonadThrow m) => EvaluationContext (WithInput m i e o) m where
+  data ParserSpec (WithInput m i e o) = ParserSpecWithInput (Text -> i) (Text -> e) (Text -> o)
+  data WrappedParsedRecord (WithInput m i e o) = WrappedParsedRecordWithInput (SourceItem i) (SourceItem e) (SourceItem o)
+  data ParsedRecord (WithInput m i e o) = ParsedRecordWithInput i e o
+  getExpectedFilePath (WithInput _ (LineSource _ expectedFilePath _) _) = expectedFilePath
+  getOutFilePath (WithInput _ _ (LineSource _ outFilePath _)) = outFilePath
+  recordSource (WithInput inputLineSource expectedLineSource outLineSource) (ParserSpecWithInput inpParser expParser outParser) = getZipSource $ (\x (y,z) -> WrappedParsedRecordWithInput x y z)
+         <$> ZipSource (items inputLineSource inpParser)                                                                         <*> (ZipSource $ getZipSource $ (,)
+                        <$> ZipSource (items expectedLineSource expParser)
+                        <*> ZipSource (items outLineSource outParser))
+  checkStep _ step (lineNo, WrappedParsedRecordWithInput (Got inputItem) (Got expectedItem) (Got outItem)) = Just $ step (lineNo, ParsedRecordWithInput inputItem expectedItem outItem)
+  checkStep _ _ (_, WrappedParsedRecordWithInput _ (Got _) Done) = throw TooFewLines
+  checkStep _ _ (_, WrappedParsedRecordWithInput _ Done (Got _)) = throw TooManyLines
+  checkStep _ _ (_, WrappedParsedRecordWithInput Done (Got _) (Got _)) = throw TooFewLinesInInput
+  checkStep _ _ (_, WrappedParsedRecordWithInput (Got _) Done Done) = throw TooManyLinesInInput
+  checkStep _ _ (_, WrappedParsedRecordWithInput Done Done Done) = Nothing
 
 
 
@@ -379,12 +409,9 @@ averageC = getZipSink
   <$> ZipSink CC.sum
   <*> ZipSink CC.length
 
-items :: MonadResource m => String -> (Text -> a) -> Source m (SourceItem a)
-items filePath parser =
-  (CB.sourceFile filePath
-   $= (CT.decodeUtf8Lenient
-       =$= CT.lines
-       =$= CL.map ((\x -> Got x) . parser))) >> yield Done
+items :: MonadResource m => LineSource m -> (Text -> a) -> Source m (SourceItem a)
+items (LineSource lineSource _ _) parser =
+  (lineSource =$= CL.map ((\x -> Got x) . parser)) >> yield Done
 
 itemError :: (Double, Double) -> Double
 itemError (exp, out) = (exp-out)**2
