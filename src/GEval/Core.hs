@@ -8,6 +8,8 @@
 module GEval.Core
     ( geval,
       gevalCore,
+      gevalCoreOnSingleLines,
+      LineInFile(..),
       Metric(..),
       MetricOrdering(..),
       getMetricOrdering,
@@ -231,6 +233,16 @@ fileAsLineSource :: FilePath -> LineSource (ResourceT IO)
 fileAsLineSource filePath =
   LineSource (CB.sourceFile filePath $= CT.decodeUtf8Lenient =$= CT.lines) filePath 1
 
+gevalCoreOnSingleLines :: Metric -> LineInFile -> LineInFile -> LineInFile -> IO (MetricValue)
+gevalCoreOnSingleLines metric inpLine expLine outLine =
+  gevalCoreOnSources metric (singleLineAsLineSource inpLine)
+                            (singleLineAsLineSource expLine)
+                            (singleLineAsLineSource outLine)
+
+singleLineAsLineSource :: LineInFile -> LineSource (ResourceT IO)
+singleLineAsLineSource (LineInFile filePath lineNo line) =
+  LineSource (CL.sourceList [line]) filePath lineNo
+
 gevalCore :: Metric -> String -> String -> String -> IO (MetricValue)
 gevalCore metric inputFilePath expectedFilePath outFilePath = do
   unlessM (D.doesFileExist expectedFilePath) $ throwM $ NoExpectedFile expectedFilePath
@@ -252,6 +264,8 @@ gevalCoreOnSources RMSE inputLineSource expectedLineSource outLineSource = do
 
 gevalCoreOnSources metric inputLineSource expectedLineSource outLineSource = do
   gevalCore' metric inputLineSource expectedLineSource outLineSource
+
+data LineInFile = LineInFile FilePath Int Text
 
 gevalCore' :: (MonadIO m, MonadThrow m, MonadBaseControl IO m) => Metric -> LineSource (ResourceT m) -> LineSource (ResourceT m) -> LineSource (ResourceT m) -> m (MetricValue)
 gevalCore' MSE _ = gevalCoreWithoutInput outParser outParser itemError averageC id

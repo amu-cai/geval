@@ -175,6 +175,12 @@ main = hspec $ do
                                 ["one", "one"]) `shouldBeAlmost` 0.5
     it "simple test" $ do
       runGEvalTest "map-simple" `shouldReturnAlmost` 0.444444444
+  describe "evaluating single lines" $ do
+    it "RMSE" $ do
+      gevalCoreOnSingleLines RMSE (LineInFile "stub1" 1 "blabla")
+                                  (LineInFile "stub2" 1 "3.4")
+                                  (LineInFile "stub3" 1 "2.6") `shouldReturnAlmost` 0.8
+
 
 neverMatch :: Char -> Int -> Bool
 neverMatch _ _ = False
