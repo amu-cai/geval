@@ -210,12 +210,18 @@ data LineSource m = LineSource (Source m Text) FilePath Int
 
 geval :: GEvalSpecification -> IO (MetricValue)
 geval gevalSpec = do
+  (inputFilePath, expectedFilePath, outFilePath) <- checkAndGetFiles gevalSpec
+  gevalCore metric inputFilePath expectedFilePath outFilePath
+   where metric = gesMetric gevalSpec
+
+checkAndGetFiles :: GEvalSpecification -> IO (FilePath, FilePath, FilePath)
+checkAndGetFiles gevalSpec = do
   unlessM (D.doesDirectoryExist outDirectory) $ throwM $ NoOutDirectory outDirectory
   unlessM (D.doesDirectoryExist expectedDirectory) $ throwM $ NoExpectedDirectory expectedDirectory
   unlessM (D.doesDirectoryExist outTestDirectory) $ throwM $ NoOutTestDirectory outTestDirectory
   unlessM (D.doesDirectoryExist expectedTestDirectory) $ throwM $ NoExpectedTestDirectory expectedTestDirectory
   checkInputFileIfNeeded metric inputFilePath
-  gevalCore metric inputFilePath expectedFilePath outFilePath
+  return (inputFilePath expectedFilePath outFilePath)
    where expectedFilePath = expectedTestDirectory </> (gesExpectedFile gevalSpec)
          outFilePath = outTestDirectory </> (gesOutFile gevalSpec)
          inputFilePath = expectedTestDirectory </> (gesInputFile gevalSpec)
