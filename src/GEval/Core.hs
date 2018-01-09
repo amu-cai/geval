@@ -26,7 +26,14 @@ module GEval.Core
       defaultInputFile,
       defaultMetric,
       getExpectedDirectory,
-      configFileName
+      configFileName,
+      ParsedRecord(..),
+      WithoutInput(..),
+      WithInput(..),
+      EvaluationContext(..),
+      ParserSpec(..),
+      fileAsLineSource,
+      checkAndGetFiles
     ) where
 
 import Data.Conduit
@@ -145,7 +152,7 @@ getExpectedDirectory :: GEvalSpecification -> FilePath
 getExpectedDirectory spec = fromMaybe outDirectory $ gesExpectedDirectory spec
                             where outDirectory = gesOutDirectory spec
 
-data GEvalSpecialCommand = Init
+data GEvalSpecialCommand = Init | LineByLine
 
 data GEvalOptions = GEvalOptions
                     { geoSpecialCommand :: Maybe GEvalSpecialCommand,
@@ -206,7 +213,7 @@ isEmptyFile path = do
     return ((fileSize stat) == 0)
 
 
-data LineSource m = LineSource (Source m Text) FilePath Int
+data LineSource m = LineSource (Source m Text) FilePath Word32
 
 geval :: GEvalSpecification -> IO (MetricValue)
 geval gevalSpec = do
@@ -221,7 +228,7 @@ checkAndGetFiles gevalSpec = do
   unlessM (D.doesDirectoryExist outTestDirectory) $ throwM $ NoOutTestDirectory outTestDirectory
   unlessM (D.doesDirectoryExist expectedTestDirectory) $ throwM $ NoExpectedTestDirectory expectedTestDirectory
   checkInputFileIfNeeded metric inputFilePath
-  return (inputFilePath expectedFilePath outFilePath)
+  return (inputFilePath, expectedFilePath, outFilePath)
    where expectedFilePath = expectedTestDirectory </> (gesExpectedFile gevalSpec)
          outFilePath = outTestDirectory </> (gesOutFile gevalSpec)
          inputFilePath = expectedTestDirectory </> (gesInputFile gevalSpec)
@@ -274,7 +281,7 @@ gevalCoreOnSources RMSE inputLineSource expectedLineSource outLineSource = do
 gevalCoreOnSources metric inputLineSource expectedLineSource outLineSource = do
   gevalCore' metric inputLineSource expectedLineSource outLineSource
 
-data LineInFile = LineInFile FilePath Int Text
+data LineInFile = LineInFile FilePath Word32 Text
 
 gevalCore' :: (MonadIO m, MonadThrow m, MonadBaseControl IO m) => Metric -> LineSource (ResourceT m) -> LineSource (ResourceT m) -> LineSource (ResourceT m) -> m (MetricValue)
 gevalCore' MSE _ = gevalCoreWithoutInput outParser outParser itemError averageC id
@@ -385,6 +392,7 @@ class EvaluationContext ctxt m where
   getExpectedFilePath :: ctxt -> String
   getOutFilePath :: ctxt -> String
   checkStep :: Proxy m -> ((Word32, ParsedRecord ctxt) -> c) -> (Word32, WrappedParsedRecord ctxt) -> Maybe c
+  checkStepM :: ((Word32, ParsedRecord ctxt) -> (ResourceT m) c) -> (Word32, WrappedParsedRecord ctxt) -> (ResourceT m) (Maybe c)
 
 data WithoutInput m e o = WithoutInput (LineSource (ResourceT m)) (LineSource (ResourceT m))
 
@@ -401,6 +409,11 @@ instance (MonadBaseControl IO m, MonadIO m, MonadThrow m) => EvaluationContext (
   checkStep _ _ (_, WrappedParsedRecordWithoutInput (Got _) Done) = throw TooFewLines
   checkStep _ _ (_, WrappedParsedRecordWithoutInput Done (Got _)) = throw TooManyLines
   checkStep _ _ (_, WrappedParsedRecordWithoutInput Done Done) = Nothing
+
+  checkStepM step (lineNo, WrappedParsedRecordWithoutInput (Got expectedItem) (Got outItem)) = Just <$> step (lineNo, ParsedRecordWithoutInput expectedItem outItem)
+  checkStepM _ (_, WrappedParsedRecordWithoutInput (Got _) Done) = throwM TooFewLines
+  checkStepM _ (_, WrappedParsedRecordWithoutInput Done (Got _)) = throwM TooManyLines
+  checkStepM _ (_, WrappedParsedRecordWithoutInput Done Done) = return Nothing
 
 
 data WithInput m i e o = WithInput (LineSource (ResourceT m)) (LineSource (ResourceT m)) (LineSource (ResourceT m))
@@ -423,6 +436,14 @@ instance (MonadBaseControl IO m, MonadIO m, MonadThrow m) => EvaluationContext (
   checkStep _ _ (_, WrappedParsedRecordWithInput Done (Got _) (Got _)) = throw TooFewLinesInInput
   checkStep _ _ (_, WrappedParsedRecordWithInput (Got _) Done Done) = throw TooManyLinesInInput
   checkStep _ _ (_, WrappedParsedRecordWithInput Done Done Done) = Nothing
+
+  checkStepM step (lineNo, WrappedParsedRecordWithInput (Got inputItem) (Got expectedItem) (Got outItem)) = Just <$> step (lineNo, ParsedRecordWithInput inputItem expectedItem outItem)
+  checkStepM _ (_, WrappedParsedRecordWithInput _ (Got _) Done) = throw TooFewLines
+  checkStepM _ (_, WrappedParsedRecordWithInput _ Done (Got _)) = throw TooManyLines
+  checkStepM _ (_, WrappedParsedRecordWithInput Done (Got _) (Got _)) = throw TooFewLinesInInput
+  checkStepM _ (_, WrappedParsedRecordWithInput (Got _) Done Done) = throw TooManyLinesInInput
+  checkStepM _ (_, WrappedParsedRecordWithInput Done Done Done) = return Nothing
+
 
 
 

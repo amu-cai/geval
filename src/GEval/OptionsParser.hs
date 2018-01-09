@@ -18,6 +18,7 @@ import Data.Monoid ((<>))
 
 import GEval.Core
 import GEval.CreateChallenge
+import GEval.LineByLine
 
 fullOptionsParser = info (helper <*> optionsParser)
        (fullDesc
@@ -26,9 +27,13 @@ fullOptionsParser = info (helper <*> optionsParser)
 
 optionsParser :: Parser GEvalOptions
 optionsParser = GEvalOptions
-   <$> optional (flag' Init
+   <$> optional ((flag' Init
                  ( long "init"
                    <> help "Init a sample Gonito challenge rather than run an evaluation" ))
+                 <|>
+                 (flag' LineByLine
+                 ( long "line-by-line"
+                   <> help "Give scores for each line rather than the whole test set" )))
    <*> optional precisionArgParser
    <*> specParser
 
@@ -135,6 +140,9 @@ runGEval''' Nothing spec = do
   return $ Just val
 runGEval''' (Just Init) spec = do
   initChallenge spec
+  return Nothing
+runGEval''' (Just LineByLine) spec = do
+  runLineByLine spec
   return Nothing
 
 initChallenge :: GEvalSpecification -> IO ()
