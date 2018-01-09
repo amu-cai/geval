@@ -26,9 +26,9 @@ fullOptionsParser = info (helper <*> optionsParser)
 
 optionsParser :: Parser GEvalOptions
 optionsParser = GEvalOptions
-   <$> switch
-      ( long "init"
-         <> help "Init a sample Gonito challenge rather than run an evaluation" )
+   <$> optional (flag' Init
+                 ( long "init"
+                   <> help "Init a sample Gonito challenge rather than run an evaluation" ))
    <*> optional precisionArgParser
    <*> specParser
 
@@ -127,15 +127,15 @@ attemptToReadOptsFromConfigFile args opts = do
 
 
 runGEval'' :: GEvalOptions -> IO (Maybe MetricValue)
-runGEval'' opts = runGEval''' (geoInit opts) (geoSpec opts)
+runGEval'' opts = runGEval''' (geoSpecialCommand opts) (geoSpec opts)
 
-runGEval''' :: Bool -> GEvalSpecification -> IO (Maybe MetricValue)
-runGEval''' True spec = do
-  initChallenge spec
-  return Nothing
-runGEval''' False spec = do
+runGEval''' :: Maybe GEvalSpecialCommand -> GEvalSpecification -> IO (Maybe MetricValue)
+runGEval''' Nothing spec = do
   val <- geval spec
   return $ Just val
+runGEval''' (Just Init) spec = do
+  initChallenge spec
+  return Nothing
 
 initChallenge :: GEvalSpecification -> IO ()
 initChallenge spec = case gesExpectedDirectory spec of

@@ -14,6 +14,7 @@ module GEval.Core
       MetricOrdering(..),
       getMetricOrdering,
       MetricValue,
+      GEvalSpecialCommand(..),
       GEvalSpecification(..),
       GEvalOptions(..),
       GEvalException(..),
@@ -144,8 +145,10 @@ getExpectedDirectory :: GEvalSpecification -> FilePath
 getExpectedDirectory spec = fromMaybe outDirectory $ gesExpectedDirectory spec
                             where outDirectory = gesOutDirectory spec
 
+data GEvalSpecialCommand = Init
+
 data GEvalOptions = GEvalOptions
-                    { geoInit :: Bool,
+                    { geoSpecialCommand :: Maybe GEvalSpecialCommand,
                       geoPrecision :: Maybe Int,
                       geoSpec :: GEvalSpecification }
 
