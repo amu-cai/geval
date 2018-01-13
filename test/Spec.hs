@@ -104,9 +104,9 @@ main = hspec $ do
     it "empty output is handled" $ do
       runGEvalTest "empty-output" `shouldThrow` (== EmptyOutput)
     it "unexpected data is handled" $
-      runGEvalTest "unexpected-data" `shouldThrow` (== UnexpectedData "input does not start with a digit")
+      runGEvalTest "unexpected-data" `shouldThrow` (== UnexpectedData 3 "input does not start with a digit")
     it "unwanted data is handled" $
-      runGEvalTest "unwanted-data" `shouldThrow` (== UnexpectedData "number expected")
+      runGEvalTest "unwanted-data" `shouldThrow` (== UnexpectedData 2 "number expected")
   describe "precision and recall" $ do
     it "null test" $ do
       precision neverMatch ['a', 'b', 'c'] [0, 1, 2, 3, 4, 5] `shouldBeAlmost` 0.0

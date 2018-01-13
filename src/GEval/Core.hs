@@ -174,7 +174,7 @@ data GEvalException = NoExpectedFile FilePath
                       | TooFewLinesInInput
                       | TooManyLinesInInput
                       | EmptyOutput
-                      | UnexpectedData String
+                      | UnexpectedData Word32 String
                       deriving (Eq)
 
 instance Exception GEvalException
@@ -193,7 +193,7 @@ instance Show GEvalException where
   show TooFewLinesInInput = "Too few lines in the input file"
   show TooManyLinesInInput = "Too many lines in the input file"
   show EmptyOutput = "The output file is empty"
-  show (UnexpectedData message) = "Unexpected data [" ++ message ++ "]"
+  show (UnexpectedData lineNo message) = "Line " ++ (show lineNo) ++ ": Unexpected data [" ++ message ++ "]"
 
 somethingWrongWithFilesMessage :: String -> FilePath -> String
 somethingWrongWithFilesMessage msg filePath = Prelude.concat
@@ -340,7 +340,14 @@ gevalCore' MAP _ = gevalCoreWithoutInput (Right . DLS.splitOn "\t" . unpack)
 gevalCore' (LogLossHashed nbOfBits) _ = helper nbOfBits
   -- for LogLossHashed we "salt" each hash with the line number
   where helper nbOfBits expectedLineSource outLineSource =
-          gevalCore''' (ParserSpecWithoutInput (Right . id) (Right . id)) (\(lineNo, (t,d)) -> calculateLogLoss nbOfBits lineNo t (parseDistributionWrapper nbOfBits lineNo d)) averageC negate (WithoutInput expectedLineSource outLineSource)
+          gevalCore''' (ParserSpecWithoutInput (Right . id) tentativeParser) (\(lineNo, (t,d)) -> calculateLogLoss nbOfBits lineNo t (parseDistributionWrapper nbOfBits lineNo d)) averageC negate (WithoutInput expectedLineSource outLineSource)
+        -- Unfortunately, we're parsing the distribution twice. We need to
+        -- tentatively parse the distribution when the line number is unknown
+        -- (so we just set it to 1)
+        -- @TODO Fix this.
+        tentativeParser t = case parseDistribution nbOfBits 1 t of
+          Right _ -> Right t
+          Left m -> Left m
 
 gevalCore' CharMatch inputLineSource = helper inputLineSource
  where
@@ -352,7 +359,7 @@ gevalCore' CharMatch inputLineSource = helper inputLineSource
 parseDistributionWrapper :: Word32 -> Word32 -> Text -> HashedDistribution
 parseDistributionWrapper nbOfBits seed distroSpec = case parseDistribution nbOfBits seed distroSpec of
   Right distro -> distro
-  Left m -> throw $ UnexpectedData m
+  Left s -> throw $ UnexpectedData 0 s -- shouldn't be here anyway
 
 data SourceItem a = Got a | Wrong String | Done
 
@@ -407,15 +414,15 @@ instance (MonadBaseControl IO m, MonadIO m, MonadThrow m) => EvaluationContext (
                         <$> ZipSource (items expectedLineSource expParser)
                         <*> ZipSource (items outLineSource outParser)
   checkStep _ step (lineNo, WrappedParsedRecordWithoutInput (Got expectedItem) (Got outItem)) = Just $ step (lineNo, ParsedRecordWithoutInput expectedItem outItem)
-  checkStep _ _ (_, WrappedParsedRecordWithoutInput _ (Wrong m)) = throw $ UnexpectedData m
-  checkStep _ _ (_, WrappedParsedRecordWithoutInput (Wrong m) _) = throw $ UnexpectedData m
+  checkStep _ _ (lineNo, WrappedParsedRecordWithoutInput _ (Wrong m)) = throw $ UnexpectedData lineNo m
+  checkStep _ _ (lineNo, WrappedParsedRecordWithoutInput (Wrong m) _) = throw $ UnexpectedData lineNo m
   checkStep _ _ (_, WrappedParsedRecordWithoutInput (Got _) Done) = throw TooFewLines
   checkStep _ _ (_, WrappedParsedRecordWithoutInput Done (Got _)) = throw TooManyLines
   checkStep _ _ (_, WrappedParsedRecordWithoutInput Done Done) = Nothing
 
   checkStepM step (lineNo, WrappedParsedRecordWithoutInput (Got expectedItem) (Got outItem)) = Just <$> step (lineNo, ParsedRecordWithoutInput expectedItem outItem)
-  checkStepM _ (_, WrappedParsedRecordWithoutInput _ (Wrong m)) = throw $ UnexpectedData m
-  checkStepM _ (_, WrappedParsedRecordWithoutInput (Wrong m) _) = throw $ UnexpectedData m
+  checkStepM _ (lineNo, WrappedParsedRecordWithoutInput _ (Wrong m)) = throw $ UnexpectedData lineNo m
+  checkStepM _ (lineNo, WrappedParsedRecordWithoutInput (Wrong m) _) = throw $ UnexpectedData lineNo m
   checkStepM _ (_, WrappedParsedRecordWithoutInput (Got _) Done) = throwM TooFewLines
   checkStepM _ (_, WrappedParsedRecordWithoutInput Done (Got _)) = throwM TooManyLines
   checkStepM _ (_, WrappedParsedRecordWithoutInput Done Done) = return Nothing
@@ -436,9 +443,9 @@ instance (MonadBaseControl IO m, MonadIO m, MonadThrow m) => EvaluationContext (
                         <$> ZipSource (items expectedLineSource expParser)
                         <*> ZipSource (items outLineSource outParser))
   checkStep _ step (lineNo, WrappedParsedRecordWithInput (Got inputItem) (Got expectedItem) (Got outItem)) = Just $ step (lineNo, ParsedRecordWithInput inputItem expectedItem outItem)
-  checkStep _ _ (_, WrappedParsedRecordWithInput _ _ (Wrong m)) = throw $ UnexpectedData m
-  checkStep _ _ (_, WrappedParsedRecordWithInput _ (Wrong m) _) = throw $ UnexpectedData m
-  checkStep _ _ (_, WrappedParsedRecordWithInput (Wrong m) _ _) = throw $ UnexpectedData m
+  checkStep _ _ (lineNo, WrappedParsedRecordWithInput _ _ (Wrong m)) = throw $ UnexpectedData lineNo m
+  checkStep _ _ (lineNo, WrappedParsedRecordWithInput _ (Wrong m) _) = throw $ UnexpectedData lineNo m
+  checkStep _ _ (lineNo, WrappedParsedRecordWithInput (Wrong m) _ _) = throw $ UnexpectedData lineNo m
   checkStep _ _ (_, WrappedParsedRecordWithInput _ (Got _) Done) = throw TooFewLines
   checkStep _ _ (_, WrappedParsedRecordWithInput _ Done (Got _)) = throw TooManyLines
   checkStep _ _ (_, WrappedParsedRecordWithInput Done (Got _) (Got _)) = throw TooFewLinesInInput
@@ -446,9 +453,9 @@ instance (MonadBaseControl IO m, MonadIO m, MonadThrow m) => EvaluationContext (
   checkStep _ _ (_, WrappedParsedRecordWithInput Done Done Done) = Nothing
 
   checkStepM step (lineNo, WrappedParsedRecordWithInput (Got inputItem) (Got expectedItem) (Got outItem)) = Just <$> step (lineNo, ParsedRecordWithInput inputItem expectedItem outItem)
-  checkStepM _ (_, WrappedParsedRecordWithInput _ _ (Wrong m)) = throw $ UnexpectedData m
-  checkStepM _ (_, WrappedParsedRecordWithInput _ (Wrong m) _) = throw $ UnexpectedData m
-  checkStepM _ (_, WrappedParsedRecordWithInput (Wrong m) _ _) = throw $ UnexpectedData m
+  checkStepM _ (lineNo, WrappedParsedRecordWithInput _ _ (Wrong m)) = throw $ UnexpectedData lineNo m
+  checkStepM _ (lineNo, WrappedParsedRecordWithInput _ (Wrong m) _) = throw $ UnexpectedData lineNo m
+  checkStepM _ (lineNo, WrappedParsedRecordWithInput (Wrong m) _ _) = throw $ UnexpectedData lineNo m
   checkStepM _ (_, WrappedParsedRecordWithInput _ (Got _) Done) = throw TooFewLines
   checkStepM _ (_, WrappedParsedRecordWithInput _ Done (Got _)) = throw TooManyLines
   checkStepM _ (_, WrappedParsedRecordWithInput Done (Got _) (Got _)) = throw TooFewLinesInInput
