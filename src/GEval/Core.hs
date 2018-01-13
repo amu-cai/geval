@@ -388,7 +388,7 @@ gevalCoreGeneralized' :: forall m ctxt c d . (EvaluationContext ctxt m, MonadBas
 gevalCoreGeneralized' parserSpec itemStep aggregator finalStep context = do
    v <- runResourceT $
      (((getZipSource $ (,)
-       <$> ZipSource (CL.sourceList [1..])
+       <$> ZipSource (CL.sourceList [(getFirstLineNo (Proxy :: Proxy m) context)..])
        <*> (ZipSource $ recordSource context parserSpec)) =$= CL.map (checkStep (Proxy :: Proxy m) itemStep)) $$ CL.catMaybes =$ aggregator)
    return $ finalStep v
 
@@ -397,6 +397,7 @@ class EvaluationContext ctxt m where
   data WrappedParsedRecord ctxt :: *
   data ParsedRecord ctxt :: *
   recordSource :: ctxt -> ParserSpec ctxt -> Source (ResourceT m) (WrappedParsedRecord ctxt)
+  getFirstLineNo :: Proxy m -> ctxt -> Word32
   getExpectedFilePath :: ctxt -> String
   getOutFilePath :: ctxt -> String
   checkStep :: Proxy m -> ((Word32, ParsedRecord ctxt) -> c) -> (Word32, WrappedParsedRecord ctxt) -> Maybe c
@@ -408,6 +409,7 @@ instance (MonadBaseControl IO m, MonadIO m, MonadThrow m) => EvaluationContext (
   data ParserSpec (WithoutInput m e o) = ParserSpecWithoutInput (Text -> Either String e) (Text -> Either String o)
   data WrappedParsedRecord (WithoutInput m e o) = WrappedParsedRecordWithoutInput (SourceItem e) (SourceItem o)
   data ParsedRecord (WithoutInput m e o) = ParsedRecordWithoutInput e o
+  getFirstLineNo _ (WithoutInput _ (LineSource _ _ lineNo)) = lineNo
   getExpectedFilePath (WithoutInput (LineSource _ expectedFilePath _) _) = expectedFilePath
   getOutFilePath (WithoutInput _ (LineSource _ outFilePath _)) = outFilePath
   recordSource (WithoutInput expectedLineSource outLineSource) (ParserSpecWithoutInput expParser outParser) = getZipSource $ WrappedParsedRecordWithoutInput
@@ -436,6 +438,7 @@ instance (MonadBaseControl IO m, MonadIO m, MonadThrow m) => EvaluationContext (
   data ParserSpec (WithInput m i e o) = ParserSpecWithInput (Text -> Either String i) (Text -> Either String e) (Text -> Either String o)
   data WrappedParsedRecord (WithInput m i e o) = WrappedParsedRecordWithInput (SourceItem i) (SourceItem e) (SourceItem o)
   data ParsedRecord (WithInput m i e o) = ParsedRecordWithInput i e o
+  getFirstLineNo _ (WithInput _ _ (LineSource _ _ lineNo)) = lineNo
   getExpectedFilePath (WithInput _ (LineSource _ expectedFilePath _) _) = expectedFilePath
   getOutFilePath (WithInput _ _ (LineSource _ outFilePath _)) = outFilePath
   recordSource (WithInput inputLineSource expectedLineSource outLineSource) (ParserSpecWithInput inpParser expParser outParser) = getZipSource $ (\x (y,z) -> WrappedParsedRecordWithInput x y z)
