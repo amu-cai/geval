@@ -54,6 +54,7 @@ import Data.Maybe
 import qualified Data.List.Split as DLS
 
 import Control.Monad.IO.Class
+import Control.Monad ((<=<))
 
 import Data.Attoparsec.Text (parseOnly)
 
@@ -287,7 +288,7 @@ gevalCore' :: (MonadIO m, MonadThrow m, MonadBaseControl IO m) => Metric -> Line
 gevalCore' MSE _ = gevalCoreWithoutInput outParser outParser itemError averageC id
   where outParser = getValue . TR.double
 
-gevalCore' BLEU _ = gevalCoreWithoutInput (Prelude.map Prelude.words . DLS.splitOn "\t" . unpack) (Prelude.words . unpack) bleuCombine bleuAgg bleuFinal
+gevalCore' BLEU _ = gevalCoreWithoutInput (Right . Prelude.map Prelude.words . DLS.splitOn "\t" . unpack) (Right . Prelude.words . unpack) bleuCombine bleuAgg bleuFinal
   where bleuFinal (p1, p2, p3, p4, rl, l1, l2, l3, l4) = ((p1 /. l1) * (p2 /. l2) * (p3 /. l3) * (p4 /. l4)) ** 0.25 * (brevityPenalty l1 rl)
         bleuCombine (refs, sen) = bleuStep refs sen
         bleuAgg = CC.foldl bleuFuse (0, 0, 0, 0, 0,  0, 0, 0, 0)
@@ -297,20 +298,20 @@ gevalCore' BLEU _ = gevalCoreWithoutInput (Prelude.map Prelude.words . DLS.split
           | c == 0 && r > 0 = 0.0
           | otherwise = exp (1.0 - (r /. c))
 
-gevalCore' Accuracy _ = gevalCoreWithoutInput strip strip hitOrMiss averageC id
+gevalCore' Accuracy _ = gevalCoreWithoutInput (Right . strip) (Right . strip) hitOrMiss averageC id
                       where hitOrMiss (x,y) = if x == y then 1.0 else 0.0
 
 gevalCore' (FMeasure beta) _ = gevalCoreWithoutInput outParser outParser getCount countAgg (fMeasureOnCounts beta)
-  where outParser = detected . getValue . TR.double
-        expParser = expected . getValue . TR.decimal
-        expected 1 = True
-        expected 0 = False
-        expected _ = throw $ UnexpectedData "expected 0 or 1"
+  where outParser = detected <=< (getValue . TR.double)
+        expParser = expected <=< (getValue . TR.decimal)
+        expected 1 = Right True
+        expected 0 = Right False
+        expected _ = Left "expected 0 or 1"
         -- output value could be a probability (for compatibility with other measures)
         detected prob
-          | prob >= 0.0 && prob < detectionThreshold = False
-          | prob >= detectionThreshold && prob <= 1.0 = True
-          | otherwise = throw $ UnexpectedData "expected probability"
+          | prob >= 0.0 && prob < detectionThreshold = Right False
+          | prob >= detectionThreshold && prob <= 1.0 = Right True
+          | otherwise = Left "expected probability"
         detectionThreshold = 0.5
         getCount (True, True)   = (1, 1, 1)
         getCount (True, False)  = (0, 1, 0)
@@ -328,10 +329,10 @@ gevalCore' ClippEU _ = gevalCoreWithoutInput parseClippingSpecs parseClippings m
     clippeuAgg = CC.foldl countFolder (0, 0, 0)
     finalStep counts = f2MeasureOnCounts counts
 
-gevalCore' NMI _ = gevalCoreWithoutInput id id id (CC.foldl updateConfusionMatrix M.empty) normalizedMutualInformationFromConfusionMatrix
+gevalCore' NMI _ = gevalCoreWithoutInput (Right . id) (Right . id) id (CC.foldl updateConfusionMatrix M.empty) normalizedMutualInformationFromConfusionMatrix
 
-gevalCore' MAP _ = gevalCoreWithoutInput (DLS.splitOn "\t" . unpack)
-                                         (DLS.splitOn "\t" . unpack)
+gevalCore' MAP _ = gevalCoreWithoutInput (Right . DLS.splitOn "\t" . unpack)
+                                         (Right . DLS.splitOn "\t" . unpack)
                                          (\(e,g) -> calculateMAPForOneResult e g)
                                          averageC
                                          id
@@ -339,12 +340,12 @@ gevalCore' MAP _ = gevalCoreWithoutInput (DLS.splitOn "\t" . unpack)
 gevalCore' (LogLossHashed nbOfBits) _ = helper nbOfBits
   -- for LogLossHashed we "salt" each hash with the line number
   where helper nbOfBits expectedLineSource outLineSource =
-          gevalCore''' (ParserSpecWithoutInput id id) (\(lineNo, (t,d)) -> calculateLogLoss nbOfBits lineNo t (parseDistributionWrapper nbOfBits lineNo d)) averageC negate (WithoutInput expectedLineSource outLineSource)
+          gevalCore''' (ParserSpecWithoutInput (Right . id) (Right . id)) (\(lineNo, (t,d)) -> calculateLogLoss nbOfBits lineNo t (parseDistributionWrapper nbOfBits lineNo d)) averageC negate (WithoutInput expectedLineSource outLineSource)
 
 gevalCore' CharMatch inputLineSource = helper inputLineSource
  where
    helper inputLineSource expectedLineSource outputLineSource = do
-     gevalCoreGeneralized (ParserSpecWithInput unpack unpack unpack) step countAgg (fMeasureOnCounts charMatchBeta) (WithInput inputLineSource expectedLineSource outputLineSource)
+     gevalCoreGeneralized (ParserSpecWithInput (Right . unpack) (Right . unpack) (Right . unpack)) step countAgg (fMeasureOnCounts charMatchBeta) (WithInput inputLineSource expectedLineSource outputLineSource)
    step (ParsedRecordWithInput inp exp out) = getCharMatchCount inp exp out
    countAgg = CC.foldl countFolder (0, 0, 0)
 
@@ -353,12 +354,12 @@ parseDistributionWrapper nbOfBits seed distroSpec = case parseDistribution nbOfB
   Right distro -> distro
   Left m -> throw $ UnexpectedData m
 
-data SourceItem a = Got a | Done
+data SourceItem a = Got a | Wrong String | Done
 
 skipLineNumber :: (x -> c) -> ((Word32, x) -> c)
 skipLineNumber fun = fun . snd
 
-gevalCoreWithoutInput :: (MonadBaseControl IO m, MonadThrow m, MonadIO m) => (Text -> a) -> (Text -> b) -> ((a, b) -> c) -> (Sink c (ResourceT m) d) -> (d -> Double) -> LineSource (ResourceT m) -> LineSource (ResourceT m) -> m (MetricValue)
+gevalCoreWithoutInput :: (MonadBaseControl IO m, MonadThrow m, MonadIO m) => (Text -> Either String a) -> (Text -> Either String b) -> ((a, b) -> c) -> (Sink c (ResourceT m) d) -> (d -> Double) -> LineSource (ResourceT m) -> LineSource (ResourceT m) -> m (MetricValue)
 gevalCoreWithoutInput expParser outParser itemStep aggregator finalStep expectedLineStream outLineStream =
   gevalCoreGeneralized (ParserSpecWithoutInput expParser outParser) (trans itemStep) aggregator finalStep (WithoutInput expectedLineStream outLineStream)
  where
@@ -397,7 +398,7 @@ class EvaluationContext ctxt m where
 data WithoutInput m e o = WithoutInput (LineSource (ResourceT m)) (LineSource (ResourceT m))
 
 instance (MonadBaseControl IO m, MonadIO m, MonadThrow m) => EvaluationContext (WithoutInput m e o) m where
-  data ParserSpec (WithoutInput m e o) = ParserSpecWithoutInput (Text -> e) (Text -> o)
+  data ParserSpec (WithoutInput m e o) = ParserSpecWithoutInput (Text -> Either String e) (Text -> Either String o)
   data WrappedParsedRecord (WithoutInput m e o) = WrappedParsedRecordWithoutInput (SourceItem e) (SourceItem o)
   data ParsedRecord (WithoutInput m e o) = ParsedRecordWithoutInput e o
   getExpectedFilePath (WithoutInput (LineSource _ expectedFilePath _) _) = expectedFilePath
@@ -406,11 +407,15 @@ instance (MonadBaseControl IO m, MonadIO m, MonadThrow m) => EvaluationContext (
                         <$> ZipSource (items expectedLineSource expParser)
                         <*> ZipSource (items outLineSource outParser)
   checkStep _ step (lineNo, WrappedParsedRecordWithoutInput (Got expectedItem) (Got outItem)) = Just $ step (lineNo, ParsedRecordWithoutInput expectedItem outItem)
+  checkStep _ _ (_, WrappedParsedRecordWithoutInput _ (Wrong m)) = throw $ UnexpectedData m
+  checkStep _ _ (_, WrappedParsedRecordWithoutInput (Wrong m) _) = throw $ UnexpectedData m
   checkStep _ _ (_, WrappedParsedRecordWithoutInput (Got _) Done) = throw TooFewLines
   checkStep _ _ (_, WrappedParsedRecordWithoutInput Done (Got _)) = throw TooManyLines
   checkStep _ _ (_, WrappedParsedRecordWithoutInput Done Done) = Nothing
 
   checkStepM step (lineNo, WrappedParsedRecordWithoutInput (Got expectedItem) (Got outItem)) = Just <$> step (lineNo, ParsedRecordWithoutInput expectedItem outItem)
+  checkStepM _ (_, WrappedParsedRecordWithoutInput _ (Wrong m)) = throw $ UnexpectedData m
+  checkStepM _ (_, WrappedParsedRecordWithoutInput (Wrong m) _) = throw $ UnexpectedData m
   checkStepM _ (_, WrappedParsedRecordWithoutInput (Got _) Done) = throwM TooFewLines
   checkStepM _ (_, WrappedParsedRecordWithoutInput Done (Got _)) = throwM TooManyLines
   checkStepM _ (_, WrappedParsedRecordWithoutInput Done Done) = return Nothing
@@ -421,7 +426,7 @@ data WithInput m i e o = WithInput (LineSource (ResourceT m)) (LineSource (Resou
 getInputFilePath (WithInput (LineSource _ inputFilePath _) _ _) = inputFilePath
 
 instance (MonadBaseControl IO m, MonadIO m, MonadThrow m) => EvaluationContext (WithInput m i e o) m where
-  data ParserSpec (WithInput m i e o) = ParserSpecWithInput (Text -> i) (Text -> e) (Text -> o)
+  data ParserSpec (WithInput m i e o) = ParserSpecWithInput (Text -> Either String i) (Text -> Either String e) (Text -> Either String o)
   data WrappedParsedRecord (WithInput m i e o) = WrappedParsedRecordWithInput (SourceItem i) (SourceItem e) (SourceItem o)
   data ParsedRecord (WithInput m i e o) = ParsedRecordWithInput i e o
   getExpectedFilePath (WithInput _ (LineSource _ expectedFilePath _) _) = expectedFilePath
@@ -431,6 +436,9 @@ instance (MonadBaseControl IO m, MonadIO m, MonadThrow m) => EvaluationContext (
                         <$> ZipSource (items expectedLineSource expParser)
                         <*> ZipSource (items outLineSource outParser))
   checkStep _ step (lineNo, WrappedParsedRecordWithInput (Got inputItem) (Got expectedItem) (Got outItem)) = Just $ step (lineNo, ParsedRecordWithInput inputItem expectedItem outItem)
+  checkStep _ _ (_, WrappedParsedRecordWithInput _ _ (Wrong m)) = throw $ UnexpectedData m
+  checkStep _ _ (_, WrappedParsedRecordWithInput _ (Wrong m) _) = throw $ UnexpectedData m
+  checkStep _ _ (_, WrappedParsedRecordWithInput (Wrong m) _ _) = throw $ UnexpectedData m
   checkStep _ _ (_, WrappedParsedRecordWithInput _ (Got _) Done) = throw TooFewLines
   checkStep _ _ (_, WrappedParsedRecordWithInput _ Done (Got _)) = throw TooManyLines
   checkStep _ _ (_, WrappedParsedRecordWithInput Done (Got _) (Got _)) = throw TooFewLinesInInput
@@ -438,6 +446,9 @@ instance (MonadBaseControl IO m, MonadIO m, MonadThrow m) => EvaluationContext (
   checkStep _ _ (_, WrappedParsedRecordWithInput Done Done Done) = Nothing
 
   checkStepM step (lineNo, WrappedParsedRecordWithInput (Got inputItem) (Got expectedItem) (Got outItem)) = Just <$> step (lineNo, ParsedRecordWithInput inputItem expectedItem outItem)
+  checkStepM _ (_, WrappedParsedRecordWithInput _ _ (Wrong m)) = throw $ UnexpectedData m
+  checkStepM _ (_, WrappedParsedRecordWithInput _ (Wrong m) _) = throw $ UnexpectedData m
+  checkStepM _ (_, WrappedParsedRecordWithInput (Wrong m) _ _) = throw $ UnexpectedData m
   checkStepM _ (_, WrappedParsedRecordWithInput _ (Got _) Done) = throw TooFewLines
   checkStepM _ (_, WrappedParsedRecordWithInput _ Done (Got _)) = throw TooManyLines
   checkStepM _ (_, WrappedParsedRecordWithInput Done (Got _) (Got _)) = throw TooFewLinesInInput
@@ -453,21 +464,23 @@ averageC = getZipSink
   <$> ZipSink CC.sum
   <*> ZipSink CC.length
 
-items :: MonadResource m => LineSource m -> (Text -> a) -> Source m (SourceItem a)
+items :: MonadResource m => LineSource m -> (Text -> Either String a) -> Source m (SourceItem a)
 items (LineSource lineSource _ _) parser =
-  (lineSource =$= CL.map ((\x -> Got x) . parser)) >> yield Done
+  (lineSource =$= CL.map (toItem . parser)) >> yield Done
+  where toItem (Right x) = Got x
+        toItem (Left m) = Wrong m
 
 itemError :: (Double, Double) -> Double
 itemError (exp, out) = (exp-out)**2
 
-getValue :: Num a => Either String (a, Text) -> a
+getValue :: Num a => Either String (a, Text) -> Either String a
 getValue (Right (x, reminder)) =
   if Data.Text.null reminder || Data.Text.head reminder == '\t'
-  then x
-  else throw $ UnexpectedData "number expected"
-getValue (Left s) = throw $ UnexpectedData s
+  then Right x
+  else Left "number expected"
+getValue (Left s) = Left s
 
 controlledParse parser t =
   case parseOnly parser t of
-    (Right v) -> v
-    (Left _) -> throw $ UnexpectedData "cannot parse line"
+    (Right v) -> Right v
+    (Left _) -> Left "cannot parse line"

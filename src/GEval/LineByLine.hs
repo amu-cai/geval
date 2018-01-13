@@ -52,7 +52,7 @@ gevalLineByLineCore metric inputFilePath expectedFilePath outFilePath consum =
      ((getZipSource $ (,)
        <$> ZipSource (CL.sourceList [1..])
        <*> (ZipSource $ recordSource context parserSpec)) =$= CL.mapM (checkStepM evaluateLine) =$= CL.catMaybes $$ consum)
-  where parserSpec = (ParserSpecWithInput id id id)
+  where parserSpec = (ParserSpecWithInput (Right . id) (Right . id) (Right . id))
         context = (WithInput inputLineSource expectedLineSource outputLineSource)
         inputLineSource = fileAsLineSource inputFilePath
         expectedLineSource = fileAsLineSource expectedFilePath
