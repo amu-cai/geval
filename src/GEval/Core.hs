@@ -147,7 +147,8 @@ data GEvalSpecification = GEvalSpecification
                             gesOutFile :: String,
                             gesExpectedFile :: String,
                             gesInputFile :: String,
-                            gesMetric :: Metric }
+                            gesMetric :: Metric,
+                            gesPrecision :: Maybe Int}
 
 getExpectedDirectory :: GEvalSpecification -> FilePath
 getExpectedDirectory spec = fromMaybe outDirectory $ gesExpectedDirectory spec
@@ -157,7 +158,6 @@ data GEvalSpecialCommand = Init | LineByLine
 
 data GEvalOptions = GEvalOptions
                     { geoSpecialCommand :: Maybe GEvalSpecialCommand,
-                      geoPrecision :: Maybe Int,
                       geoSpec :: GEvalSpecification }
 
 
@@ -206,7 +206,8 @@ defaultGEvalSpecification = GEvalSpecification {
   gesOutFile = defaultOutFile,
   gesExpectedFile = defaultExpectedFile,
   gesInputFile = defaultInputFile,
-  gesMetric = defaultMetric }
+  gesMetric = defaultMetric,
+  gesPrecision = Nothing}
 
 isEmptyFile :: FilePath -> IO (Bool)
 isEmptyFile path = do

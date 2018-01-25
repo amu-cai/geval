@@ -34,7 +34,6 @@ optionsParser = GEvalOptions
                  (flag' LineByLine
                  ( long "line-by-line"
                    <> help "Give scores for each line rather than the whole test set" )))
-   <*> optional precisionArgParser
    <*> specParser
 
 precisionArgParser :: Parser Int
@@ -80,6 +79,7 @@ specParser = GEvalSpecification
     <> metavar "INPUT"
     <> help "The name of the file with the input (applicable only for some metrics)" )
   <*> metricReader
+  <*> optional precisionArgParser
 
 metricReader :: Parser Metric
 metricReader = option auto

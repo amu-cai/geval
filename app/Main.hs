@@ -18,7 +18,7 @@ main = do
     Right (_, Nothing) -> return ()
 
 showTheResult :: GEvalOptions -> MetricValue -> IO ()
-showTheResult opts val = putStrLn $ formatTheResult (geoPrecision opts) val
+showTheResult opts val = putStrLn $ formatTheResult (gesPrecision $ geoSpec opts) val
 
 formatTheResult :: Maybe Int -> MetricValue -> String
 formatTheResult Nothing  = show
