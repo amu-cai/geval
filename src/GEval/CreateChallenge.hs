@@ -18,7 +18,7 @@ createChallenge :: FilePath -> GEvalSpecification -> IO ()
 createChallenge expectedDirectory spec = do
   D.createDirectoryIfMissing False expectedDirectory
   createFile (expectedDirectory </> "README.md") $ readmeMDContents metric testName
-  createFile (expectedDirectory </> configFileName) $ configContents metric testName
+  createFile (expectedDirectory </> configFileName) $ configContents metric precision testName
   D.createDirectoryIfMissing False trainDirectory
   createFile (trainDirectory </> "train.tsv") $ trainContents metric
   D.createDirectoryIfMissing False devDirectory
@@ -29,6 +29,7 @@ createChallenge expectedDirectory spec = do
   createFile (testDirectory </> expectedFile) $ testExpectedContents metric
   createFile (expectedDirectory </> ".gitignore") $ gitignoreContents
   where metric = gesMetric spec
+        precision = gesPrecision spec
         testName = gesTestName spec
         trainDirectory = expectedDirectory </> "train"
         devDirectory = expectedDirectory </> "dev-0"
@@ -188,15 +189,17 @@ Directory structure
 |]
 
 
-configContents :: Metric -> String -> String
-configContents metric testName = "--metric " ++
+configContents :: Metric -> Maybe Int -> String -> String
+configContents metric precision testName = "--metric " ++
                                  (show metric) ++
                                  (if testName /= defaultTestName
                                      then
                                         " --test-name " ++ testName
                                      else
-                                        "")
-
+                                     "") ++
+                                 (precisionOpt precision)
+    where precisionOpt Nothing = ""
+          precisionOpt (Just p) = " --precision " ++ (show p)
 
 trainContents :: Metric -> String
 trainContents BLEU = [hereLit|alussa loi jumala taivaan ja maan	he mea hanga na te atua i te timatanga te rangi me te whenua
