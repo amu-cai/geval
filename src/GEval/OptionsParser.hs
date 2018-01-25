@@ -33,14 +33,16 @@ optionsParser = GEvalOptions
                  <|>
                  (flag' LineByLine
                  ( long "line-by-line"
+                   <> short 'l'
                    <> help "Give scores for each line rather than the whole test set" )))
    <*> specParser
 
 precisionArgParser :: Parser Int
 precisionArgParser = option auto
     ( long "precision"
-      <> metavar "PRECISION"
-      <> help "Precision with which the evaluation results should be shown" )
+      <> short 'p'
+      <> metavar "NUMBER-OF-FRACTIONAL-DIGITS"
+      <> help "Arithmetic precision, i.e. the number of fractional digits to be shown" )
 
 specParser :: Parser GEvalSpecification
 specParser = GEvalSpecification
@@ -56,24 +58,28 @@ specParser = GEvalSpecification
                   <> help "Directory with expected test results (the same as OUT-DIRECTORY, if not given)" ))
   <*> strOption
   ( long "test-name"
+    <> short 't'
     <> value defaultTestName
     <> showDefault
     <> metavar "NAME"
     <> help "Test name (i.e. subdirectory with results or expected results)" )
   <*> strOption
   ( long "out-file"
+    <> short 'o'
     <> value defaultOutFile
     <> showDefault
     <> metavar "OUT"
     <> help "The name of the file to be evaluated" )
   <*> strOption
   ( long "expected-file"
+    <> short 'e'
     <> value defaultExpectedFile
     <> showDefault
     <> metavar "EXPECTED"
     <> help "The name of the file with expected results" )
   <*> strOption
   ( long "input-file"
+    <> short 'i'
     <> value defaultInputFile
     <> showDefault
     <> metavar "INPUT"
@@ -84,6 +90,7 @@ specParser = GEvalSpecification
 metricReader :: Parser Metric
 metricReader = option auto
                ( long "metric"
+                 <> short 'm'
                  <> value defaultMetric
                  <> showDefault
                  <> metavar "METRIC"
