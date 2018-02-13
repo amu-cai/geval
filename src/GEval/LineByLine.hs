@@ -49,9 +49,13 @@ runLineByLine spec = do
 gevalLineByLineCore :: Metric -> FilePath -> FilePath -> FilePath -> Sink LineRecord (ResourceT IO) () -> IO ()
 gevalLineByLineCore metric inputFilePath expectedFilePath outFilePath consum =
   runResourceT $
-     ((getZipSource $ (,)
+     ((gevalLineByLineSource metric inputFilePath expectedFilePath outFilePath) $$ consum)
+
+gevalLineByLineSource :: Metric -> FilePath -> FilePath -> FilePath -> Source (ResourceT IO) LineRecord
+gevalLineByLineSource metric inputFilePath expectedFilePath outFilePath =
+  (getZipSource $ (,)
        <$> ZipSource (CL.sourceList [1..])
-       <*> (ZipSource $ recordSource context parserSpec)) =$= CL.mapM (checkStepM evaluateLine) =$= CL.catMaybes $$ consum)
+       <*> (ZipSource $ recordSource context parserSpec)) =$= CL.mapM (checkStepM evaluateLine) =$= CL.catMaybes
   where parserSpec = (ParserSpecWithInput (Right . id) (Right . id) (Right . id))
         context = (WithInput inputLineSource expectedLineSource outputLineSource)
         inputLineSource = fileAsLineSource inputFilePath
