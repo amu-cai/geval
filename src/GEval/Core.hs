@@ -33,7 +33,8 @@ module GEval.Core
       EvaluationContext(..),
       ParserSpec(..),
       fileAsLineSource,
-      checkAndGetFiles
+      checkAndGetFiles,
+      getOutFile
     ) where
 
 import Data.Conduit
@@ -154,7 +155,7 @@ getExpectedDirectory :: GEvalSpecification -> FilePath
 getExpectedDirectory spec = fromMaybe outDirectory $ gesExpectedDirectory spec
                             where outDirectory = gesOutDirectory spec
 
-data GEvalSpecialCommand = Init | LineByLine
+data GEvalSpecialCommand = Init | LineByLine | Diff FilePath
 
 data GEvalOptions = GEvalOptions
                     { geoSpecialCommand :: Maybe GEvalSpecialCommand,
@@ -232,7 +233,7 @@ checkAndGetFiles gevalSpec = do
   checkInputFileIfNeeded metric inputFilePath
   return (inputFilePath, expectedFilePath, outFilePath)
    where expectedFilePath = expectedTestDirectory </> (gesExpectedFile gevalSpec)
-         outFilePath = outTestDirectory </> (gesOutFile gevalSpec)
+         outFilePath = getOutFile gevalSpec (gesOutFile gevalSpec)
          inputFilePath = expectedTestDirectory </> (gesInputFile gevalSpec)
          expectedTestDirectory = expectedDirectory </> testName
          outTestDirectory = outDirectory </> testName
@@ -240,6 +241,11 @@ checkAndGetFiles gevalSpec = do
          outDirectory = gesOutDirectory gevalSpec
          testName = gesTestName gevalSpec
          metric = gesMetric gevalSpec
+
+getOutFile :: GEvalSpecification -> FilePath -> FilePath
+getOutFile gevalSpec out = outDirectory </> testName </> out
+  where outDirectory = gesOutDirectory gevalSpec
+        testName = gesTestName gevalSpec
 
 checkInputFileIfNeeded :: Metric -> FilePath -> IO ()
 checkInputFileIfNeeded CharMatch inputFilePath = do

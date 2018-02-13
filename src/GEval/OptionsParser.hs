@@ -34,7 +34,13 @@ optionsParser = GEvalOptions
                  (flag' LineByLine
                  ( long "line-by-line"
                    <> short 'l'
-                   <> help "Give scores for each line rather than the whole test set" )))
+                   <> help "Give scores for each line rather than the whole test set" ))
+                 <|>
+                 (Diff <$> strOption
+                    ( long "diff"
+                      <> short 'd'
+                      <> metavar "OTHER-OUT"
+                      <> help "compare results")))
    <*> specParser
 
 precisionArgParser :: Parser Int
@@ -150,6 +156,9 @@ runGEval''' (Just Init) spec = do
   return Nothing
 runGEval''' (Just LineByLine) spec = do
   runLineByLine spec
+  return Nothing
+runGEval''' (Just (Diff otherOut)) spec = do
+  runDiff otherOut spec
   return Nothing
 
 initChallenge :: GEvalSpecification -> IO ()
