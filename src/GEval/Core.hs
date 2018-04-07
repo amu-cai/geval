@@ -47,6 +47,7 @@ import Data.Text
 import Data.Text.Read as TR
 import Control.Applicative
 import Control.Exception
+import Text.Read (readMaybe)
 import Control.Conditional (unlessM, whenM)
 import qualified System.Directory as D
 import System.Posix
@@ -312,7 +313,20 @@ gevalCore' BLEU _ = gevalCoreWithoutInput (Right . Prelude.map Prelude.words . D
           | otherwise = exp (1.0 - (r /. c))
 
 gevalCore' Accuracy _ = gevalCoreWithoutInput (Right . strip) (Right . strip) hitOrMiss averageC id
-                      where hitOrMiss (x,y) = if x == y then 1.0 else 0.0
+                      where hitOrMiss (exp,got) = if (normalizeProbForAccuracy exp got) == exp then 1.0 else 0.0
+                            -- if the expected value is 0 or 1 treat values between 0.0 and 1.0 as probabilities
+                            -- for the positive outcome
+                            normalizeProbForAccuracy :: Text -> Text -> Text
+                            normalizeProbForAccuracy exp got
+                              | exp == (pack "1") = case tryReadingAsFloat got of
+                                            Just p -> if p >= 0.5 && p <= 1.0 then exp else got
+                                            Nothing -> got
+                              | exp == (pack "0") = case tryReadingAsFloat got of
+                                            Just p -> if p < 0.5 && p >= 0.0 then exp else got
+                                            Nothing -> got
+                              | otherwise = got
+                            tryReadingAsFloat :: Text -> Maybe Float
+                            tryReadingAsFloat = readMaybe . unpack
 
 gevalCore' (FMeasure beta) _ = gevalCoreWithoutInput outParser outParser getCount countAgg (fMeasureOnCounts beta)
   where outParser = detected <=< (getValue . TR.double)

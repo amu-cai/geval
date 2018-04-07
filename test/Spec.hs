@@ -53,6 +53,8 @@ main = hspec $ do
   describe "Accuracy" $ do
     it "simple example" $
       runGEvalTest "accuracy-simple" `shouldReturnAlmost` 0.6
+    it "with probs" $
+      runGEvalTest "accuracy-probs" `shouldReturnAlmost` 0.4
   describe "F-measure" $ do
     it "simple example" $
       runGEvalTest "f-measure-simple" `shouldReturnAlmost` 0.57142857
