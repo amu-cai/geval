@@ -175,6 +175,11 @@ main = hspec $ do
                                 ["one", "one"]) `shouldBeAlmost` 0.5
     it "simple test" $ do
       runGEvalTest "map-simple" `shouldReturnAlmost` 0.444444444
+  describe "LogLoss" $ do
+    it "simple" $ do
+      runGEvalTest "logloss-simple" `shouldReturnAlmost` 0.31824
+    it "perfect" $ do
+      runGEvalTest "logloss-perfect" `shouldReturnAlmost` 0.0
   describe "evaluating single lines" $ do
     it "RMSE" $ do
       gevalCoreOnSingleLines RMSE (LineInFile "stub1" 1 "blabla")

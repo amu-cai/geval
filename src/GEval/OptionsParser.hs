@@ -100,7 +100,7 @@ metricReader = option auto
                  <> value defaultMetric
                  <> showDefault
                  <> metavar "METRIC"
-                 <> help "Metric to be used - RMSE, MSE, Accuracy, F-measure (specify as F1, F2, F0.25, etc.), MAP, BLEU, NMI, ClippEU, LogLossHashed or CharMatch" )
+                 <> help "Metric to be used - RMSE, MSE, Accuracy, LogLoss, F-measure (specify as F1, F2, F0.25, etc.), MAP, BLEU, NMI, ClippEU, LogLossHashed or CharMatch" )
 
 runGEval :: [String] -> IO (Either (ParserResult GEvalOptions) (Maybe MetricValue))
 runGEval args = do

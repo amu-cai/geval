@@ -79,7 +79,7 @@ defaultLogLossHashedSize :: Word32
 defaultLogLossHashedSize = 10
 
 data Metric = RMSE | MSE | BLEU | Accuracy | ClippEU | FMeasure Double | NMI | LogLossHashed Word32 | CharMatch
-              | MAP
+              | MAP | LogLoss
               deriving (Eq)
 
 instance Show Metric where
@@ -98,6 +98,7 @@ instance Show Metric where
                                                        (show nbOfBits))
   show CharMatch = "CharMatch"
   show MAP = "MAP"
+  show LogLoss = "LogLoss"
 
 instance Read Metric where
   readsPrec _ ('R':'M':'S':'E':theRest) = [(RMSE, theRest)]
@@ -112,6 +113,7 @@ instance Read Metric where
   readsPrec p ('L':'o':'g':'L':'o':'s':'s':'H':'a':'s':'h':'e':'d':theRest) = case readsPrec p theRest of
     [(nbOfBits, theRest)] -> [(LogLossHashed nbOfBits, theRest)]
     _ -> [(LogLossHashed defaultLogLossHashedSize, theRest)]
+  readsPrec _ ('L':'o':'g':'L':'o':'s':'s':theRest) = [(LogLoss, theRest)]
   readsPrec p ('C':'h':'a':'r':'M':'a':'t':'c':'h':theRest) = [(CharMatch, theRest)]
   readsPrec _ ('M':'A':'P':theRest) = [(MAP, theRest)]
 
@@ -128,6 +130,7 @@ getMetricOrdering NMI = TheHigherTheBetter
 getMetricOrdering (LogLossHashed _) = TheLowerTheBetter
 getMetricOrdering CharMatch = TheHigherTheBetter
 getMetricOrdering MAP = TheHigherTheBetter
+getMetricOrdering LogLoss = TheLowerTheBetter
 
 defaultOutDirectory = "."
 defaultTestName = "test-A"
@@ -293,6 +296,9 @@ data LineInFile = LineInFile FilePath Word32 Text
 
 gevalCore' :: (MonadIO m, MonadThrow m, MonadBaseControl IO m) => Metric -> LineSource (ResourceT m) -> LineSource (ResourceT m) -> LineSource (ResourceT m) -> m (MetricValue)
 gevalCore' MSE _ = gevalCoreWithoutInput outParser outParser itemError averageC id
+  where outParser = getValue . TR.double
+
+gevalCore' LogLoss _ = gevalCoreWithoutInput outParser outParser itemLogLossError averageC id
   where outParser = getValue . TR.double
 
 gevalCore' BLEU _ = gevalCoreWithoutInput (Right . Prelude.map Prelude.words . DLS.splitOn "\t" . unpack) (Right . Prelude.words . unpack) bleuCombine bleuAgg bleuFinal
@@ -489,6 +495,17 @@ items (LineSource lineSource _ _) parser =
 
 itemError :: (Double, Double) -> Double
 itemError (exp, out) = (exp-out)**2
+
+itemLogLossError :: (Double, Double) -> Double
+itemLogLossError (exp, out)
+  | exp' > 0.5 = - (log out')
+  | otherwise = - (log (1 - out'))
+  where exp' = normalizeAsProb exp
+        out' = normalizeAsProb out
+        normalizeAsProb v
+          | v >= 1.0 = 1.0
+          | v <= 0.0 = 0.0
+          | otherwise = v
 
 getValue :: Num a => Either String (a, Text) -> Either String a
 getValue (Right (x, reminder)) =

@@ -160,6 +160,15 @@ See Christopher D. Manning, Prabhakar Raghavan and Hinrich Schütze,
 more discussion of the metric.
 |] ++ (commonReadmeMDContents testName)
 
+readmeMDContents LogLoss testName = [i|
+Give the probability of a positive sentiment
+============================================
+
+Give the probability that a sentence expresses a positive sentiment.
+
+This a sample challenge for the log-loss metric.
+
+|] ++ (commonReadmeMDContents testName)
 
 readmeMDContents _ testName = [i|
 GEval sample challenge
@@ -245,6 +254,11 @@ honour	GB	honor
 titbit	GB	smakołyk
 tidbit	US	smakołyk
 |]
+trainContents LogLoss = [hereLit|0.0	Hell, no!!!
+0.0	I hate this stuff
+1.0	Lekker!!!
+0.0	Boring, boring, boring
+|]
 trainContents _ = [hereLit|0.06	0.39	0	0.206
 1.00	1.00	1	0.017
 317.8	5.20	67	0.048
@@ -276,6 +290,10 @@ devInContents MAP = [hereLit|US	noc
 GB	wózek dziecięcy
 GB	wizualizować
 |]
+devInContents LogLoss = [hereLit|Great stuff!
+Boring stuff
+That's good
+|]
 devInContents _ = [hereLit|0.72	0	0.007
 9.54	62	0.054
 |]
@@ -304,6 +322,10 @@ time traveler
 devExpectedContents MAP = [hereLit|night	nite
 pram
 visualise
+|]
+devExpectedContents LogLoss = [hereLit|1.0
+0.0
+1.0
 |]
 devExpectedContents _ = [hereLit|0.82
 95.2
@@ -336,6 +358,10 @@ testInContents MAP = [hereLit|US	wózek dziecięcy
 GB	słoń
 US	słoń
 |]
+testInContents LogLoss = [hereLit|That's great, ha, ha, I love it!
+Super-duper!!
+That is incredibly boring.
+|]
 testInContents _ = [hereLit|1.52	2	0.093
 30.06	14	0.009
 |]
@@ -366,6 +392,10 @@ nothing
 testExpectedContents MAP = [hereLit|trolley
 elephant
 elephant
+|]
+testExpectedContents LogLoss = [hereLit|1.0
+1.0
+0.0
 |]
 testExpectedContents _ = [hereLit|0.11
 17.2
