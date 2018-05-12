@@ -60,6 +60,8 @@ import Control.Monad ((<=<))
 
 import Data.Attoparsec.Text (parseOnly)
 
+import Data.Conduit.SmartSource
+
 import GEval.BLEU
 import GEval.Common
 import GEval.ClippEU
@@ -259,7 +261,7 @@ checkInputFileIfNeeded _ _ = return ()
 
 fileAsLineSource :: FilePath -> LineSource (ResourceT IO)
 fileAsLineSource filePath =
-  LineSource (CB.sourceFile filePath $= CT.decodeUtf8Lenient =$= CT.lines) filePath 1
+  LineSource (smartSource [] Nothing (parseSmartSpec filePath) $= CT.decodeUtf8Lenient =$= CT.lines) filePath 1
 
 gevalCoreOnSingleLines :: Metric -> LineInFile -> LineInFile -> LineInFile -> IO (MetricValue)
 gevalCoreOnSingleLines metric inpLine expLine outLine =

@@ -26,6 +26,7 @@ library
                      , GEval.LogLossHashed
                      , GEval.CharMatch
                      , GEval.LineByLine
+                     , Data.Conduit.SmartSource
   build-depends:       base >= 4.7 && < 5
                      , cond
                      , conduit
@@ -48,6 +49,9 @@ library
                      , vector
                      , mtl
                      , edit-distance
+                     , bytestring
+                     , http-conduit
+                     , transformers
   default-language:    Haskell2010
 
 executable geval
@@ -72,6 +76,9 @@ test-suite geval-test
                      , text
                      , attoparsec
                      , edit-distance
+                     , resourcet
+                     , conduit
+                     , conduit-extra
   ghc-options:         -threaded -rtsopts -with-rtsopts=-N
   default-language:    Haskell2010
 

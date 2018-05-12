@@ -15,6 +15,12 @@ import Text.EditDistance
 
 import qualified Test.HUnit as HU
 
+import Data.Conduit.SmartSource
+import qualified Data.Conduit.Text as CT
+import Data.Conduit
+import Control.Monad.Trans.Resource
+import qualified Data.Conduit.List as CL
+
 informationRetrievalBookExample :: [(String, Int)]
 informationRetrievalBookExample = [("o", 2), ("o", 2), ("d", 2), ("x", 3), ("d", 3),
                                    ("x", 1), ("o", 1), ("x", 1), ( "x", 1), ("x", 1), ("x", 1),
@@ -187,7 +193,39 @@ main = hspec $ do
       gevalCoreOnSingleLines RMSE (LineInFile "stub1" 1 "blabla")
                                   (LineInFile "stub2" 1 "3.4")
                                   (LineInFile "stub3" 1 "2.6") `shouldReturnAlmost` 0.8
+  describe "smart sources" $ do
+    it "smart specs are parsed" $ do
+      parseSmartSpec "" `shouldBe` NoSpec
+      parseSmartSpec "-" `shouldBe` Stdin
+      parseSmartSpec "http://gonito.net/foo" `shouldBe` Http "http://gonito.net/foo"
+      parseSmartSpec "https://gonito.net" `shouldBe` Https "https://gonito.net"
+      parseSmartSpec "branch:" `shouldBe` GitSpec "branch" Nothing
+      parseSmartSpec "37be:foo/bar.tsv" `shouldBe` GitSpec "37be" (Just "foo/bar.tsv")
+      parseSmartSpec "bla/xyz:foo/bar.tsv" `shouldBe` GitSpec "bla/xyz" (Just "foo/bar.tsv")
+      parseSmartSpec "out.tsv" `shouldBe` FileNameSpec "out.tsv"
+      parseSmartSpec "dev-1/out.tsv" `shouldBe` FilePathSpec "dev-1/out.tsv"
+      parseSmartSpec "../out.tsv" `shouldBe` FilePathSpec "../out.tsv"
+      parseSmartSpec "4a5f" `shouldBe` PossiblyGitSpec "4a5f"
+      parseSmartSpec "!!" `shouldBe` PossiblyGitSpec "!!"
+      parseSmartSpec "branch" `shouldBe` PossiblyGitSpec "branch"
+    it "smart specs are parsed in context" $ do
+      parseSmartSpecInContext [] Nothing "xyz" `shouldBe` Just (PossiblyGitSpec "xyz")
+      parseSmartSpecInContext ["foo", "bar"] Nothing "out.tsv" `shouldBe` Just (FilePathSpec "foo/out.tsv")
+      parseSmartSpecInContext [] (Just "default") "" `shouldBe` Just (FileNameSpec "default")
+      parseSmartSpecInContext ["foo"] (Just "default") "" `shouldBe` Just (FilePathSpec "foo/default")
+      parseSmartSpecInContext ["foo/bar"] (Just "default") "http://gonito.net" `shouldBe` Just (Http "http://gonito.net")
+      parseSmartSpecInContext ["foo/bar"] Nothing "" `shouldBe` Nothing
+    it "sources are accessed" $ do
+      readFromSmartSource [] Nothing "test/files/foo.txt" `shouldReturn` ["foo\n"]
+      readFromSmartSource [] Nothing "https://httpbin.org/robots.txt" `shouldReturn`
+        ["User-agent: *\nDisallow: /deny\n"]
 
+readFromSmartSource :: [FilePath] -> Maybe FilePath -> String -> IO [String]
+readFromSmartSource defaultDirs defaultFile specS = do
+  let (Just spec) = parseSmartSpecInContext defaultDirs defaultFile specS
+  let source = smartSource defaultDirs defaultFile spec
+  contents <- runResourceT (source $$ CT.decodeUtf8Lenient =$ CL.consume)
+  return $ Prelude.map unpack contents
 
 neverMatch :: Char -> Int -> Bool
 neverMatch _ _ = False
