@@ -113,6 +113,35 @@ The metric is average log-loss calculated for 10-bit hashes.
 Train file is a just text file (one utterance per line).
 In an input file, left and right contexts (TAB-separated) are given.
 In an expected file, the word to be guessed is given.
+
+Format of the output files
+--------------------------
+
+For each input line, a probability distribution for words in a gap
+must be given:
+
+    word1:logprob1 word2:logprob2 ... wordN:logprobN :logprob0
+
+where *logprobi* is the logarithm of the probability for *wordi* and
+*logprob0* is the logarithm of the probability mass for all the other
+words (it will be spread between all 1024 fingerprint values). If the
+respective probabilities do not sum up to 1, they will be normalised with
+softmax.
+
+Note: the separator here is space, not TAB!
+
+### Probs
+
+Probabilities could be given (instead of logprobs):
+
+  * if **all** values look as probs and **at least value** is positive, we treat
+    the values as probs rather then logprobs (single value 0.0 is treated
+    as a logprob, i.e. probability 1.0!);
+  * if their sum is greater than 1.0, then we normalize simply by dividing by the sum;
+  * if the sum is smaller than 1.0 and there is no entry for all the other words,
+    we add such an entry for the missing probability mass;
+  * if the sum is smaller than 1.0 and there is an entry for all the other words,
+    we normalize by dividing by the sum.
 |] ++ (commonReadmeMDContents testName)
 
 readmeMDContents CharMatch testName = [i|
