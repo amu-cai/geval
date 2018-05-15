@@ -95,6 +95,10 @@ main = hspec $ do
       runGEvalTest "log-loss-hashed-simple" `shouldReturnAlmost` 2.398479083333333
     it "example with unnormalized values" $ do
       runGEvalTest "log-loss-hashed-not-normalized" `shouldReturnAlmost` 1.0468455186722887
+    it "with probs instead of log probs" $ do
+      runGEvalTest "log-loss-hashed-probs" `shouldReturnAlmost` 4.11631293099392
+    it "with probs instead of log probs (with normalization)" $ do
+      runGEvalTest "log-loss-hashed-probs-normalized" `shouldReturnAlmost` 1.55537749098853
   describe "reading options" $ do
     it "can get the metric" $ do
       extractMetric "bleu-complex" `shouldReturn` (Just BLEU)
