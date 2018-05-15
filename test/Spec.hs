@@ -8,6 +8,7 @@ import GEval.BLEU
 import GEval.ClippEU
 import GEval.PrecisionRecall
 import GEval.ClusteringMetrics
+import GEval.BIO
 import Data.Attoparsec.Text
 import Options.Applicative
 import Data.Text
@@ -191,7 +192,63 @@ main = hspec $ do
       gevalCoreOnSingleLines RMSE (LineInFile "stub1" 1 "blabla")
                                   (LineInFile "stub2" 1 "3.4")
                                   (LineInFile "stub3" 1 "2.6") `shouldReturnAlmost` 0.8
-
+  describe "BIO format" $ do
+    it "just parse" $ do
+      let (Right r) = parseOnly (bioSequenceParser <* endOfInput) "O B-city/NEW_YORK I-city B-city/KALISZ I-city O B-name"
+      r `shouldBe` [Outside,
+                    Beginning "city" (Just "NEW_YORK"),
+                    Inside "city" Nothing,
+                    Beginning "city" (Just "KALISZ"),
+                    Inside "city" Nothing,
+                    Outside,
+                    Beginning "name" Nothing]
+    it "simplest entity" $ do
+      let (Right ents) = parseBioSequenceIntoEntities "B-city"
+      ents `shouldBe` [TaggedEntity (TaggedSpan 1 1) "city" Nothing]
+    it "multi-word entity" $ do
+      let (Right ents) = parseBioSequenceIntoEntities "B-date I-date"
+      ents `shouldBe` [TaggedEntity (TaggedSpan 1 2) "date" Nothing]
+    it "multi-word entity with normalized text" $ do
+      let (Right ents) = parseBioSequenceIntoEntities "B-date/FOO I-date/BAR"
+      ents `shouldBe` [TaggedEntity (TaggedSpan 1 2) "date" (Just "FOO_BAR")]
+    it "simplest entity with something outside" $ do
+      let (Right ents) = parseBioSequenceIntoEntities "O B-city"
+      ents `shouldBe` [TaggedEntity (TaggedSpan 2 2) "city" Nothing]
+    it "another simple case" $ do
+      let (Right ents) = parseBioSequenceIntoEntities "B-city B-city"
+      ents `shouldBe` [TaggedEntity (TaggedSpan 1 1) "city" Nothing,
+                       TaggedEntity (TaggedSpan 2 2) "city" Nothing]
+    it "just parse into entities" $ do
+      let (Right ents) = parseBioSequenceIntoEntities "O O B-city/LOS_ANGELES I-city B-city/KLUCZBORK O B-name O B-person/JOHN I-person/VON I-person/NEUMANN"
+      ents `shouldBe` [TaggedEntity (TaggedSpan 3 4) "city" (Just "LOS_ANGELES"),
+                       TaggedEntity (TaggedSpan 5 5) "city" (Just "KLUCZBORK"),
+                       TaggedEntity (TaggedSpan 7 7) "name" (Nothing),
+                       TaggedEntity (TaggedSpan 9 11) "person" (Just "JOHN_VON_NEUMANN")]
+    it "another entity parse" $ do
+      let (Right ents) = parseBioSequenceIntoEntities "B-month/JULY B-month/JULY O O B-foo/bar"
+      ents `shouldBe` [TaggedEntity (TaggedSpan 1 1) "month" (Just "JULY"),
+                       TaggedEntity (TaggedSpan 2 2) "month" (Just "JULY"),
+                       TaggedEntity (TaggedSpan 5 5) "foo" (Just "bar")]
+    it "another entity parse" $ do
+      let (Right ents) = parseBioSequenceIntoEntities "B-city/LOS I-city/ANGELES O B-city/NEW I-city/YORK"
+      ents `shouldBe` [TaggedEntity (TaggedSpan 1 2) "city" (Just "LOS_ANGELES"),
+                       TaggedEntity (TaggedSpan 4 5) "city" (Just "NEW_YORK")]
+    it "parse entity" $ do
+      let (Right ents) = parseBioSequenceIntoEntities "B-surname/BROWN B-surname/SMITH"
+      ents `shouldBe` [TaggedEntity (TaggedSpan 1 1) "surname" (Just "BROWN"),
+                       TaggedEntity (TaggedSpan 2 2) "surname" (Just "SMITH")]
+    it "parse entity" $ do
+      let (Right ents) = parseBioSequenceIntoEntities "O B-surname/SMITH"
+      ents `shouldBe` [TaggedEntity (TaggedSpan 2 2) "surname" (Just "SMITH")]
+    it "check counting" $ do
+      gatherCountsForBIO [TaggedEntity (TaggedSpan 2 2) "surname" (Just "SMITH")] [TaggedEntity (TaggedSpan 1 1) "surname" (Just "BROWN"),
+                                                                                   TaggedEntity (TaggedSpan 2 2) "surname" (Just "SMITH")] `shouldBe` (1, 1, 2)
+    it "check F1 on a more complicated example" $ do
+      runGEvalTest "bio-f1-complex" `shouldReturnAlmost` 0.625
+    it "calculate F1" $ do
+      runGEvalTest "bio-f1-simple" `shouldReturnAlmost` 0.5
+    it "check perfect score" $ do
+      runGEvalTest "bio-f1-perfect" `shouldReturnAlmost` 1.0
 
 neverMatch :: Char -> Int -> Bool
 neverMatch _ _ = False

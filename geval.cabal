@@ -26,6 +26,7 @@ library
                      , GEval.LogLossHashed
                      , GEval.CharMatch
                      , GEval.LineByLine
+                     , GEval.BIO
   build-depends:       base >= 4.7 && < 5
                      , cond
                      , conduit

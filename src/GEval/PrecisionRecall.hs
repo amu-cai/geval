@@ -3,7 +3,7 @@
 module GEval.PrecisionRecall(calculateMAPForOneResult,
                              fMeasure, f1Measure, f2Measure, precision, recall,
                              fMeasureOnCounts, f1MeasureOnCounts, f2MeasureOnCounts, countFolder,
-                             precisionAndRecall, precisionAndRecallFromCounts, maxMatch)
+                             precisionAndRecall, precisionAndRecallFromCounts, maxMatch, maxMatchOnOrdered)
        where
 
 import GEval.Common
@@ -65,13 +65,23 @@ precision matchFun expected got = fst $ precisionAndRecall matchFun expected got
 recall :: (a -> b -> Bool) -> [a] -> [b] -> Double
 recall matchFun expected got = snd $ precisionAndRecall matchFun expected got
 
+
+maxMatchOnOrdered :: Eq a => (a -> a -> Bool) -> [a] -> [a] -> Int
+maxMatchOnOrdered laterThan expected got =
+   let (matched, _) = foldl' step (0, expected) got
+   in matched
+         where step (matched, l@(h:t)) g
+                | h == g = (matched+1, t)
+                | h `laterThan` g  = (matched, l)
+                | otherwise = step (matched, t) g
+               step (matched, []) g = (matched, [])
+
 -- counting maximum match with maximum bipartite matching
 -- (we build an auxiliary graph and do a max-flow on this)
 maxMatch :: (a -> b -> Bool) -> [a] -> [b] -> Int
 maxMatch matchFun expected got = mf
    where (b, e, g) = buildGraph matchFun expected got
          mf = maxFlow g (fst b) (fst e)
-
 
 buildGraph :: (a -> b -> Bool) -> [a] -> [b] -> (LNode Int, LNode Int, Gr Int Int)
 buildGraph matchFun expected got = (b, e, g)

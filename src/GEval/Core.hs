@@ -53,6 +53,7 @@ import qualified System.Directory as D
 import System.Posix
 import System.FilePath
 import Data.Maybe
+import Data.Tuple
 import qualified Data.List.Split as DLS
 
 import Control.Monad.IO.Class
@@ -67,6 +68,7 @@ import GEval.PrecisionRecall
 import GEval.ClusteringMetrics
 import GEval.LogLossHashed
 import GEval.CharMatch
+import GEval.BIO
 
 import qualified Data.HashMap.Strict as M
 
@@ -80,7 +82,7 @@ defaultLogLossHashedSize :: Word32
 defaultLogLossHashedSize = 10
 
 data Metric = RMSE | MSE | BLEU | Accuracy | ClippEU | FMeasure Double | NMI | LogLossHashed Word32 | CharMatch
-              | MAP | LogLoss
+              | MAP | LogLoss | BIOF1
               deriving (Eq)
 
 instance Show Metric where
@@ -100,6 +102,7 @@ instance Show Metric where
   show CharMatch = "CharMatch"
   show MAP = "MAP"
   show LogLoss = "LogLoss"
+  show BIOF1 = "BIO-F1"
 
 instance Read Metric where
   readsPrec _ ('R':'M':'S':'E':theRest) = [(RMSE, theRest)]
@@ -117,6 +120,7 @@ instance Read Metric where
   readsPrec _ ('L':'o':'g':'L':'o':'s':'s':theRest) = [(LogLoss, theRest)]
   readsPrec p ('C':'h':'a':'r':'M':'a':'t':'c':'h':theRest) = [(CharMatch, theRest)]
   readsPrec _ ('M':'A':'P':theRest) = [(MAP, theRest)]
+  readsPrec _ ('B':'I':'O':'-':'F':'1':theRest) = [(BIOF1, theRest)]
 
 data MetricOrdering = TheLowerTheBetter | TheHigherTheBetter
 
@@ -132,6 +136,7 @@ getMetricOrdering (LogLossHashed _) = TheLowerTheBetter
 getMetricOrdering CharMatch = TheHigherTheBetter
 getMetricOrdering MAP = TheHigherTheBetter
 getMetricOrdering LogLoss = TheLowerTheBetter
+getMetricOrdering BIOF1 = TheHigherTheBetter
 
 defaultOutDirectory = "."
 defaultTestName = "test-A"
@@ -381,7 +386,11 @@ gevalCore' CharMatch inputLineSource = helper inputLineSource
    helper inputLineSource expectedLineSource outputLineSource = do
      gevalCoreGeneralized (ParserSpecWithInput (Right . unpack) (Right . unpack) (Right . unpack)) step countAgg (fMeasureOnCounts charMatchBeta) (WithInput inputLineSource expectedLineSource outputLineSource)
    step (ParsedRecordWithInput inp exp out) = getCharMatchCount inp exp out
-   countAgg = CC.foldl countFolder (0, 0, 0)
+
+gevalCore' BIOF1 _ = gevalCoreWithoutInput parseBioSequenceIntoEntities parseBioSequenceIntoEntities (uncurry gatherCountsForBIO) countAgg f1MeasureOnCounts
+
+countAgg :: Monad m => ConduitM (Int, Int, Int) o m (Int, Int, Int)
+countAgg = CC.foldl countFolder (0, 0, 0)
 
 parseDistributionWrapper :: Word32 -> Word32 -> Text -> HashedDistribution
 parseDistributionWrapper nbOfBits seed distroSpec = case parseDistribution nbOfBits seed distroSpec of

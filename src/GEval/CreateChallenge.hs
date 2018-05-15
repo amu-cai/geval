@@ -199,6 +199,18 @@ This a sample challenge for the log-loss metric.
 
 |] ++ (commonReadmeMDContents testName)
 
+readmeMDContents BIOF1 testName = [i|
+Tag and normalize names
+=======================
+
+Tag names in the tokenized text and normalized them.
+
+The output should be given in the BIO format with the normalized forms given after slashes (see
+`dev-0/expected.tsv` for an example).
+
+The metric is F1 counted on entities (not labels).
+|] ++ (commonReadmeMDContents testName)
+
 readmeMDContents _ testName = [i|
 GEval sample challenge
 ======================
@@ -288,6 +300,10 @@ trainContents LogLoss = [hereLit|0.0	Hell, no!!!
 1.0	Lekker!!!
 0.0	Boring, boring, boring
 |]
+trainContents BIOF1 = [hereLit|O O O B-surname/BOND O B-firstname/JAMES B-surname/BOND	My name is Bond , James Bond
+O O O O O	There is no name here
+B-firstname/JOHN I-surname/VON I-surname/NEUMANN	John von Nueman
+|]
 trainContents _ = [hereLit|0.06	0.39	0	0.206
 1.00	1.00	1	0.017
 317.8	5.20	67	0.048
@@ -323,6 +339,9 @@ devInContents LogLoss = [hereLit|Great stuff!
 Boring stuff
 That's good
 |]
+devInContents BIOF1 = [hereLit|Adam and Eve
+Mr Jan Kowalski
+|]
 devInContents _ = [hereLit|0.72	0	0.007
 9.54	62	0.054
 |]
@@ -355,6 +374,9 @@ visualise
 devExpectedContents LogLoss = [hereLit|1.0
 0.0
 1.0
+|]
+devExpectedContents BIOF1 = [hereLit|B-firstname/ADAM O B-firstname/EVE
+O B-firstname/JAN B-surname/KOWALSKI
 |]
 devExpectedContents _ = [hereLit|0.82
 95.2
@@ -391,6 +413,9 @@ testInContents LogLoss = [hereLit|That's great, ha, ha, I love it!
 Super-duper!!
 That is incredibly boring.
 |]
+testInContents BIOF1 = [hereLit|Alan Tring
+No name here
+|]
 testInContents _ = [hereLit|1.52	2	0.093
 30.06	14	0.009
 |]
@@ -425,6 +450,9 @@ elephant
 testExpectedContents LogLoss = [hereLit|1.0
 1.0
 0.0
+|]
+testExpectedContents BIOF1 = [hereLit|B-firstname/ALAN B-surname/TURING
+O O O
 |]
 testExpectedContents _ = [hereLit|0.11
 17.2
