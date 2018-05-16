@@ -169,11 +169,9 @@ initChallenge spec = case gesExpectedDirectory spec of
 showInitInstructions = do
   putStrLn [here|
 Run:
-    geval --init --expected-directory CHALLENGE
+    geval --init --expected-directory CHALLENGE --metric METRIC-NAME --precision NUMBER-OF-DIGITS
 to create a directory CHALLENGE representing a Gonito challenge.
 
-You can specify a metric with `--metric METRIC-NAME` option.
-
-Note that `--out-directory` option is not taken into account with `--init` option.
+(Note that `--out-directory` option is not taken into account with `--init` option.)
 |]
   exitFailure
