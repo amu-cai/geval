@@ -61,6 +61,7 @@ data WordSpecWithLogProb = WordSpecWithLogProb WordSpec Double
 
 parseDistributionFromWordList :: Word32 -> Word32 -> T.Text -> Either String HashedDistribution
 parseDistributionFromWordList nbOfBits seed distroSpec = (parseDistributionFromWordList' nbOfBits seed) =<<
+  normalizeLogProbs =<<
   lookForProbs =<<
   (processEithers $ map getWordSpecWithLogProb $ T.splitOn " " distroSpec)
 
@@ -98,6 +99,17 @@ areProbs specs = all isProb specs && any isPositiveProb specs
 
 toLogProbs :: [WordSpecWithLogProb] -> [WordSpecWithLogProb]
 toLogProbs = map (\(WordSpecWithLogProb w p) -> (WordSpecWithLogProb w (log p)))
+
+normalizeLogProbs :: [WordSpecWithLogProb] -> Either String [WordSpecWithLogProb]
+normalizeLogProbs specs = if isProbTotalIncorrect probTotal
+                             && probTotal < 1.0 && probTotal > 0.0
+                             && not (any (\(WordSpecWithLogProb w _) -> isAnyWord w) specs)
+                             && all (\(WordSpecWithLogProb _ lp) -> lp <= 0) specs
+                          then
+                            Right ((WordSpecWithLogProb AnyWord (log (1-probTotal))):specs)
+                          else
+                            Right specs
+  where probTotal = sum $ map (\(WordSpecWithLogProb _ logp) -> exp logp) specs
 
 normalizeProbs :: [WordSpecWithLogProb] -> [WordSpecWithLogProb]
 normalizeProbs specs = if isProbTotalIncorrect probTotal

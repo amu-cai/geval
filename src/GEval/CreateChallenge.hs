@@ -125,8 +125,12 @@ must be given:
 where *logprobi* is the logarithm of the probability for *wordi* and
 *logprob0* is the logarithm of the probability mass for all the other
 words (it will be spread between all 1024 fingerprint values). If the
-respective probabilities do not sum up to 1, they will be normalised with
-softmax.
+respective probabilities do not sum up to 1:
+
+  * if the sum is larger than 0.0 and smaller than 1.0, and no logprob0
+    is given, log of the remaining probablity mass will be assigned to logprob0,
+  * otherwise they will be normalised with.
+softmax
 
 Note: the separator here is space, not TAB!
 
