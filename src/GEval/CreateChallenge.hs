@@ -101,6 +101,8 @@ Cluster proverbs for languages.
 This is a sample challenge for flat clustering (unsupervised learning challenge).
 |] ++ (commonReadmeMDContents testName)
 
+readmeMDContents (LikelihoodHashed b) testname = readmeMDContents (LogLossHashed b) testname
+
 readmeMDContents (LogLossHashed _) testName = [i|
 GEval sample challenge — language model evaluation
 ==================================================
@@ -203,6 +205,16 @@ This a sample challenge for the log-loss metric.
 
 |] ++ (commonReadmeMDContents testName)
 
+readmeMDContents Likelihood testName = [i|
+Give the probability of a positive sentiment
+============================================
+
+Give the probability that a sentence expresses a positive sentiment.
+
+This a sample challenge for the likelihood metric.
+
+|] ++ (commonReadmeMDContents testName)
+
 readmeMDContents BIOF1 testName = [i|
 Tag and normalize names
 =======================
@@ -284,6 +296,7 @@ trainContents NMI = [hereLit|pl	Kto pod kim dołki kopie, ten sam w nie wpada.
 en	The pen is mightier than the sword.
 pl	Baba z wozu, koniom lżej.
 |]
+trainContents (LikelihoodHashed b) = trainContents (LogLossHashed b)
 trainContents (LogLossHashed _) = [hereLit|Ala ma psa i kota
 Basia ma psa
 Nie kupujemy kota w worku
@@ -299,6 +312,7 @@ honour	GB	honor
 titbit	GB	smakołyk
 tidbit	US	smakołyk
 |]
+trainContents Likelihood = trainContents LogLoss
 trainContents LogLoss = [hereLit|0.0	Hell, no!!!
 0.0	I hate this stuff
 1.0	Lekker!!!
@@ -328,6 +342,7 @@ When the going gets tough, the tough get going.
 devInContents (FMeasure _) = [hereLit|b	b	W	29520	779	-28	-32	a	0	0	0	0	0	0	0	0	0	0
 b	b	W	55200	1259	35	9	a	1	0	1	0	0	0	0	0	4000	4000
 |]
+devInContents (LikelihoodHashed b) = devInContents (LogLossHashed b)
 devInContents (LogLossHashed _) = [hereLit|Nie kupuj	w worku
 Ona	psa
 |]
@@ -339,6 +354,7 @@ devInContents MAP = [hereLit|US	noc
 GB	wózek dziecięcy
 GB	wizualizować
 |]
+devInContents Likelihood = devInContents LogLoss
 devInContents LogLoss = [hereLit|Great stuff!
 Boring stuff
 That's good
@@ -364,6 +380,7 @@ devExpectedContents NMI = [hereLit|en
 pl
 en
 |]
+devExpectedContents (LikelihoodHashed b) = devExpectedContents (LogLossHashed b)
 devExpectedContents (LogLossHashed _) = [hereLit|kota
 ma
 |]
@@ -375,6 +392,7 @@ devExpectedContents MAP = [hereLit|night	nite
 pram
 visualise
 |]
+devExpectedContents Likelihood = devExpectedContents LogLoss
 devExpectedContents LogLoss = [hereLit|1.0
 0.0
 1.0
@@ -402,6 +420,7 @@ W marcu, jak w garncu.
 A cada necio agrada su porrada.
 Kwiecień plecień, bo przeplata trochę zimy, trochę lata.
 |]
+testInContents (LikelihoodHashed b) = testInContents (LogLossHashed b)
 testInContents (LogLossHashed _) = [hereLit|Ala	ma
 Ona ma kota	worku
 |]
@@ -413,6 +432,7 @@ testInContents MAP = [hereLit|US	wózek dziecięcy
 GB	słoń
 US	słoń
 |]
+testInContents Likelihood = testInContents LogLoss
 testInContents LogLoss = [hereLit|That's great, ha, ha, I love it!
 Super-duper!!
 That is incredibly boring.
@@ -440,6 +460,7 @@ pl
 es
 pl
 |]
+testExpectedContents (LikelihoodHashed b) = testExpectedContents (LogLossHashed b)
 testExpectedContents (LogLossHashed _) = [hereLit|ma
 w
 |]
@@ -451,6 +472,7 @@ testExpectedContents MAP = [hereLit|trolley
 elephant
 elephant
 |]
+testExpectedContents Likelihood = testExpectedContents LogLoss
 testExpectedContents LogLoss = [hereLit|1.0
 1.0
 0.0

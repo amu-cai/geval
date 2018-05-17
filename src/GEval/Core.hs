@@ -83,7 +83,7 @@ defaultLogLossHashedSize :: Word32
 defaultLogLossHashedSize = 10
 
 data Metric = RMSE | MSE | BLEU | Accuracy | ClippEU | FMeasure Double | NMI | LogLossHashed Word32 | CharMatch
-              | MAP | LogLoss | BIOF1
+              | MAP | LogLoss | Likelihood | BIOF1 | LikelihoodHashed Word32
               deriving (Eq)
 
 instance Show Metric where
@@ -100,9 +100,16 @@ instance Show Metric where
                                                        ""
                                                       else
                                                        (show nbOfBits))
+  show (LikelihoodHashed nbOfBits) = "LikelihoodHashed" ++ (if
+                                                               nbOfBits == defaultLogLossHashedSize
+                                                            then
+                                                              ""
+                                                            else
+                                                              (show nbOfBits))
   show CharMatch = "CharMatch"
   show MAP = "MAP"
   show LogLoss = "LogLoss"
+  show Likelihood = "Likelihood"
   show BIOF1 = "BIO-F1"
 
 instance Read Metric where
@@ -118,7 +125,11 @@ instance Read Metric where
   readsPrec p ('L':'o':'g':'L':'o':'s':'s':'H':'a':'s':'h':'e':'d':theRest) = case readsPrec p theRest of
     [(nbOfBits, theRest)] -> [(LogLossHashed nbOfBits, theRest)]
     _ -> [(LogLossHashed defaultLogLossHashedSize, theRest)]
+  readsPrec p ('L':'i':'k':'e':'l':'i':'h':'o':'o':'d':'H':'a':'s':'h':'e':'d':theRest) = case readsPrec p theRest of
+    [(nbOfBits, theRest)] -> [(LikelihoodHashed nbOfBits, theRest)]
+    _ -> [(LikelihoodHashed defaultLogLossHashedSize, theRest)]
   readsPrec _ ('L':'o':'g':'L':'o':'s':'s':theRest) = [(LogLoss, theRest)]
+  readsPrec _ ('L':'i':'k':'e':'l':'i':'h':'o':'o':'d':theRest) = [(Likelihood, theRest)]
   readsPrec p ('C':'h':'a':'r':'M':'a':'t':'c':'h':theRest) = [(CharMatch, theRest)]
   readsPrec _ ('M':'A':'P':theRest) = [(MAP, theRest)]
   readsPrec _ ('B':'I':'O':'-':'F':'1':theRest) = [(BIOF1, theRest)]
@@ -134,9 +145,11 @@ getMetricOrdering ClippEU  = TheHigherTheBetter
 getMetricOrdering (FMeasure _) = TheHigherTheBetter
 getMetricOrdering NMI = TheHigherTheBetter
 getMetricOrdering (LogLossHashed _) = TheLowerTheBetter
+getMetricOrdering (LikelihoodHashed _) = TheHigherTheBetter
 getMetricOrdering CharMatch = TheHigherTheBetter
 getMetricOrdering MAP = TheHigherTheBetter
 getMetricOrdering LogLoss = TheLowerTheBetter
+getMetricOrdering Likelihood = TheHigherTheBetter
 getMetricOrdering BIOF1 = TheHigherTheBetter
 
 defaultOutDirectory = "."
@@ -308,6 +321,8 @@ gevalCore metric inputFilePath expectedFilePath outFilePath = do
                      (fileAsLineSource expectedFilePath)
                      (fileAsLineSource outFilePath)
 
+logLossToLikehood logLoss = exp (-logLoss)
+
 gevalCoreOnSources :: (MonadIO m, MonadThrow m, MonadBaseControl IO m) => Metric
                      -> LineSource (ResourceT m)
                      -> LineSource (ResourceT m)
@@ -316,6 +331,14 @@ gevalCoreOnSources :: (MonadIO m, MonadThrow m, MonadBaseControl IO m) => Metric
 gevalCoreOnSources RMSE inputLineSource expectedLineSource outLineSource = do
   mse <- gevalCoreOnSources MSE inputLineSource expectedLineSource outLineSource
   return $ mse ** 0.5
+
+gevalCoreOnSources Likelihood inputLineSource expectedLineSource outLineSource = do
+  logLoss <- gevalCoreOnSources LogLoss inputLineSource expectedLineSource outLineSource
+  return $ logLossToLikehood logLoss
+
+gevalCoreOnSources (LikelihoodHashed b) inputLineSource expectedLineSource outLineSource = do
+  logLoss <- gevalCoreOnSources (LogLossHashed b) inputLineSource expectedLineSource outLineSource
+  return $ logLossToLikehood logLoss
 
 gevalCoreOnSources metric inputLineSource expectedLineSource outLineSource = do
   gevalCore' metric inputLineSource expectedLineSource outLineSource

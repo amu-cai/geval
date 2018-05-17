@@ -102,6 +102,9 @@ main = hspec $ do
       runGEvalTest "log-loss-hashed-probs-normalized" `shouldReturnAlmost` 1.55537749098853
     it "with log probs whose probs are summing up to less than 1.0" $ do
       runGEvalTest "log-loss-hashed-normalization" `shouldReturnAlmost` 5.16395069238851
+  describe "LikelihoodHashed challenge" $ do
+    it "example with unnormalized values" $ do
+      runGEvalTest "likelihood-hashed-not-normalized" `shouldReturnAlmost` 0.351043364110715
 
   describe "reading options" $ do
     it "can get the metric" $ do
@@ -190,6 +193,9 @@ main = hspec $ do
       runGEvalTest "logloss-simple" `shouldReturnAlmost` 0.31824
     it "perfect" $ do
       runGEvalTest "logloss-perfect" `shouldReturnAlmost` 0.0
+  describe "Likelihood" $ do
+    it "simple" $ do
+      runGEvalTest "likelihood-simple" `shouldReturnAlmost` 0.72742818469866
   describe "evaluating single lines" $ do
     it "RMSE" $ do
       gevalCoreOnSingleLines RMSE (LineInFile "stub1" 1 "blabla")
