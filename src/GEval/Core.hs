@@ -57,7 +57,7 @@ import Data.Tuple
 import qualified Data.List.Split as DLS
 
 import Control.Monad.IO.Class
-import Control.Monad ((<=<))
+import Control.Monad ((<=<), filterM)
 
 import Data.Attoparsec.Text (parseOnly)
 
@@ -69,6 +69,7 @@ import GEval.ClusteringMetrics
 import GEval.LogLossHashed
 import GEval.CharMatch
 import GEval.BIO
+import Data.Conduit.AutoDecompress
 
 import qualified Data.HashMap.Strict as M
 
@@ -239,17 +240,38 @@ checkAndGetFiles gevalSpec = do
   unlessM (D.doesDirectoryExist expectedDirectory) $ throwM $ NoExpectedDirectory expectedDirectory
   unlessM (D.doesDirectoryExist outTestDirectory) $ throwM $ NoOutTestDirectory outTestDirectory
   unlessM (D.doesDirectoryExist expectedTestDirectory) $ throwM $ NoExpectedTestDirectory expectedTestDirectory
+  inputFilePath <- lookForCompressedFiles inputFilePath'
+  expectedFilePath <- lookForCompressedFiles expectedFilePath'
+  outFilePath <- lookForCompressedFiles outFilePath'
   checkInputFileIfNeeded metric inputFilePath
   return (inputFilePath, expectedFilePath, outFilePath)
-   where expectedFilePath = expectedTestDirectory </> (gesExpectedFile gevalSpec)
-         outFilePath = getOutFile gevalSpec (gesOutFile gevalSpec)
-         inputFilePath = expectedTestDirectory </> (gesInputFile gevalSpec)
+   where expectedFilePath' = expectedTestDirectory </> (gesExpectedFile gevalSpec)
+         outFilePath' = getOutFile gevalSpec (gesOutFile gevalSpec)
+         inputFilePath' = expectedTestDirectory </> (gesInputFile gevalSpec)
          expectedTestDirectory = expectedDirectory </> testName
          outTestDirectory = outDirectory </> testName
          expectedDirectory = getExpectedDirectory gevalSpec
          outDirectory = gesOutDirectory gevalSpec
          testName = gesTestName gevalSpec
          metric = gesMetric gevalSpec
+
+lookForCompressedFiles :: FilePath -> IO FilePath
+lookForCompressedFiles = lookForAlternativeFiles [".gz", ".xz", ".bz2"]
+
+lookForAlternativeFiles :: [String] -> FilePath -> IO FilePath
+lookForAlternativeFiles suffixes filePath
+   | takeExtension filePath `Prelude.elem` suffixes = return filePath
+   | otherwise = do
+       fileIsThere <- D.doesFileExist filePath
+       if fileIsThere
+         then
+           return filePath
+         else
+           do
+             found <- Control.Monad.filterM D.doesFileExist $ Prelude.map (filePath <.>) suffixes
+             return $ case found of
+                        [fp] -> fp
+                        _ -> filePath
 
 getOutFile :: GEvalSpecification -> FilePath -> FilePath
 getOutFile gevalSpec out = outDirectory </> testName </> out
@@ -264,7 +286,7 @@ checkInputFileIfNeeded _ _ = return ()
 
 fileAsLineSource :: FilePath -> LineSource (ResourceT IO)
 fileAsLineSource filePath =
-  LineSource (CB.sourceFile filePath $= CT.decodeUtf8Lenient =$= CT.lines) filePath 1
+  LineSource (CB.sourceFile filePath $= autoDecompress =$= CT.decodeUtf8Lenient =$= CT.lines) filePath 1
 
 gevalCoreOnSingleLines :: Metric -> LineInFile -> LineInFile -> LineInFile -> IO (MetricValue)
 gevalCoreOnSingleLines metric inpLine expLine outLine =

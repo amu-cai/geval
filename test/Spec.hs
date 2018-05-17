@@ -252,6 +252,10 @@ main = hspec $ do
       runGEvalTest "bio-f1-simple" `shouldReturnAlmost` 0.5
     it "check perfect score" $ do
       runGEvalTest "bio-f1-perfect" `shouldReturnAlmost` 1.0
+  describe "automatic decompression" $ do
+    it "more complex test" $ do
+      runGEvalTest "charmatch-complex-compressed" `shouldReturnAlmost` 0.1923076923076923
+
 
 neverMatch :: Char -> Int -> Bool
 neverMatch _ _ = False
