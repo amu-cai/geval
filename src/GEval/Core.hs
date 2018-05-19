@@ -323,7 +323,7 @@ gevalCore metric inputFilePath expectedFilePath outFilePath = do
 
 logLossToLikehood logLoss = exp (-logLoss)
 
-gevalCoreOnSources :: (MonadIO m, MonadThrow m, MonadBaseControl IO m) => Metric
+gevalCoreOnSources :: (MonadIO m, MonadThrow m, MonadUnliftIO m) => Metric
                      -> LineSource (ResourceT m)
                      -> LineSource (ResourceT m)
                      -> LineSource (ResourceT m)
@@ -345,7 +345,7 @@ gevalCoreOnSources metric inputLineSource expectedLineSource outLineSource = do
 
 data LineInFile = LineInFile FilePath Word32 Text
 
-gevalCore' :: (MonadIO m, MonadThrow m, MonadBaseControl IO m) => Metric -> LineSource (ResourceT m) -> LineSource (ResourceT m) -> LineSource (ResourceT m) -> m (MetricValue)
+gevalCore' :: (MonadIO m, MonadThrow m, MonadUnliftIO m) => Metric -> LineSource (ResourceT m) -> LineSource (ResourceT m) -> LineSource (ResourceT m) -> m (MetricValue)
 gevalCore' MSE _ = gevalCoreWithoutInput outParser outParser itemError averageC id
   where outParser = getValue . TR.double
 
@@ -447,25 +447,25 @@ data SourceItem a = Got a | Wrong String | Done
 skipLineNumber :: (x -> c) -> ((Word32, x) -> c)
 skipLineNumber fun = fun . snd
 
-gevalCoreWithoutInput :: (MonadBaseControl IO m, MonadThrow m, MonadIO m) => (Text -> Either String a) -> (Text -> Either String b) -> ((a, b) -> c) -> (Sink c (ResourceT m) d) -> (d -> Double) -> LineSource (ResourceT m) -> LineSource (ResourceT m) -> m (MetricValue)
+gevalCoreWithoutInput :: (MonadUnliftIO m, MonadThrow m, MonadIO m) => (Text -> Either String a) -> (Text -> Either String b) -> ((a, b) -> c) -> (Sink c (ResourceT m) d) -> (d -> Double) -> LineSource (ResourceT m) -> LineSource (ResourceT m) -> m (MetricValue)
 gevalCoreWithoutInput expParser outParser itemStep aggregator finalStep expectedLineStream outLineStream =
   gevalCoreGeneralized (ParserSpecWithoutInput expParser outParser) (trans itemStep) aggregator finalStep (WithoutInput expectedLineStream outLineStream)
  where
    trans :: ((a, b) -> c) -> ParsedRecord (WithoutInput m a b) -> c
    trans step (ParsedRecordWithoutInput x y) = step (x, y)
 
-gevalCore''' :: (MonadBaseControl IO m, MonadThrow m, MonadIO m) => ParserSpec (WithoutInput m a b) -> ((Word32, (a, b)) -> c) -> (Sink c (ResourceT m) d) -> (d -> Double) -> WithoutInput m a b -> m (MetricValue)
+gevalCore''' :: (MonadUnliftIO m, MonadThrow m, MonadIO m) => ParserSpec (WithoutInput m a b) -> ((Word32, (a, b)) -> c) -> (Sink c (ResourceT m) d) -> (d -> Double) -> WithoutInput m a b -> m (MetricValue)
 gevalCore''' parserSpec itemStep aggregator finalStep context =
   gevalCoreGeneralized' parserSpec (trans itemStep) aggregator finalStep context
  where
    trans :: ((Word32, (a, b)) -> c) -> (Word32, ParsedRecord (WithoutInput m a b)) -> c
    trans step (n, ParsedRecordWithoutInput x y) = step (n, (x, y))
 
-gevalCoreGeneralized :: (EvaluationContext ctxt m, MonadBaseControl IO m, MonadThrow m, MonadIO m) => ParserSpec ctxt -> (ParsedRecord ctxt -> c) -> (Sink c (ResourceT m) d) -> (d -> Double) -> ctxt -> m (MetricValue)
+gevalCoreGeneralized :: (EvaluationContext ctxt m, MonadUnliftIO m, MonadThrow m, MonadIO m) => ParserSpec ctxt -> (ParsedRecord ctxt -> c) -> (Sink c (ResourceT m) d) -> (d -> Double) -> ctxt -> m (MetricValue)
 gevalCoreGeneralized parserSpec itemStep aggregator finalStep context =
   gevalCoreGeneralized' parserSpec (skipLineNumber itemStep) aggregator finalStep context
 
-gevalCoreGeneralized' :: forall m ctxt c d . (EvaluationContext ctxt m, MonadBaseControl IO m, MonadThrow m, MonadIO m) => ParserSpec ctxt -> ((Word32, ParsedRecord ctxt) -> c) -> (Sink c (ResourceT m) d) -> (d -> Double) -> ctxt -> m (MetricValue)
+gevalCoreGeneralized' :: forall m ctxt c d . (EvaluationContext ctxt m, MonadUnliftIO m, MonadThrow m, MonadIO m) => ParserSpec ctxt -> ((Word32, ParsedRecord ctxt) -> c) -> (Sink c (ResourceT m) d) -> (d -> Double) -> ctxt -> m (MetricValue)
 gevalCoreGeneralized' parserSpec itemStep aggregator finalStep context = do
    v <- runResourceT $
      (((getZipSource $ (,)
@@ -486,7 +486,7 @@ class EvaluationContext ctxt m where
 
 data WithoutInput m e o = WithoutInput (LineSource (ResourceT m)) (LineSource (ResourceT m))
 
-instance (MonadBaseControl IO m, MonadIO m, MonadThrow m) => EvaluationContext (WithoutInput m e o) m where
+instance (MonadUnliftIO m, MonadIO m, MonadThrow m) => EvaluationContext (WithoutInput m e o) m where
   data ParserSpec (WithoutInput m e o) = ParserSpecWithoutInput (Text -> Either String e) (Text -> Either String o)
   data WrappedParsedRecord (WithoutInput m e o) = WrappedParsedRecordWithoutInput (SourceItem e) (SourceItem o)
   data ParsedRecord (WithoutInput m e o) = ParsedRecordWithoutInput e o
@@ -515,7 +515,7 @@ data WithInput m i e o = WithInput (LineSource (ResourceT m)) (LineSource (Resou
 
 getInputFilePath (WithInput (LineSource _ inputFilePath _) _ _) = inputFilePath
 
-instance (MonadBaseControl IO m, MonadIO m, MonadThrow m) => EvaluationContext (WithInput m i e o) m where
+instance (MonadUnliftIO m, MonadIO m, MonadThrow m) => EvaluationContext (WithInput m i e o) m where
   data ParserSpec (WithInput m i e o) = ParserSpecWithInput (Text -> Either String i) (Text -> Either String e) (Text -> Either String o)
   data WrappedParsedRecord (WithInput m i e o) = WrappedParsedRecordWithInput (SourceItem i) (SourceItem e) (SourceItem o)
   data ParsedRecord (WithInput m i e o) = ParsedRecordWithInput i e o

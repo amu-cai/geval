@@ -15,7 +15,7 @@ import Control.Monad.Base (MonadBase)
 import qualified Data.Conduit.Lzma as XZ
 import qualified Data.Conduit.BZlib as BZ
 
-autoDecompress :: (MonadResource m, MonadBase base m, MonadThrow m, PrimMonad base) => ConduitM ByteString ByteString m ()
+autoDecompress :: (MonadResource m, MonadThrow m, PrimMonad m) => ConduitM ByteString ByteString m ()
 autoDecompress = do
   f <- await
   case f of
@@ -34,7 +34,7 @@ autoDecompress = do
     Nothing -> return ()
 
 
-lookAtMagicNumbers :: (MonadResource m, MonadBase base m, MonadThrow m, PrimMonad base) => (Word8, Word8) -> Conduit ByteString m ByteString
+lookAtMagicNumbers :: (MonadResource m, MonadThrow m, PrimMonad m) => (Word8, Word8) -> Conduit ByteString m ByteString
 lookAtMagicNumbers (31, 139) = ungzip
 lookAtMagicNumbers (66, 90) = BZ.bunzip2
 lookAtMagicNumbers (253, 55) = XZ.decompress Nothing
