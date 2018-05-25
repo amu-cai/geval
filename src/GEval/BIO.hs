@@ -19,6 +19,13 @@ import GEval.Common
 data BIOLabel = Outside | Beginning T.Text (Maybe T.Text) | Inside T.Text (Maybe T.Text)
                 deriving (Eq, Show)
 
+formatBioLabel :: BIOLabel -> T.Text
+formatBioLabel Outside = "O"
+formatBioLabel (Beginning label Nothing) = T.concat ["B-", label]
+formatBioLabel (Beginning label (Just normalized)) = T.concat ["B-", label, "/", normalized]
+formatBioLabel (Inside label Nothing) = T.concat ["I-", label]
+formatBioLabel (Inside label (Just normalized)) = T.concat ["I-", label, "/", normalized]
+
 data TaggedSpan = TaggedSpan Int Int
                   deriving (Eq, Show)
 
@@ -45,7 +52,7 @@ labelSplitToEntity labs@(h@(_,begIx):t) = if isBeginning h && all (\tp -> isInsi
                                      then
                                        Right $ TaggedEntity (TaggedSpan begIx lastItemIx) btp mNormalized
                                      else
-                                       Left "something wrong with label sequence"
+                                       Left $ "inconsistent label sequence `" ++ (T.unpack $ T.intercalate " " $ map (formatBioLabel . fst) labs)  ++ "`"
   where isBeginning (Beginning _ _, _) = True
         isBeginning _ = False
         isInside (Inside _ _, _) = True
