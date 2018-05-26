@@ -9,10 +9,13 @@ import GEval.ClippEU
 import GEval.PrecisionRecall
 import GEval.ClusteringMetrics
 import GEval.BIO
+import GEval.LineByLine
 import Data.Attoparsec.Text
 import Options.Applicative
 import Data.Text
 import Text.EditDistance
+
+import Data.Conduit.List (consume)
 
 import qualified Test.HUnit as HU
 
@@ -263,7 +266,23 @@ main = hspec $ do
   describe "automatic decompression" $ do
     it "more complex test" $ do
       runGEvalTest "charmatch-complex-compressed" `shouldReturnAlmost` 0.1923076923076923
-
+  describe "line by line mode" $ do
+    let sampleChallenge =
+          GEvalSpecification
+          { gesOutDirectory = "test/likelihood-simple/likelihood-simple-solution",
+            gesExpectedDirectory = Just "test/likelihood-simple/likelihood-simple",
+            gesTestName = "test-A",
+            gesOutFile = "out.tsv",
+            gesExpectedFile = "expected.tsv",
+            gesInputFile = "in.tsv",
+            gesMetric = Likelihood,
+            gesPrecision = Nothing }
+    it "simple test" $ do
+      results <- runLineByLineGeneralized sampleChallenge Data.Conduit.List.consume
+      Prelude.map (\(LineRecord inp _ _ _ _) -> inp) results `shouldBe` ["foo",
+                                                                        "bar",
+                                                                        "baz",
+                                                                        "baq"]
 
 neverMatch :: Char -> Int -> Bool
 neverMatch _ _ = False

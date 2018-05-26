@@ -11,7 +11,8 @@ module GEval.LineByLine
        (runLineByLine,
         runLineByLineGeneralized,
         runDiff,
-        runDiffGeneralized
+        runDiffGeneralized,
+        LineRecord(..)
        ) where
 
 import GEval.Core
