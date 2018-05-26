@@ -35,8 +35,8 @@ runLineByLine spec = do
   (inputFilePath, expectedFilePath, outFilePath) <- checkAndGetFiles spec
   gevalLineByLineCore metric inputFilePath expectedFilePath outFilePath consum
    where metric = gesMetric spec
-         consum :: Consumer LineRecord (ResourceT IO) ()
-         consum = (CL.map (encodeUtf8 . formatOutput) =$= CC.unlinesAscii =$= CC.stdout)
+         consum :: ConduitT LineRecord Void (ResourceT IO) ()
+         consum = (CL.map (encodeUtf8 . formatOutput) .| CC.unlinesAscii .| CC.stdout)
          formatOutput (LineRecord inp exp out _ score) = Data.Text.intercalate "\t" [
            formatScore score,
            escapeTabs inp,
@@ -51,13 +51,13 @@ runDiff otherOut spec = do
   (inputFilePath, expectedFilePath, outFilePath) <- checkAndGetFiles spec
   let sourceA = gevalLineByLineSource metric inputFilePath expectedFilePath outFilePath
   let sourceB = gevalLineByLineSource metric inputFilePath expectedFilePath otherOutFilePath
-  runResourceT $
+  runResourceT $ runConduit $
      ((getZipSource $ (,)
        <$> ZipSource sourceA
-       <*> ZipSource sourceB) $$ consum)
+       <*> ZipSource sourceB) .| consum)
   where metric = gesMetric spec
-        consum :: Consumer (LineRecord, LineRecord) (ResourceT IO) ()
-        consum = (CL.filter shouldBeShown =$= CL.map (encodeUtf8 . formatOutput) =$= CC.unlinesAscii =$= CC.stdout)
+        consum :: ConduitT (LineRecord, LineRecord) Void (ResourceT IO) ()
+        consum = (CL.filter shouldBeShown .| CL.map (encodeUtf8 . formatOutput) .| CC.unlinesAscii .| CC.stdout)
         shouldBeShown (LineRecord _ _ outA _ scoreA, LineRecord _ _ outB _ scoreB) =
           outA /= outB && scoreA /= scoreB
         formatOutput (LineRecord inp exp outA _ scoreA, LineRecord _ _ outB _ scoreB) = Data.Text.intercalate "\t" [
@@ -72,16 +72,16 @@ runDiff otherOut spec = do
 escapeTabs :: Text -> Text
 escapeTabs = Data.Text.replace "\t" "<tab>"
 
-gevalLineByLineCore :: Metric -> FilePath -> FilePath -> FilePath -> Sink LineRecord (ResourceT IO) () -> IO ()
+gevalLineByLineCore :: Metric -> FilePath -> FilePath -> FilePath -> ConduitT LineRecord Void (ResourceT IO) () -> IO ()
 gevalLineByLineCore metric inputFilePath expectedFilePath outFilePath consum =
-  runResourceT $
-     ((gevalLineByLineSource metric inputFilePath expectedFilePath outFilePath) $$ consum)
+  runResourceT $ runConduit $
+     ((gevalLineByLineSource metric inputFilePath expectedFilePath outFilePath) .| consum)
 
-gevalLineByLineSource :: Metric -> FilePath -> FilePath -> FilePath -> Source (ResourceT IO) LineRecord
+gevalLineByLineSource :: Metric -> FilePath -> FilePath -> FilePath -> ConduitT () LineRecord (ResourceT IO) ()
 gevalLineByLineSource metric inputFilePath expectedFilePath outFilePath =
   (getZipSource $ (,)
        <$> ZipSource (CL.sourceList [1..])
-       <*> (ZipSource $ recordSource context parserSpec)) =$= CL.mapM (checkStepM evaluateLine) =$= CL.catMaybes
+       <*> (ZipSource $ recordSource context parserSpec)) .| CL.mapM (checkStepM evaluateLine) .| CL.catMaybes
   where parserSpec = (ParserSpecWithInput (Right . id) (Right . id) (Right . id))
         context = (WithInput inputLineSource expectedLineSource outputLineSource)
         inputLineSource = fileAsLineSource inputFilePath
