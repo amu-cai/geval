@@ -1,7 +1,8 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
 
 module Data.Conduit.AutoDecompress
-       (autoDecompress)
+       (autoDecompress,
+        doNothing)
        where
 
 import Data.Conduit
@@ -34,11 +35,11 @@ autoDecompress = do
     Nothing -> return ()
 
 
-lookAtMagicNumbers :: (MonadResource m, MonadThrow m, PrimMonad m) => (Word8, Word8) -> Conduit ByteString m ByteString
+lookAtMagicNumbers :: (MonadResource m, MonadThrow m, PrimMonad m) => (Word8, Word8) -> ConduitT ByteString ByteString m ()
 lookAtMagicNumbers (31, 139) = ungzip
 lookAtMagicNumbers (66, 90) = BZ.bunzip2
 lookAtMagicNumbers (253, 55) = XZ.decompress Nothing
 lookAtMagicNumbers _ = doNothing
 
-doNothing :: Monad m => Conduit ByteString m ByteString
+doNothing :: Monad m => ConduitT a a m ()
 doNothing = Data.Conduit.Combinators.filter (const True)

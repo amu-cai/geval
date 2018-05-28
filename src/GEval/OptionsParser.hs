@@ -155,10 +155,10 @@ runGEval''' (Just Init) spec = do
   initChallenge spec
   return Nothing
 runGEval''' (Just LineByLine) spec = do
-  runLineByLine spec
+  runLineByLine KeepTheOriginalOrder spec
   return Nothing
 runGEval''' (Just (Diff otherOut)) spec = do
-  runDiff otherOut spec
+  runDiff KeepTheOriginalOrder otherOut spec
   return Nothing
 
 initChallenge :: GEvalSpecification -> IO ()

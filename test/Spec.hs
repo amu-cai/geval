@@ -278,11 +278,15 @@ main = hspec $ do
             gesMetric = Likelihood,
             gesPrecision = Nothing }
     it "simple test" $ do
-      results <- runLineByLineGeneralized sampleChallenge Data.Conduit.List.consume
+      results <- runLineByLineGeneralized KeepTheOriginalOrder sampleChallenge Data.Conduit.List.consume
       Prelude.map (\(LineRecord inp _ _ _ _) -> inp) results `shouldBe` ["foo",
                                                                         "bar",
                                                                         "baz",
                                                                         "baq"]
+    it "test sorting" $ do
+      results <- runLineByLineGeneralized FirstTheWorst sampleChallenge Data.Conduit.List.consume
+      Prelude.head (Prelude.map (\(LineRecord inp _ _ _ _) -> inp) results) `shouldBe` "baq"
+
 
 neverMatch :: Char -> Int -> Bool
 neverMatch _ _ = False

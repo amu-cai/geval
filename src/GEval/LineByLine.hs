@@ -12,16 +12,21 @@ module GEval.LineByLine
         runLineByLineGeneralized,
         runDiff,
         runDiffGeneralized,
-        LineRecord(..)
+        LineRecord(..),
+        ResultOrdering(..)
        ) where
 
 import GEval.Core
+
+import Data.Conduit.AutoDecompress (doNothing)
 
 import Data.Conduit
 import qualified Data.Conduit.List as CL
 import qualified Data.Conduit.Combinators as CC
 import Data.Text
 import Data.Text.Encoding
+
+import Data.List (sortBy, sort)
 
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Resource
@@ -33,8 +38,10 @@ import Text.Printf
 data LineRecord = LineRecord Text Text Text Word32 MetricValue
                   deriving (Eq, Show)
 
-runLineByLine :: GEvalSpecification -> IO ()
-runLineByLine spec = runLineByLineGeneralized spec consum
+data ResultOrdering = KeepTheOriginalOrder | FirstTheWorst | FirstTheBest
+
+runLineByLine :: ResultOrdering -> GEvalSpecification -> IO ()
+runLineByLine ordering spec = runLineByLineGeneralized ordering spec consum
    where consum :: ConduitT LineRecord Void (ResourceT IO) ()
          consum = (CL.map (encodeUtf8 . formatOutput) .| CC.unlinesAscii .| CC.stdout)
          formatOutput (LineRecord inp exp out _ score) = Data.Text.intercalate "\t" [
@@ -45,14 +52,25 @@ runLineByLine spec = runLineByLineGeneralized spec consum
          formatScore :: MetricValue -> Text
          formatScore = Data.Text.pack . printf "%f"
 
-runLineByLineGeneralized :: GEvalSpecification -> ConduitT LineRecord Void (ResourceT IO) a -> IO a
-runLineByLineGeneralized spec consum = do
+runLineByLineGeneralized :: ResultOrdering -> GEvalSpecification -> ConduitT LineRecord Void (ResourceT IO) a -> IO a
+runLineByLineGeneralized ordering spec consum = do
   (inputFilePath, expectedFilePath, outFilePath) <- checkAndGetFiles spec
-  gevalLineByLineCore metric inputFilePath expectedFilePath outFilePath consum
+  gevalLineByLineCore metric inputFilePath expectedFilePath outFilePath (sorter ordering .| consum)
   where metric = gesMetric spec
+        sorter KeepTheOriginalOrder = doNothing
+        sorter ordering = gobbleAndDo $ sortBy (sortOrder ordering (getMetricOrdering metric))
+        sortOrder FirstTheWorst TheHigherTheBetter = compareScores
+        sortOrder FirstTheBest TheLowerTheBetter = compareScores
+        sortOrder _ _ = flip compareScores
+        compareScores (LineRecord _ _ _ _ s1) (LineRecord _ _ _ _ s2) = s1 `compare` s2
 
-runDiff :: FilePath -> GEvalSpecification -> IO ()
-runDiff otherOut spec = runDiffGeneralized otherOut spec consum
+gobbleAndDo :: Monad m => ([a] -> [b]) -> ConduitT a b m ()
+gobbleAndDo fun = do
+  l <- CC.sinkList
+  CC.yieldMany $ fun l
+
+runDiff :: ResultOrdering -> FilePath -> GEvalSpecification -> IO ()
+runDiff ordering otherOut spec = runDiffGeneralized ordering otherOut spec consum
   where consum :: ConduitT (LineRecord, LineRecord) Void (ResourceT IO) ()
         consum = (CL.filter shouldBeShown .| CL.map (encodeUtf8 . formatOutput) .| CC.unlinesAscii .| CC.stdout)
         shouldBeShown (LineRecord _ _ outA _ scoreA, LineRecord _ _ outB _ scoreB) =
@@ -66,8 +84,8 @@ runDiff otherOut spec = runDiffGeneralized otherOut spec consum
         formatScoreDiff :: Double -> Text
         formatScoreDiff = Data.Text.pack . printf "%f"
 
-runDiffGeneralized :: FilePath -> GEvalSpecification -> ConduitT (LineRecord, LineRecord) Void (ResourceT IO) a -> IO a
-runDiffGeneralized otherOut spec consum = do
+runDiffGeneralized :: ResultOrdering -> FilePath -> GEvalSpecification -> ConduitT (LineRecord, LineRecord) Void (ResourceT IO) a -> IO a
+runDiffGeneralized ordering otherOut spec consum = do
   let otherOutFilePath = getOutFile spec otherOut
   (inputFilePath, expectedFilePath, outFilePath) <- checkAndGetFiles spec
   let sourceA = gevalLineByLineSource metric inputFilePath expectedFilePath outFilePath
