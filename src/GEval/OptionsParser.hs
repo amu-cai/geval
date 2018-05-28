@@ -41,6 +41,16 @@ optionsParser = GEvalOptions
                       <> short 'd'
                       <> metavar "OTHER-OUT"
                       <> help "compare results")))
+   <*> ((flag' FirstTheWorst
+         (long "sort"
+          <> short 's'
+          <> help "When in line-by-line or diff mode, sort the results from the worst to the best"))
+        <|>
+        (flag' FirstTheBest
+         (long "reverse-sort"
+          <> short 'r'
+          <> help "When in line-by-line or diff mode, sort the results from the best to the worst"))
+        <|> pure KeepTheOriginalOrder)
    <*> specParser
 
 precisionArgParser :: Parser Int
@@ -145,20 +155,20 @@ attemptToReadOptsFromConfigFile args opts = do
 
 
 runGEval'' :: GEvalOptions -> IO (Maybe MetricValue)
-runGEval'' opts = runGEval''' (geoSpecialCommand opts) (geoSpec opts)
+runGEval'' opts = runGEval''' (geoSpecialCommand opts) (geoResultOrdering opts) (geoSpec opts)
 
-runGEval''' :: Maybe GEvalSpecialCommand -> GEvalSpecification -> IO (Maybe MetricValue)
-runGEval''' Nothing spec = do
+runGEval''' :: Maybe GEvalSpecialCommand -> ResultOrdering -> GEvalSpecification -> IO (Maybe MetricValue)
+runGEval''' Nothing _ spec = do
   val <- geval spec
   return $ Just val
-runGEval''' (Just Init) spec = do
+runGEval''' (Just Init) _ spec = do
   initChallenge spec
   return Nothing
-runGEval''' (Just LineByLine) spec = do
-  runLineByLine KeepTheOriginalOrder spec
+runGEval''' (Just LineByLine) ordering spec = do
+  runLineByLine ordering spec
   return Nothing
-runGEval''' (Just (Diff otherOut)) spec = do
-  runDiff KeepTheOriginalOrder otherOut spec
+runGEval''' (Just (Diff otherOut)) ordering spec = do
+  runDiff ordering otherOut spec
   return Nothing
 
 initChallenge :: GEvalSpecification -> IO ()

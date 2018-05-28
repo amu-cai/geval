@@ -16,6 +16,7 @@ module GEval.Core
       MetricValue,
       GEvalSpecialCommand(..),
       GEvalSpecification(..),
+      ResultOrdering(..),
       GEvalOptions(..),
       GEvalException(..),
       defaultGEvalSpecification,
@@ -180,10 +181,12 @@ getExpectedDirectory spec = fromMaybe outDirectory $ gesExpectedDirectory spec
 
 data GEvalSpecialCommand = Init | LineByLine | Diff FilePath
 
+data ResultOrdering = KeepTheOriginalOrder | FirstTheWorst | FirstTheBest
+
 data GEvalOptions = GEvalOptions
                     { geoSpecialCommand :: Maybe GEvalSpecialCommand,
+                      geoResultOrdering :: ResultOrdering,
                       geoSpec :: GEvalSpecification }
-
 
 data GEvalException = NoExpectedFile FilePath
                       | NoOutFile FilePath

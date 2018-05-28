@@ -38,8 +38,6 @@ import Text.Printf
 data LineRecord = LineRecord Text Text Text Word32 MetricValue
                   deriving (Eq, Show)
 
-data ResultOrdering = KeepTheOriginalOrder | FirstTheWorst | FirstTheBest
-
 runLineByLine :: ResultOrdering -> GEvalSpecification -> IO ()
 runLineByLine ordering spec = runLineByLineGeneralized ordering spec consum
    where consum :: ConduitT LineRecord Void (ResourceT IO) ()
@@ -93,8 +91,17 @@ runDiffGeneralized ordering otherOut spec consum = do
   runResourceT $ runConduit $
      ((getZipSource $ (,)
        <$> ZipSource sourceA
-       <*> ZipSource sourceB) .| consum)
+       <*> ZipSource sourceB) .| sorter ordering .| consum)
   where metric = gesMetric spec
+        sorter KeepTheOriginalOrder = doNothing
+        sorter ordering = gobbleAndDo $ sortBy (sortOrder ordering (getMetricOrdering metric))
+        sortOrder FirstTheWorst TheHigherTheBetter = compareScores
+        sortOrder FirstTheBest TheLowerTheBetter = compareScores
+        sortOrder _ _ = flip compareScores
+        compareScores ((LineRecord _ _ _ _ o1), (LineRecord _ _ _ _ n1))
+                      ((LineRecord _ _ _ _ o2), (LineRecord _ _ _ _ n2))
+          = (n1 - o1) `compare` (n2 - o2)
+
 
 escapeTabs :: Text -> Text
 escapeTabs = Data.Text.replace "\t" "<tab>"
