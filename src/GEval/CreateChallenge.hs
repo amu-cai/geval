@@ -215,6 +215,7 @@ This a sample challenge for the likelihood metric.
 
 |] ++ (commonReadmeMDContents testName)
 
+readmeMDContents BIOF1Labels testName = readmeMDContents BIOF1 testName
 readmeMDContents BIOF1 testName = [i|
 Tag and normalize names
 =======================
@@ -318,6 +319,7 @@ trainContents LogLoss = [hereLit|0.0	Hell, no!!!
 1.0	Lekker!!!
 0.0	Boring, boring, boring
 |]
+trainContents BIOF1Labels = trainContents BIOF1
 trainContents BIOF1 = [hereLit|O O O B-surname/BOND O B-firstname/JAMES B-surname/BOND	My name is Bond , James Bond
 O O O O O	There is no name here
 B-firstname/JOHN I-surname/VON I-surname/NEUMANN	John von Nueman
@@ -359,6 +361,7 @@ devInContents LogLoss = [hereLit|Great stuff!
 Boring stuff
 That's good
 |]
+devInContents BIOF1Labels = devInContents BIOF1
 devInContents BIOF1 = [hereLit|Adam and Eve
 Mr Jan Kowalski
 |]
@@ -397,6 +400,7 @@ devExpectedContents LogLoss = [hereLit|1.0
 0.0
 1.0
 |]
+devExpectedContents BIOF1Labels = devExpectedContents BIOF1
 devExpectedContents BIOF1 = [hereLit|B-firstname/ADAM O B-firstname/EVE
 O B-firstname/JAN B-surname/KOWALSKI
 |]
@@ -437,6 +441,7 @@ testInContents LogLoss = [hereLit|That's great, ha, ha, I love it!
 Super-duper!!
 That is incredibly boring.
 |]
+testInContents BIOF1Labels = testInContents BIOF1
 testInContents BIOF1 = [hereLit|Alan Tring
 No name here
 |]
@@ -477,6 +482,7 @@ testExpectedContents LogLoss = [hereLit|1.0
 1.0
 0.0
 |]
+testExpectedContents BIOF1Labels = testExpectedContents BIOF1
 testExpectedContents BIOF1 = [hereLit|B-firstname/ALAN B-surname/TURING
 O O O
 |]

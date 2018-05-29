@@ -84,7 +84,7 @@ defaultLogLossHashedSize :: Word32
 defaultLogLossHashedSize = 10
 
 data Metric = RMSE | MSE | BLEU | Accuracy | ClippEU | FMeasure Double | NMI | LogLossHashed Word32 | CharMatch
-              | MAP | LogLoss | Likelihood | BIOF1 | LikelihoodHashed Word32
+              | MAP | LogLoss | Likelihood | BIOF1 | BIOF1Labels | LikelihoodHashed Word32
               deriving (Eq)
 
 instance Show Metric where
@@ -112,6 +112,7 @@ instance Show Metric where
   show LogLoss = "LogLoss"
   show Likelihood = "Likelihood"
   show BIOF1 = "BIO-F1"
+  show BIOF1Labels = "BIO-F1-Labels"
 
 instance Read Metric where
   readsPrec _ ('R':'M':'S':'E':theRest) = [(RMSE, theRest)]
@@ -133,6 +134,7 @@ instance Read Metric where
   readsPrec _ ('L':'i':'k':'e':'l':'i':'h':'o':'o':'d':theRest) = [(Likelihood, theRest)]
   readsPrec p ('C':'h':'a':'r':'M':'a':'t':'c':'h':theRest) = [(CharMatch, theRest)]
   readsPrec _ ('M':'A':'P':theRest) = [(MAP, theRest)]
+  readsPrec _ ('B':'I':'O':'-':'F':'1':'-':'L':'a':'b':'e':'l':'s':theRest) = [(BIOF1Labels, theRest)]
   readsPrec _ ('B':'I':'O':'-':'F':'1':theRest) = [(BIOF1, theRest)]
 
 data MetricOrdering = TheLowerTheBetter | TheHigherTheBetter
@@ -152,6 +154,7 @@ getMetricOrdering MAP = TheHigherTheBetter
 getMetricOrdering LogLoss = TheLowerTheBetter
 getMetricOrdering Likelihood = TheHigherTheBetter
 getMetricOrdering BIOF1 = TheHigherTheBetter
+getMetricOrdering BIOF1Labels = TheHigherTheBetter
 
 defaultOutDirectory = "."
 defaultTestName = "test-A"
@@ -436,6 +439,11 @@ gevalCore' CharMatch inputLineSource = helper inputLineSource
    step (ParsedRecordWithInput inp exp out) = getCharMatchCount inp exp out
 
 gevalCore' BIOF1 _ = gevalCoreWithoutInput parseBioSequenceIntoEntities parseBioSequenceIntoEntities (uncurry gatherCountsForBIO) countAgg f1MeasureOnCounts
+
+gevalCore' BIOF1Labels _ = gevalCoreWithoutInput parseBioSequenceIntoEntitiesWithoutNormalization parseBioSequenceIntoEntitiesWithoutNormalization (uncurry gatherCountsForBIO) countAgg f1MeasureOnCounts
+   where parseBioSequenceIntoEntitiesWithoutNormalization s = do
+           entities <- parseBioSequenceIntoEntities s
+           return $ Prelude.map eraseNormalisation entities
 
 countAgg :: Monad m => ConduitM (Int, Int, Int) o m (Int, Int, Int)
 countAgg = CC.foldl countFolder (0, 0, 0)

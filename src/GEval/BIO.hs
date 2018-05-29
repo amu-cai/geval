@@ -1,7 +1,9 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 module GEval.BIO
-       (BIOLabel(..), bioSequenceParser, parseBioSequenceIntoEntities, TaggedSpan(..), TaggedEntity(..), gatherCountsForBIO)
+       (BIOLabel(..), bioSequenceParser, parseBioSequenceIntoEntities,
+        TaggedSpan(..), TaggedEntity(..), gatherCountsForBIO,
+        eraseNormalisation)
        where
 
 import GEval.PrecisionRecall
@@ -31,6 +33,9 @@ data TaggedSpan = TaggedSpan Int Int
 
 data TaggedEntity = TaggedEntity TaggedSpan T.Text (Maybe T.Text)
                     deriving (Eq, Show)
+
+eraseNormalisation :: TaggedEntity -> TaggedEntity
+eraseNormalisation (TaggedEntity span label normalized) = (TaggedEntity span label Nothing)
 
 gatherCountsForBIO :: [TaggedEntity] -> [TaggedEntity] -> (Int, Int, Int)
 gatherCountsForBIO expected got = (maxMatchOnOrdered laterThan expected got, length expected, length got)

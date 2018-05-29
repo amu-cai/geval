@@ -257,6 +257,8 @@ main = hspec $ do
                                                                                    TaggedEntity (TaggedSpan 2 2) "surname" (Just "SMITH")] `shouldBe` (1, 1, 2)
     it "check F1 on a more complicated example" $ do
       runGEvalTest "bio-f1-complex" `shouldReturnAlmost` 0.625
+    it "check F1 on labels only" $ do
+      runGEvalTest "bio-f1-complex-labels" `shouldReturnAlmost` 0.6666666666
     it "calculate F1" $ do
       runGEvalTest "bio-f1-simple" `shouldReturnAlmost` 0.5
     it "calculate F1 with underscores rather than minus signs" $ do
