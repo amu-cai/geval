@@ -259,6 +259,8 @@ main = hspec $ do
       runGEvalTest "bio-f1-complex" `shouldReturnAlmost` 0.625
     it "calculate F1" $ do
       runGEvalTest "bio-f1-simple" `shouldReturnAlmost` 0.5
+    it "calculate F1 with underscores rather than minus signs" $ do
+      runGEvalTest "bio-f1-simple-underscores" `shouldReturnAlmost` 0.5
     it "check perfect score" $ do
       runGEvalTest "bio-f1-perfect" `shouldReturnAlmost` 1.0
     it "check inconsistent input" $ do

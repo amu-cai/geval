@@ -93,7 +93,7 @@ bioLabelParser =
   (string "O" *> pure Outside) <|>
   (do
       labelType <- bioMarkerParser
-      string "-"
+      (string "-" <|> string "_")
       label <- takeWhile1 (\c -> not (isSpace c) && c /= '/')
       normalized <- (do
                        string "/"
