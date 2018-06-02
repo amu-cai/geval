@@ -207,9 +207,9 @@ main = hspec $ do
       runGEvalTest "likelihood-simple" `shouldReturnAlmost` 0.72742818469866
   describe "evaluating single lines" $ do
     it "RMSE" $ do
-      gevalCoreOnSingleLines RMSE (LineInFile "stub1" 1 "blabla")
-                                  (LineInFile "stub2" 1 "3.4")
-                                  (LineInFile "stub3" 1 "2.6") `shouldReturnAlmost` 0.8
+      gevalCoreOnSingleLines RMSE (LineInFile (FilePathSpec "stub1") 1 "blabla")
+                                  (LineInFile (FilePathSpec "stub2") 1 "3.4")
+                                  (LineInFile (FilePathSpec "stub3") 1 "2.6") `shouldReturnAlmost` 0.8
   describe "BIO format" $ do
     it "just parse" $ do
       let (Right r) = parseOnly (bioSequenceParser <* endOfInput) "O B-city/NEW_YORK I-city B-city/KALISZ I-city O B-name"
@@ -302,36 +302,20 @@ main = hspec $ do
     it "accuracy instead of log loss" $ do
       runGEvalTestExtraOptions ["--alt-metric", "Accuracy"] "log-loss-hashed-probs" `shouldReturnAlmost` 0.4
   describe "smart sources" $ do
-    it "smart specs are parsed" $ do
-      parseSmartSpec "" `shouldBe` NoSpec
-      parseSmartSpec "-" `shouldBe` Stdin
-      parseSmartSpec "http://gonito.net/foo" `shouldBe` Http "http://gonito.net/foo"
-      parseSmartSpec "https://gonito.net" `shouldBe` Https "https://gonito.net"
-      parseSmartSpec "branch:" `shouldBe` GitSpec "branch" Nothing
-      parseSmartSpec "37be:foo/bar.tsv" `shouldBe` GitSpec "37be" (Just "foo/bar.tsv")
-      parseSmartSpec "bla/xyz:foo/bar.tsv" `shouldBe` GitSpec "bla/xyz" (Just "foo/bar.tsv")
-      parseSmartSpec "out.tsv" `shouldBe` FileNameSpec "out.tsv"
-      parseSmartSpec "dev-1/out.tsv" `shouldBe` FilePathSpec "dev-1/out.tsv"
-      parseSmartSpec "../out.tsv" `shouldBe` FilePathSpec "../out.tsv"
-      parseSmartSpec "4a5f" `shouldBe` PossiblyGitSpec "4a5f"
-      parseSmartSpec "!!" `shouldBe` PossiblyGitSpec "!!"
-      parseSmartSpec "branch" `shouldBe` PossiblyGitSpec "branch"
-    it "smart specs are parsed in context" $ do
-      parseSmartSpecInContext [] Nothing "xyz" `shouldBe` Just (PossiblyGitSpec "xyz")
-      parseSmartSpecInContext ["foo", "bar"] Nothing "out.tsv" `shouldBe` Just (FilePathSpec "foo/out.tsv")
-      parseSmartSpecInContext [] (Just "default") "" `shouldBe` Just (FileNameSpec "default")
-      parseSmartSpecInContext ["foo"] (Just "default") "" `shouldBe` Just (FilePathSpec "foo/default")
-      parseSmartSpecInContext ["foo/bar"] (Just "default") "http://gonito.net" `shouldBe` Just (Http "http://gonito.net")
-      parseSmartSpecInContext ["foo/bar"] Nothing "" `shouldBe` Nothing
+    it "smart specs are obtained" $ do
+      getSmartSourceSpec "foo" "" "" `shouldReturn` Left NoSpecGiven
+      getSmartSourceSpec "foo" "out.tsv" "-" `shouldReturn` Right Stdin
+      getSmartSourceSpec "foo" "out.sv" "http://gonito.net/foo" `shouldReturn` (Right $ Http "http://gonito.net/foo")
+      getSmartSourceSpec "foo" "in.tsv" "https://gonito.net" `shouldReturn` (Right $ Https "https://gonito.net")
     it "sources are accessed" $ do
-      readFromSmartSource [] Nothing "test/files/foo.txt" `shouldReturn` ["foo\n"]
+      readFromSmartSource "baz" "out.tsv" "test/files/foo.txt" `shouldReturn` ["foo\n"]
 --      readFromSmartSource [] Nothing "https://httpbin.org/robots.txt" `shouldReturn`
 --        ["User-agent: *\nDisallow: /deny\n"]
 
-readFromSmartSource :: [FilePath] -> Maybe FilePath -> String -> IO [String]
-readFromSmartSource defaultDirs defaultFile specS = do
-  let (Just spec) = parseSmartSpecInContext defaultDirs defaultFile specS
-  let source = smartSource defaultDirs defaultFile spec
+readFromSmartSource :: FilePath -> FilePath -> String -> IO [String]
+readFromSmartSource defaultDir defaultFile specS = do
+  (Right spec) <- getSmartSourceSpec defaultDir defaultFile specS
+  let source = smartSource spec
   contents <- runResourceT (source $$ CT.decodeUtf8Lenient =$ CL.consume)
   return $ Prelude.map unpack contents
 

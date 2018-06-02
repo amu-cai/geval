@@ -11,32 +11,66 @@ import System.FilePath
 import Control.Monad.Trans.Resource (MonadResource)
 import Data.Conduit
 import qualified Data.ByteString as S
-import Data.Conduit.Binary (sourceFile)
+import Data.Conduit.Binary (sourceFile, sourceHandle)
 import Network.HTTP.Conduit
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Class (lift)
+import qualified System.Directory as D
+import System.Posix
+import System.FilePath
+import System.IO (stdin)
+import Control.Monad ((<=<), filterM)
 
-data SmartSpec = NoSpec
-                 | Stdin
-                 | FileNameSpec FilePath
+data SourceSpec =Stdin
                  | FilePathSpec FilePath
                  | Http String
                  | Https String
-                 | GitSpec String (Maybe FilePath)
-                 | PossiblyGitSpec String
-                 deriving (Eq, Show)
+                 | GitSpec String FilePath
+                 | NoSource
+                deriving (Eq, Show)
 
---smartSource :: (MonadIO m, MonadResource m) => [FilePath] -> Maybe FilePath -> SmartSpec -> Producer m S.ByteString
-smartSource defaultDirs defaultFile spec = pureSmartSource defaultDirs spec
+recoverPath :: SourceSpec -> String
+recoverPath Stdin = "-"
+recoverPath (FilePathSpec filePath) = filePath
+recoverPath (Http url) = url
+recoverPath (Https url) = url
+recoverPath (GitSpec branch filePath) = branch ++ ":" ++ filePath
 
---pureSmartSource :: (MonadIO m, MonadResource m) => [FilePath] -> SmartSpec -> Producer m S.ByteString
-pureSmartSource _ NoSpec = error "No source specification given"
-pureSmartSource _ (FileNameSpec fileName) = sourceFile fileName
-pureSmartSource _ (FilePathSpec fileName) = sourceFile fileName
-pureSmartSource [] (PossiblyGitSpec spec) = sourceFile spec
-pureSmartSource (firstDir:_) (PossiblyGitSpec spec) = sourceFile (firstDir </> spec)
---pureSmartSource _ (Https url) = httpSource url
---pureSmartSource _ (Http url) = httpSource url
+data SmartSourceError = NoFile FilePath
+                        | NoDirectory FilePath
+                        | NoSpecGiven
+                        deriving (Eq, Show)
+
+getSmartSourceSpec :: FilePath -> FilePath -> String -> IO (Either SmartSourceError SourceSpec)
+getSmartSourceSpec _ "" "" = return $ Left NoSpecGiven
+getSmartSourceSpec _ _ "-" = return $ Right Stdin
+getSmartSourceSpec defaultDirectory defaultFile spec
+  | "http://" `isPrefixOf` spec = return $ Right $ Http spec
+  | "https://" `isPrefixOf` spec = return $ Right $ Https spec
+  | otherwise = do
+      inDefaultDirectory <- lookForCompressedFiles (defaultDirectory </> spec)
+      isInDefaultDirectory <- D.doesFileExist inDefaultDirectory
+      if isInDefaultDirectory
+        then
+          return $ Right $ FilePathSpec inDefaultDirectory
+        else
+         do
+          isThere <- D.doesFileExist spec
+          if isThere
+            then
+              return $ Right $ FilePathSpec spec
+            else
+             do
+              isDirectoryThere <- D.doesDirectoryExist defaultDirectory
+              if isDirectoryThere
+                then
+                  return $ Left $ NoFile inDefaultDirectory
+                else
+                  return $ Left $ NoDirectory spec
+
+smartSource (FilePathSpec filePath) = sourceFile filePath
+smartSource Stdin = sourceHandle stdin
+smartSource NoSource = error $ "should not be here"
 
 -- httpSource :: MonadResource m => String -> ConduitM () S.ByteString m ()
 -- httpSource url = do
@@ -46,45 +80,6 @@ pureSmartSource (firstDir:_) (PossiblyGitSpec spec) = sourceFile (firstDir </> s
 --   (httpsource, finalizer) <- lift $ unwrapResumable (responseBody response)
 --   httpsource
 --   lift finalizer
-
-parseSmartSpec :: FilePath -> SmartSpec
-parseSmartSpec "" = NoSpec
-parseSmartSpec "-" = Stdin
-parseSmartSpec spec
-  | "http://" `isPrefixOf` spec = Http spec
-  | "https://" `isPrefixOf` spec = Https spec
-  | otherwise = case elemIndex ':' spec of
-      Just ix -> let ref = take ix spec in
-                if checkRefFormat ref
-                     then
-                       GitSpec ref (if ix == length spec - 1
-                                      then
-                                         Nothing
-                                      else
-                                         Just $ drop (ix+1) spec)
-                     else
-                       fileSpec
-      Nothing -> if checkRefFormat spec && not ('/' `elem` spec) && not ('.' `elem` spec)
-                then
-                  PossiblyGitSpec spec
-                else
-                  fileSpec
-  where fileSpec = (if '/' `elem` spec then FilePathSpec else FileNameSpec) spec
-
-parseSmartSpecInContext :: [FilePath] -> Maybe FilePath -> String -> Maybe SmartSpec
-parseSmartSpecInContext defaultDirs defaultFile spec = parseSmartSpecInContext' defaultDirs defaultFile $ parseSmartSpec spec
-  where  parseSmartSpecInContext' _ Nothing NoSpec = Nothing
-         parseSmartSpecInContext' [] (Just defaultFile) NoSpec = Just $ FileNameSpec defaultFile
-         parseSmartSpecInContext' (firstDir:_) (Just defaultFile) NoSpec = Just $ FilePathSpec (firstDir </> defaultFile)
-
-         parseSmartSpecInContext' (firstDir:_) _ (FileNameSpec fileName) = Just $ FilePathSpec (firstDir </> fileName)
-
-         parseSmartSpecInContext' _ Nothing (GitSpec branch Nothing) = Nothing
-         parseSmartSpecInContext' [] (Just defaultFile) (GitSpec branch Nothing) = Just $ GitSpec branch $ Just defaultFile
-         parseSmartSpecInContext' (firstDir:_) (Just defaultFile) (GitSpec branch Nothing)
-           = Just $ GitSpec branch $ Just (firstDir </> defaultFile)
-
-         parseSmartSpecInContext' _ _ parsedSpec = Just parsedSpec
 
 checkRefFormat :: String -> Bool
 checkRefFormat ref =
@@ -106,3 +101,21 @@ checkRefFormat ref =
         isUnwantedChar '\\' = True
         isUnwantedChar '\177' = True
         isUnwantedChar c = ord c < 32
+
+lookForCompressedFiles :: FilePath -> IO FilePath
+lookForCompressedFiles = lookForAlternativeFiles [".gz", ".xz", ".bz2"]
+
+lookForAlternativeFiles :: [String] -> FilePath -> IO FilePath
+lookForAlternativeFiles suffixes filePath
+   | takeExtension filePath `Prelude.elem` suffixes = return filePath
+   | otherwise = do
+       fileIsThere <- D.doesFileExist filePath
+       if fileIsThere
+         then
+           return filePath
+         else
+           do
+             found <- Control.Monad.filterM D.doesFileExist $ Prelude.map (filePath <.>) suffixes
+             return $ case found of
+                        [fp] -> fp
+                        _ -> filePath

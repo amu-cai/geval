@@ -34,8 +34,7 @@ module GEval.Core
       EvaluationContext(..),
       ParserSpec(..),
       fileAsLineSource,
-      checkAndGetFiles,
-      getOutFile
+      checkAndGetFiles
     ) where
 
 import Data.Conduit
@@ -158,6 +157,10 @@ getMetricOrdering Likelihood = TheHigherTheBetter
 getMetricOrdering BIOF1 = TheHigherTheBetter
 getMetricOrdering BIOF1Labels = TheHigherTheBetter
 
+isInputNeeded :: Metric -> Bool
+isInputNeeded CharMatch = True
+isInputNeeded _ = False
+
 defaultOutDirectory = "."
 defaultTestName = "test-A"
 defaultOutFile = "out.tsv"
@@ -247,67 +250,66 @@ isEmptyFile path = do
     return ((fileSize stat) == 0)
 
 
-data LineSource m = LineSource (Source m Text) FilePath Word32
+data LineSource m = LineSource (Source m Text) SourceSpec Word32
 
 geval :: GEvalSpecification -> IO (MetricValue)
 geval gevalSpec = do
-  (inputFilePath, expectedFilePath, outFilePath) <- checkAndGetFiles gevalSpec
-  gevalCore metric inputFilePath expectedFilePath outFilePath
+  (inputSource, expectedSource, outSource) <- checkAndGetFiles False gevalSpec
+  gevalCore metric inputSource expectedSource outSource
    where metric = gesMetric gevalSpec
 
-checkAndGetFiles :: GEvalSpecification -> IO (FilePath, FilePath, FilePath)
-checkAndGetFiles gevalSpec = do
-  unlessM (D.doesDirectoryExist outDirectory) $ throwM $ NoOutDirectory outDirectory
-  unlessM (D.doesDirectoryExist expectedDirectory) $ throwM $ NoExpectedDirectory expectedDirectory
-  unlessM (D.doesDirectoryExist outTestDirectory) $ throwM $ NoOutTestDirectory outTestDirectory
-  unlessM (D.doesDirectoryExist expectedTestDirectory) $ throwM $ NoExpectedTestDirectory expectedTestDirectory
-  inputFilePath <- lookForCompressedFiles inputFilePath'
-  expectedFilePath <- lookForCompressedFiles expectedFilePath'
-  outFilePath <- lookForCompressedFiles outFilePath'
-  checkInputFileIfNeeded metric inputFilePath
-  return (inputFilePath, expectedFilePath, outFilePath)
-   where expectedFilePath' = expectedTestDirectory </> (gesExpectedFile gevalSpec)
-         outFilePath' = getOutFile gevalSpec (gesOutFile gevalSpec)
-         inputFilePath' = expectedTestDirectory </> (gesInputFile gevalSpec)
-         expectedTestDirectory = expectedDirectory </> testName
+checkAndGetFiles :: Bool -> GEvalSpecification -> IO (SourceSpec, SourceSpec, SourceSpec)
+checkAndGetFiles forceInput gevalSpec = do
+  oss <- getSmartSourceSpec outTestDirectory "out.tsv" outFile
+  case oss of
+    Left NoSpecGiven -> throwM $ NoOutFile outFile
+    Left (NoFile fp) -> throwM $ NoOutFile fp
+    Left (NoDirectory d) -> do
+        unlessM (D.doesDirectoryExist outDirectory) $ throwM $ NoOutDirectory outDirectory
+        unlessM (D.doesDirectoryExist outTestDirectory) $ throwM $ NoOutTestDirectory outTestDirectory
+        throwM $ NoOutFile outFile
+    Right outSource -> do
+      ess <- getSmartSourceSpec expectedTestDirectory "expected.tsv" expectedFile
+      case ess of
+        Left NoSpecGiven -> throwM $ NoExpectedFile expectedFile
+        Left (NoFile fp) -> throwM $ NoExpectedFile fp
+        Left (NoDirectory d) -> do
+          unlessM (D.doesDirectoryExist expectedDirectory) $ throwM $ NoExpectedDirectory expectedDirectory
+          unlessM (D.doesDirectoryExist expectedTestDirectory) $ throwM $ NoExpectedTestDirectory expectedTestDirectory
+          throwM $ NoExpectedDirectory d
+        Right expectedSource -> do
+          -- in most cases inputSource is NoSource (unless needed by a metric or in the line-by-line mode)
+          inputSource <- getInputSourceIfNeeded forceInput metric expectedTestDirectory inputFile
+          return (inputSource, expectedSource, outSource)
+   where expectedTestDirectory = expectedDirectory </> testName
          outTestDirectory = outDirectory </> testName
          expectedDirectory = getExpectedDirectory gevalSpec
          outDirectory = gesOutDirectory gevalSpec
          testName = gesTestName gevalSpec
+         outFile = gesOutFile gevalSpec
+         expectedFile = gesExpectedFile gevalSpec
+         inputFile = gesInputFile gevalSpec
          metric = gesMetric gevalSpec
-
-lookForCompressedFiles :: FilePath -> IO FilePath
-lookForCompressedFiles = lookForAlternativeFiles [".gz", ".xz", ".bz2"]
-
-lookForAlternativeFiles :: [String] -> FilePath -> IO FilePath
-lookForAlternativeFiles suffixes filePath
-   | takeExtension filePath `Prelude.elem` suffixes = return filePath
-   | otherwise = do
-       fileIsThere <- D.doesFileExist filePath
-       if fileIsThere
-         then
-           return filePath
-         else
-           do
-             found <- Control.Monad.filterM D.doesFileExist $ Prelude.map (filePath <.>) suffixes
-             return $ case found of
-                        [fp] -> fp
-                        _ -> filePath
 
 getOutFile :: GEvalSpecification -> FilePath -> FilePath
 getOutFile gevalSpec out = outDirectory </> testName </> out
   where outDirectory = gesOutDirectory gevalSpec
         testName = gesTestName gevalSpec
 
-checkInputFileIfNeeded :: Metric -> FilePath -> IO ()
-checkInputFileIfNeeded CharMatch inputFilePath = do
-  unlessM (D.doesFileExist inputFilePath) $ throwM $ NoInputFile inputFilePath
-  return ()
-checkInputFileIfNeeded _ _ = return ()
+getInputSourceIfNeeded :: Bool -> Metric -> FilePath -> FilePath -> IO SourceSpec
+getInputSourceIfNeeded forced metric directory inputFilePath
+   | forced || (isInputNeeded metric) = do
+       iss <- getSmartSourceSpec directory "in.tsv" inputFilePath
+       case iss of
+         Left NoSpecGiven -> throwM $ NoInputFile inputFilePath
+         Left (NoFile fp) -> throwM $ NoInputFile fp
+         Left (NoDirectory _) -> throwM $ NoInputFile inputFilePath
+         Right sourceSpec -> return sourceSpec
+   | otherwise = return NoSource
 
-fileAsLineSource :: FilePath -> LineSource (ResourceT IO)
-fileAsLineSource filePath =
-  LineSource (smartSource [] Nothing (parseSmartSpec filePath) $= autoDecompress $= CT.decodeUtf8Lenient =$= CT.lines) filePath 1
+fileAsLineSource :: SourceSpec -> LineSource (ResourceT IO)
+fileAsLineSource spec =
+  LineSource ((smartSource spec) $= autoDecompress $= CT.decodeUtf8Lenient =$= CT.lines) spec 1
 
 gevalCoreOnSingleLines :: Metric -> LineInFile -> LineInFile -> LineInFile -> IO (MetricValue)
 gevalCoreOnSingleLines metric inpLine expLine outLine =
@@ -316,18 +318,20 @@ gevalCoreOnSingleLines metric inpLine expLine outLine =
                             (singleLineAsLineSource outLine)
 
 singleLineAsLineSource :: LineInFile -> LineSource (ResourceT IO)
-singleLineAsLineSource (LineInFile filePath lineNo line) =
-  LineSource (CL.sourceList [line]) filePath lineNo
+singleLineAsLineSource (LineInFile sourceSpec lineNo line) =
+  LineSource (CL.sourceList [line]) sourceSpec lineNo
 
-gevalCore :: Metric -> String -> String -> String -> IO (MetricValue)
-gevalCore metric inputFilePath expectedFilePath outFilePath = do
-  unlessM (D.doesFileExist expectedFilePath) $ throwM $ NoExpectedFile expectedFilePath
-  unlessM (D.doesFileExist outFilePath) $ throwM $ NoOutFile outFilePath
-  whenM (isEmptyFile outFilePath) $ throwM $ EmptyOutput
+gevalCore :: Metric -> SourceSpec -> SourceSpec -> SourceSpec -> IO (MetricValue)
+gevalCore metric inputSource expectedSource outSource = do
+  whenM (isEmptyFileSource outSource) $ throwM $ EmptyOutput
   gevalCoreOnSources metric
-                     (fileAsLineSource inputFilePath)
-                     (fileAsLineSource expectedFilePath)
-                     (fileAsLineSource outFilePath)
+                     (fileAsLineSource inputSource)
+                     (fileAsLineSource expectedSource)
+                     (fileAsLineSource outSource)
+
+isEmptyFileSource :: SourceSpec -> IO Bool
+isEmptyFileSource (FilePathSpec filePath) = isEmptyFile filePath
+isEmptyFileSource _ = return False
 
 logLossToLikehood logLoss = exp (-logLoss)
 
@@ -351,7 +355,7 @@ gevalCoreOnSources (LikelihoodHashed b) inputLineSource expectedLineSource outLi
 gevalCoreOnSources metric inputLineSource expectedLineSource outLineSource = do
   gevalCore' metric inputLineSource expectedLineSource outLineSource
 
-data LineInFile = LineInFile FilePath Word32 Text
+data LineInFile = LineInFile SourceSpec Word32 Text
 
 gevalCore' :: (MonadIO m, MonadThrow m, MonadUnliftIO m) => Metric -> LineSource (ResourceT m) -> LineSource (ResourceT m) -> LineSource (ResourceT m) -> m (MetricValue)
 gevalCore' MSE _ = gevalCoreWithoutInput outParser outParser itemError averageC id
@@ -501,8 +505,8 @@ class EvaluationContext ctxt m where
   data ParsedRecord ctxt :: *
   recordSource :: ctxt -> ParserSpec ctxt -> Source (ResourceT m) (WrappedParsedRecord ctxt)
   getFirstLineNo :: Proxy m -> ctxt -> Word32
-  getExpectedFilePath :: ctxt -> String
-  getOutFilePath :: ctxt -> String
+  getExpectedSource :: ctxt -> SourceSpec
+  getOutSource :: ctxt -> SourceSpec
   checkStep :: Proxy m -> ((Word32, ParsedRecord ctxt) -> c) -> (Word32, WrappedParsedRecord ctxt) -> Maybe c
   checkStepM :: ((Word32, ParsedRecord ctxt) -> (ResourceT m) c) -> (Word32, WrappedParsedRecord ctxt) -> (ResourceT m) (Maybe c)
 
@@ -513,8 +517,8 @@ instance (MonadUnliftIO m, MonadIO m, MonadThrow m) => EvaluationContext (Withou
   data WrappedParsedRecord (WithoutInput m e o) = WrappedParsedRecordWithoutInput (SourceItem e) (SourceItem o)
   data ParsedRecord (WithoutInput m e o) = ParsedRecordWithoutInput e o
   getFirstLineNo _ (WithoutInput _ (LineSource _ _ lineNo)) = lineNo
-  getExpectedFilePath (WithoutInput (LineSource _ expectedFilePath _) _) = expectedFilePath
-  getOutFilePath (WithoutInput _ (LineSource _ outFilePath _)) = outFilePath
+  getExpectedSource (WithoutInput (LineSource _ expectedSource _) _) = expectedSource
+  getOutSource (WithoutInput _ (LineSource _ outSource _)) = outSource
   recordSource (WithoutInput expectedLineSource outLineSource) (ParserSpecWithoutInput expParser outParser) = getZipSource $ WrappedParsedRecordWithoutInput
                         <$> ZipSource (items expectedLineSource expParser)
                         <*> ZipSource (items outLineSource outParser)
@@ -542,8 +546,8 @@ instance (MonadUnliftIO m, MonadIO m, MonadThrow m) => EvaluationContext (WithIn
   data WrappedParsedRecord (WithInput m i e o) = WrappedParsedRecordWithInput (SourceItem i) (SourceItem e) (SourceItem o)
   data ParsedRecord (WithInput m i e o) = ParsedRecordWithInput i e o
   getFirstLineNo _ (WithInput _ _ (LineSource _ _ lineNo)) = lineNo
-  getExpectedFilePath (WithInput _ (LineSource _ expectedFilePath _) _) = expectedFilePath
-  getOutFilePath (WithInput _ _ (LineSource _ outFilePath _)) = outFilePath
+  getExpectedSource (WithInput _ (LineSource _ expectedSource _) _) = expectedSource
+  getOutSource (WithInput _ _ (LineSource _ outSource _)) = outSource
   recordSource (WithInput inputLineSource expectedLineSource outLineSource) (ParserSpecWithInput inpParser expParser outParser) = getZipSource $ (\x (y,z) -> WrappedParsedRecordWithInput x y z)
          <$> ZipSource (items inputLineSource inpParser)                                                                         <*> (ZipSource $ getZipSource $ (,)
                         <$> ZipSource (items expectedLineSource expParser)
