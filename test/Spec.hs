@@ -290,6 +290,9 @@ main = hspec $ do
     it "test sorting" $ do
       results <- runLineByLineGeneralized FirstTheWorst sampleChallenge Data.Conduit.List.consume
       Prelude.head (Prelude.map (\(LineRecord inp _ _ _ _) -> inp) results) `shouldBe` "baq"
+  describe "handle --alt-metric option" $ do
+    it "accuracy instead of likelihood" $ do
+      runGEvalTestExtraOptions ["--alt-metric", "Accuracy"] "likelihood-simple" `shouldReturnAlmost` 0.75
 
 
 neverMatch :: Char -> Int -> Bool
@@ -309,11 +312,13 @@ testMatchFun _ _ = False
 extractVal :: (Either (ParserResult GEvalOptions) (Maybe MetricValue)) -> IO MetricValue
 extractVal (Right (Just val)) = return val
 
-runGEvalTest testName = (runGEval [
+runGEvalTest = runGEvalTestExtraOptions []
+
+runGEvalTestExtraOptions extraOptions testName = (runGEval ([
   "--expected-directory",
   "test/" ++ testName ++ "/" ++ testName,
   "--out-directory",
-  "test/" ++ testName ++ "/" ++ testName ++ "-solution"]) >>= extractVal
+  "test/" ++ testName ++ "/" ++ testName ++ "-solution"] ++ extraOptions)) >>= extractVal
 
 extractMetric :: String -> IO (Maybe Metric)
 extractMetric testName = do

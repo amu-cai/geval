@@ -100,8 +100,12 @@ specParser = GEvalSpecification
     <> showDefault
     <> metavar "INPUT"
     <> help "The name of the file with the input (applicable only for some metrics)" )
-  <*> metricReader
+  <*> ((flip fromMaybe) <$> altMetricReader <*> metricReader)
   <*> optional precisionArgParser
+
+sel :: Maybe Metric -> Metric -> Metric
+sel Nothing m = m
+sel (Just m) _ = m
 
 metricReader :: Parser Metric
 metricReader = option auto
@@ -111,6 +115,13 @@ metricReader = option auto
                  <> showDefault
                  <> metavar "METRIC"
                  <> help "Metric to be used - RMSE, MSE, Accuracy, LogLoss, Likelihood, F-measure (specify as F1, F2, F0.25, etc.), MAP, BLEU, NMI, ClippEU, LogLossHashed, LikelihoodHashed, BIO-F1, BIO-F1-Labels or CharMatch" )
+
+altMetricReader :: Parser (Maybe Metric)
+altMetricReader = optional $ option auto
+               ( long "alt-metric"
+                 <> short 'a'
+                 <> metavar "METRIC"
+                 <> help "Alternative metric (overrides --metric option)" )
 
 runGEval :: [String] -> IO (Either (ParserResult GEvalOptions) (Maybe MetricValue))
 runGEval args = do
