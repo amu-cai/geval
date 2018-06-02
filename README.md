@@ -1,11 +1,14 @@
 # GEval
 
-GEval is a Haskell library (and a stand-alone tool) for evaluating the
+GEval is a Haskell library and a stand-alone tool for evaluating the
 results of solutions to machine learning challenges as defined on the
 [Gonito](http://gonito.net) platform.
 
 Note that GEval is only about machine learning evaluation. No actual
 machine learning algorithms are available here.
+
+The official repository is `git://gonito.net/geval`, browsable at
+<https://gonito.net/gitlist/geval.git/>.
 
 ## Installing
 
