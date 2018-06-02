@@ -1,7 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 module GEval.LogLossHashed
-       (HashedDistribution, parseDistribution, calculateLogLoss)
+       (HashedDistribution, parseDistribution, calculateLogLoss, parseWordSpecs, wordSpecToPair)
        where
 
 import qualified Data.Vector as V
@@ -59,11 +59,18 @@ isAnyWord _ = False
 
 data WordSpecWithLogProb = WordSpecWithLogProb WordSpec Double
 
+wordSpecToPair :: WordSpecWithLogProb -> Maybe (Double, T.Text)
+wordSpecToPair (WordSpecWithLogProb AnyWord _) = Nothing
+wordSpecToPair (WordSpecWithLogProb (SpecificWord w) lp) = Just (lp, w)
+
 parseDistributionFromWordList :: Word32 -> Word32 -> T.Text -> Either String HashedDistribution
 parseDistributionFromWordList nbOfBits seed distroSpec = (parseDistributionFromWordList' nbOfBits seed) =<<
   normalizeLogProbs =<<
   lookForProbs =<<
-  (processEithers $ map getWordSpecWithLogProb $ T.splitOn " " distroSpec)
+  (parseWordSpecs distroSpec)
+
+parseWordSpecs :: T.Text -> Either String [WordSpecWithLogProb]
+parseWordSpecs distroSpec = processEithers $ map getWordSpecWithLogProb $ T.splitOn " " distroSpec
 
 getWordSpecWithLogProb :: T.Text -> Either String WordSpecWithLogProb
 getWordSpecWithLogProb t =

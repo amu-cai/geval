@@ -293,7 +293,8 @@ main = hspec $ do
   describe "handle --alt-metric option" $ do
     it "accuracy instead of likelihood" $ do
       runGEvalTestExtraOptions ["--alt-metric", "Accuracy"] "likelihood-simple" `shouldReturnAlmost` 0.75
-
+    it "accuracy instead of log loss" $ do
+      runGEvalTestExtraOptions ["--alt-metric", "Accuracy"] "log-loss-hashed-probs" `shouldReturnAlmost` 0.4
 
 neverMatch :: Char -> Int -> Bool
 neverMatch _ _ = False

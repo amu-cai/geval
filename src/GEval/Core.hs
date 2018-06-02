@@ -369,9 +369,18 @@ gevalCore' BLEU _ = gevalCoreWithoutInput (Right . Prelude.map Prelude.words . D
           | otherwise = exp (1.0 - (r /. c))
 
 gevalCore' Accuracy _ = gevalCoreWithoutInput (Right . strip) (Right . strip) hitOrMiss averageC id
-                      where hitOrMiss (exp,got) = if (normalizeProbForAccuracy exp got) == exp then 1.0 else 0.0
-                            -- if the expected value is 0 or 1 treat values between 0.0 and 1.0 as probabilities
-                            -- for the positive outcome
+                      where hitOrMiss (exp, got) =
+                              -- first try to parse what we got as a probability distribution
+                              -- (like the one used for Likelikehood/LogLossHashed metric)
+                              case parseWordSpecs got of
+                                Right wordSpecs -> if Prelude.null pairs
+                                                   then 0.0
+                                                   else indicator (exp == (snd $ Prelude.maximum pairs))
+                                                 where pairs = catMaybes $ Prelude.map wordSpecToPair wordSpecs
+                                Left _ ->  indicator ((normalizeProbForAccuracy exp got) == exp)
+                                          -- if the expected value is 0 or 1 treat values
+                                          -- between 0.0 and 1.0 as probabilities
+                                          -- for the positive outcome
                             normalizeProbForAccuracy :: Text -> Text -> Text
                             normalizeProbForAccuracy exp got
                               | exp == (pack "1") = case tryReadingAsFloat got of
