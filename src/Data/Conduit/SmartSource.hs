@@ -71,15 +71,15 @@ getSmartSourceSpec defaultDirectory defaultFile spec
 smartSource (FilePathSpec filePath) = sourceFile filePath
 smartSource Stdin = sourceHandle stdin
 smartSource NoSource = error $ "should not be here"
+smartSource (Http url) = httpSource url
+smartSource (Https url) = httpSource url
 
--- httpSource :: MonadResource m => String -> ConduitM () S.ByteString m ()
--- httpSource url = do
---   request <- liftIO $ parseRequest url
---   manager <- liftIO $ newManager tlsManagerSettings
---   response <- lift $ http request manager
---   (httpsource, finalizer) <- lift $ unwrapResumable (responseBody response)
---   httpsource
---   lift finalizer
+httpSource :: MonadResource m => String -> ConduitM () S.ByteString m ()
+httpSource url = do
+  request <- liftIO $ parseRequest url
+  manager <- liftIO $ newManager tlsManagerSettings
+  response <- lift $ http request manager
+  responseBody response
 
 checkRefFormat :: String -> Bool
 checkRefFormat ref =

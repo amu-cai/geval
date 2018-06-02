@@ -309,8 +309,8 @@ main = hspec $ do
       getSmartSourceSpec "foo" "in.tsv" "https://gonito.net" `shouldReturn` (Right $ Https "https://gonito.net")
     it "sources are accessed" $ do
       readFromSmartSource "baz" "out.tsv" "test/files/foo.txt" `shouldReturn` ["foo\n"]
---      readFromSmartSource [] Nothing "https://httpbin.org/robots.txt" `shouldReturn`
---        ["User-agent: *\nDisallow: /deny\n"]
+      readFromSmartSource "" "" "https://httpbin.org/robots.txt" `shouldReturn`
+        ["User-agent: *\nDisallow: /deny\n"]
 
 readFromSmartSource :: FilePath -> FilePath -> String -> IO [String]
 readFromSmartSource defaultDir defaultFile specS = do
