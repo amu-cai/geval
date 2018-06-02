@@ -16,6 +16,7 @@ module GEval.Core
       MetricValue,
       GEvalSpecialCommand(..),
       GEvalSpecification(..),
+      ResultOrdering(..),
       GEvalOptions(..),
       GEvalException(..),
       defaultGEvalSpecification,
@@ -53,10 +54,11 @@ import qualified System.Directory as D
 import System.Posix
 import System.FilePath
 import Data.Maybe
+import Data.Tuple
 import qualified Data.List.Split as DLS
 
 import Control.Monad.IO.Class
-import Control.Monad ((<=<))
+import Control.Monad ((<=<), filterM)
 
 import Data.Attoparsec.Text (parseOnly)
 
@@ -69,6 +71,8 @@ import GEval.PrecisionRecall
 import GEval.ClusteringMetrics
 import GEval.LogLossHashed
 import GEval.CharMatch
+import GEval.BIO
+import Data.Conduit.AutoDecompress
 
 import qualified Data.HashMap.Strict as M
 
@@ -82,7 +86,7 @@ defaultLogLossHashedSize :: Word32
 defaultLogLossHashedSize = 10
 
 data Metric = RMSE | MSE | BLEU | Accuracy | ClippEU | FMeasure Double | NMI | LogLossHashed Word32 | CharMatch
-              | MAP | LogLoss
+              | MAP | LogLoss | Likelihood | BIOF1 | BIOF1Labels | LikelihoodHashed Word32
               deriving (Eq)
 
 instance Show Metric where
@@ -99,9 +103,18 @@ instance Show Metric where
                                                        ""
                                                       else
                                                        (show nbOfBits))
+  show (LikelihoodHashed nbOfBits) = "LikelihoodHashed" ++ (if
+                                                               nbOfBits == defaultLogLossHashedSize
+                                                            then
+                                                              ""
+                                                            else
+                                                              (show nbOfBits))
   show CharMatch = "CharMatch"
   show MAP = "MAP"
   show LogLoss = "LogLoss"
+  show Likelihood = "Likelihood"
+  show BIOF1 = "BIO-F1"
+  show BIOF1Labels = "BIO-F1-Labels"
 
 instance Read Metric where
   readsPrec _ ('R':'M':'S':'E':theRest) = [(RMSE, theRest)]
@@ -116,9 +129,15 @@ instance Read Metric where
   readsPrec p ('L':'o':'g':'L':'o':'s':'s':'H':'a':'s':'h':'e':'d':theRest) = case readsPrec p theRest of
     [(nbOfBits, theRest)] -> [(LogLossHashed nbOfBits, theRest)]
     _ -> [(LogLossHashed defaultLogLossHashedSize, theRest)]
+  readsPrec p ('L':'i':'k':'e':'l':'i':'h':'o':'o':'d':'H':'a':'s':'h':'e':'d':theRest) = case readsPrec p theRest of
+    [(nbOfBits, theRest)] -> [(LikelihoodHashed nbOfBits, theRest)]
+    _ -> [(LikelihoodHashed defaultLogLossHashedSize, theRest)]
   readsPrec _ ('L':'o':'g':'L':'o':'s':'s':theRest) = [(LogLoss, theRest)]
+  readsPrec _ ('L':'i':'k':'e':'l':'i':'h':'o':'o':'d':theRest) = [(Likelihood, theRest)]
   readsPrec p ('C':'h':'a':'r':'M':'a':'t':'c':'h':theRest) = [(CharMatch, theRest)]
   readsPrec _ ('M':'A':'P':theRest) = [(MAP, theRest)]
+  readsPrec _ ('B':'I':'O':'-':'F':'1':'-':'L':'a':'b':'e':'l':'s':theRest) = [(BIOF1Labels, theRest)]
+  readsPrec _ ('B':'I':'O':'-':'F':'1':theRest) = [(BIOF1, theRest)]
 
 data MetricOrdering = TheLowerTheBetter | TheHigherTheBetter
 
@@ -131,9 +150,13 @@ getMetricOrdering ClippEU  = TheHigherTheBetter
 getMetricOrdering (FMeasure _) = TheHigherTheBetter
 getMetricOrdering NMI = TheHigherTheBetter
 getMetricOrdering (LogLossHashed _) = TheLowerTheBetter
+getMetricOrdering (LikelihoodHashed _) = TheHigherTheBetter
 getMetricOrdering CharMatch = TheHigherTheBetter
 getMetricOrdering MAP = TheHigherTheBetter
 getMetricOrdering LogLoss = TheLowerTheBetter
+getMetricOrdering Likelihood = TheHigherTheBetter
+getMetricOrdering BIOF1 = TheHigherTheBetter
+getMetricOrdering BIOF1Labels = TheHigherTheBetter
 
 defaultOutDirectory = "."
 defaultTestName = "test-A"
@@ -163,10 +186,12 @@ getExpectedDirectory spec = fromMaybe outDirectory $ gesExpectedDirectory spec
 
 data GEvalSpecialCommand = Init | LineByLine | Diff FilePath
 
+data ResultOrdering = KeepTheOriginalOrder | FirstTheWorst | FirstTheBest
+
 data GEvalOptions = GEvalOptions
                     { geoSpecialCommand :: Maybe GEvalSpecialCommand,
+                      geoResultOrdering :: ResultOrdering,
                       geoSpec :: GEvalSpecification }
-
 
 data GEvalException = NoExpectedFile FilePath
                       | NoOutFile FilePath
@@ -236,17 +261,38 @@ checkAndGetFiles gevalSpec = do
   unlessM (D.doesDirectoryExist expectedDirectory) $ throwM $ NoExpectedDirectory expectedDirectory
   unlessM (D.doesDirectoryExist outTestDirectory) $ throwM $ NoOutTestDirectory outTestDirectory
   unlessM (D.doesDirectoryExist expectedTestDirectory) $ throwM $ NoExpectedTestDirectory expectedTestDirectory
+  inputFilePath <- lookForCompressedFiles inputFilePath'
+  expectedFilePath <- lookForCompressedFiles expectedFilePath'
+  outFilePath <- lookForCompressedFiles outFilePath'
   checkInputFileIfNeeded metric inputFilePath
   return (inputFilePath, expectedFilePath, outFilePath)
-   where expectedFilePath = expectedTestDirectory </> (gesExpectedFile gevalSpec)
-         outFilePath = getOutFile gevalSpec (gesOutFile gevalSpec)
-         inputFilePath = expectedTestDirectory </> (gesInputFile gevalSpec)
+   where expectedFilePath' = expectedTestDirectory </> (gesExpectedFile gevalSpec)
+         outFilePath' = getOutFile gevalSpec (gesOutFile gevalSpec)
+         inputFilePath' = expectedTestDirectory </> (gesInputFile gevalSpec)
          expectedTestDirectory = expectedDirectory </> testName
          outTestDirectory = outDirectory </> testName
          expectedDirectory = getExpectedDirectory gevalSpec
          outDirectory = gesOutDirectory gevalSpec
          testName = gesTestName gevalSpec
          metric = gesMetric gevalSpec
+
+lookForCompressedFiles :: FilePath -> IO FilePath
+lookForCompressedFiles = lookForAlternativeFiles [".gz", ".xz", ".bz2"]
+
+lookForAlternativeFiles :: [String] -> FilePath -> IO FilePath
+lookForAlternativeFiles suffixes filePath
+   | takeExtension filePath `Prelude.elem` suffixes = return filePath
+   | otherwise = do
+       fileIsThere <- D.doesFileExist filePath
+       if fileIsThere
+         then
+           return filePath
+         else
+           do
+             found <- Control.Monad.filterM D.doesFileExist $ Prelude.map (filePath <.>) suffixes
+             return $ case found of
+                        [fp] -> fp
+                        _ -> filePath
 
 getOutFile :: GEvalSpecification -> FilePath -> FilePath
 getOutFile gevalSpec out = outDirectory </> testName </> out
@@ -261,7 +307,7 @@ checkInputFileIfNeeded _ _ = return ()
 
 fileAsLineSource :: FilePath -> LineSource (ResourceT IO)
 fileAsLineSource filePath =
-  LineSource (smartSource [] Nothing (parseSmartSpec filePath) $= CT.decodeUtf8Lenient =$= CT.lines) filePath 1
+  LineSource (smartSource [] Nothing (parseSmartSpec filePath) $= autoDecompress $= CT.decodeUtf8Lenient =$= CT.lines) filePath 1
 
 gevalCoreOnSingleLines :: Metric -> LineInFile -> LineInFile -> LineInFile -> IO (MetricValue)
 gevalCoreOnSingleLines metric inpLine expLine outLine =
@@ -283,7 +329,9 @@ gevalCore metric inputFilePath expectedFilePath outFilePath = do
                      (fileAsLineSource expectedFilePath)
                      (fileAsLineSource outFilePath)
 
-gevalCoreOnSources :: (MonadIO m, MonadThrow m, MonadBaseControl IO m) => Metric
+logLossToLikehood logLoss = exp (-logLoss)
+
+gevalCoreOnSources :: (MonadIO m, MonadThrow m, MonadUnliftIO m) => Metric
                      -> LineSource (ResourceT m)
                      -> LineSource (ResourceT m)
                      -> LineSource (ResourceT m)
@@ -292,12 +340,20 @@ gevalCoreOnSources RMSE inputLineSource expectedLineSource outLineSource = do
   mse <- gevalCoreOnSources MSE inputLineSource expectedLineSource outLineSource
   return $ mse ** 0.5
 
+gevalCoreOnSources Likelihood inputLineSource expectedLineSource outLineSource = do
+  logLoss <- gevalCoreOnSources LogLoss inputLineSource expectedLineSource outLineSource
+  return $ logLossToLikehood logLoss
+
+gevalCoreOnSources (LikelihoodHashed b) inputLineSource expectedLineSource outLineSource = do
+  logLoss <- gevalCoreOnSources (LogLossHashed b) inputLineSource expectedLineSource outLineSource
+  return $ logLossToLikehood logLoss
+
 gevalCoreOnSources metric inputLineSource expectedLineSource outLineSource = do
   gevalCore' metric inputLineSource expectedLineSource outLineSource
 
 data LineInFile = LineInFile FilePath Word32 Text
 
-gevalCore' :: (MonadIO m, MonadThrow m, MonadBaseControl IO m) => Metric -> LineSource (ResourceT m) -> LineSource (ResourceT m) -> LineSource (ResourceT m) -> m (MetricValue)
+gevalCore' :: (MonadIO m, MonadThrow m, MonadUnliftIO m) => Metric -> LineSource (ResourceT m) -> LineSource (ResourceT m) -> LineSource (ResourceT m) -> m (MetricValue)
 gevalCore' MSE _ = gevalCoreWithoutInput outParser outParser itemError averageC id
   where outParser = getValue . TR.double
 
@@ -315,9 +371,18 @@ gevalCore' BLEU _ = gevalCoreWithoutInput (Right . Prelude.map Prelude.words . D
           | otherwise = exp (1.0 - (r /. c))
 
 gevalCore' Accuracy _ = gevalCoreWithoutInput (Right . strip) (Right . strip) hitOrMiss averageC id
-                      where hitOrMiss (exp,got) = if (normalizeProbForAccuracy exp got) == exp then 1.0 else 0.0
-                            -- if the expected value is 0 or 1 treat values between 0.0 and 1.0 as probabilities
-                            -- for the positive outcome
+                      where hitOrMiss (exp, got) =
+                              -- first try to parse what we got as a probability distribution
+                              -- (like the one used for Likelikehood/LogLossHashed metric)
+                              case parseWordSpecs got of
+                                Right wordSpecs -> if Prelude.null pairs
+                                                   then 0.0
+                                                   else indicator (exp == (snd $ Prelude.maximum pairs))
+                                                 where pairs = catMaybes $ Prelude.map wordSpecToPair wordSpecs
+                                Left _ ->  indicator ((normalizeProbForAccuracy exp got) == exp)
+                                          -- if the expected value is 0 or 1 treat values
+                                          -- between 0.0 and 1.0 as probabilities
+                                          -- for the positive outcome
                             normalizeProbForAccuracy :: Text -> Text -> Text
                             normalizeProbForAccuracy exp got
                               | exp == (pack "1") = case tryReadingAsFloat got of
@@ -383,7 +448,16 @@ gevalCore' CharMatch inputLineSource = helper inputLineSource
    helper inputLineSource expectedLineSource outputLineSource = do
      gevalCoreGeneralized (ParserSpecWithInput (Right . unpack) (Right . unpack) (Right . unpack)) step countAgg (fMeasureOnCounts charMatchBeta) (WithInput inputLineSource expectedLineSource outputLineSource)
    step (ParsedRecordWithInput inp exp out) = getCharMatchCount inp exp out
-   countAgg = CC.foldl countFolder (0, 0, 0)
+
+gevalCore' BIOF1 _ = gevalCoreWithoutInput parseBioSequenceIntoEntities parseBioSequenceIntoEntities (uncurry gatherCountsForBIO) countAgg f1MeasureOnCounts
+
+gevalCore' BIOF1Labels _ = gevalCoreWithoutInput parseBioSequenceIntoEntitiesWithoutNormalization parseBioSequenceIntoEntitiesWithoutNormalization (uncurry gatherCountsForBIO) countAgg f1MeasureOnCounts
+   where parseBioSequenceIntoEntitiesWithoutNormalization s = do
+           entities <- parseBioSequenceIntoEntities s
+           return $ Prelude.map eraseNormalisation entities
+
+countAgg :: Monad m => ConduitM (Int, Int, Int) o m (Int, Int, Int)
+countAgg = CC.foldl countFolder (0, 0, 0)
 
 parseDistributionWrapper :: Word32 -> Word32 -> Text -> HashedDistribution
 parseDistributionWrapper nbOfBits seed distroSpec = case parseDistribution nbOfBits seed distroSpec of
@@ -395,25 +469,25 @@ data SourceItem a = Got a | Wrong String | Done
 skipLineNumber :: (x -> c) -> ((Word32, x) -> c)
 skipLineNumber fun = fun . snd
 
-gevalCoreWithoutInput :: (MonadBaseControl IO m, MonadThrow m, MonadIO m) => (Text -> Either String a) -> (Text -> Either String b) -> ((a, b) -> c) -> (Sink c (ResourceT m) d) -> (d -> Double) -> LineSource (ResourceT m) -> LineSource (ResourceT m) -> m (MetricValue)
+gevalCoreWithoutInput :: (MonadUnliftIO m, MonadThrow m, MonadIO m) => (Text -> Either String a) -> (Text -> Either String b) -> ((a, b) -> c) -> (Sink c (ResourceT m) d) -> (d -> Double) -> LineSource (ResourceT m) -> LineSource (ResourceT m) -> m (MetricValue)
 gevalCoreWithoutInput expParser outParser itemStep aggregator finalStep expectedLineStream outLineStream =
   gevalCoreGeneralized (ParserSpecWithoutInput expParser outParser) (trans itemStep) aggregator finalStep (WithoutInput expectedLineStream outLineStream)
  where
    trans :: ((a, b) -> c) -> ParsedRecord (WithoutInput m a b) -> c
    trans step (ParsedRecordWithoutInput x y) = step (x, y)
 
-gevalCore''' :: (MonadBaseControl IO m, MonadThrow m, MonadIO m) => ParserSpec (WithoutInput m a b) -> ((Word32, (a, b)) -> c) -> (Sink c (ResourceT m) d) -> (d -> Double) -> WithoutInput m a b -> m (MetricValue)
+gevalCore''' :: (MonadUnliftIO m, MonadThrow m, MonadIO m) => ParserSpec (WithoutInput m a b) -> ((Word32, (a, b)) -> c) -> (Sink c (ResourceT m) d) -> (d -> Double) -> WithoutInput m a b -> m (MetricValue)
 gevalCore''' parserSpec itemStep aggregator finalStep context =
   gevalCoreGeneralized' parserSpec (trans itemStep) aggregator finalStep context
  where
    trans :: ((Word32, (a, b)) -> c) -> (Word32, ParsedRecord (WithoutInput m a b)) -> c
    trans step (n, ParsedRecordWithoutInput x y) = step (n, (x, y))
 
-gevalCoreGeneralized :: (EvaluationContext ctxt m, MonadBaseControl IO m, MonadThrow m, MonadIO m) => ParserSpec ctxt -> (ParsedRecord ctxt -> c) -> (Sink c (ResourceT m) d) -> (d -> Double) -> ctxt -> m (MetricValue)
+gevalCoreGeneralized :: (EvaluationContext ctxt m, MonadUnliftIO m, MonadThrow m, MonadIO m) => ParserSpec ctxt -> (ParsedRecord ctxt -> c) -> (Sink c (ResourceT m) d) -> (d -> Double) -> ctxt -> m (MetricValue)
 gevalCoreGeneralized parserSpec itemStep aggregator finalStep context =
   gevalCoreGeneralized' parserSpec (skipLineNumber itemStep) aggregator finalStep context
 
-gevalCoreGeneralized' :: forall m ctxt c d . (EvaluationContext ctxt m, MonadBaseControl IO m, MonadThrow m, MonadIO m) => ParserSpec ctxt -> ((Word32, ParsedRecord ctxt) -> c) -> (Sink c (ResourceT m) d) -> (d -> Double) -> ctxt -> m (MetricValue)
+gevalCoreGeneralized' :: forall m ctxt c d . (EvaluationContext ctxt m, MonadUnliftIO m, MonadThrow m, MonadIO m) => ParserSpec ctxt -> ((Word32, ParsedRecord ctxt) -> c) -> (Sink c (ResourceT m) d) -> (d -> Double) -> ctxt -> m (MetricValue)
 gevalCoreGeneralized' parserSpec itemStep aggregator finalStep context = do
    v <- runResourceT $
      (((getZipSource $ (,)
@@ -434,7 +508,7 @@ class EvaluationContext ctxt m where
 
 data WithoutInput m e o = WithoutInput (LineSource (ResourceT m)) (LineSource (ResourceT m))
 
-instance (MonadBaseControl IO m, MonadIO m, MonadThrow m) => EvaluationContext (WithoutInput m e o) m where
+instance (MonadUnliftIO m, MonadIO m, MonadThrow m) => EvaluationContext (WithoutInput m e o) m where
   data ParserSpec (WithoutInput m e o) = ParserSpecWithoutInput (Text -> Either String e) (Text -> Either String o)
   data WrappedParsedRecord (WithoutInput m e o) = WrappedParsedRecordWithoutInput (SourceItem e) (SourceItem o)
   data ParsedRecord (WithoutInput m e o) = ParsedRecordWithoutInput e o
@@ -463,7 +537,7 @@ data WithInput m i e o = WithInput (LineSource (ResourceT m)) (LineSource (Resou
 
 getInputFilePath (WithInput (LineSource _ inputFilePath _) _ _) = inputFilePath
 
-instance (MonadBaseControl IO m, MonadIO m, MonadThrow m) => EvaluationContext (WithInput m i e o) m where
+instance (MonadUnliftIO m, MonadIO m, MonadThrow m) => EvaluationContext (WithInput m i e o) m where
   data ParserSpec (WithInput m i e o) = ParserSpecWithInput (Text -> Either String i) (Text -> Either String e) (Text -> Either String o)
   data WrappedParsedRecord (WithInput m i e o) = WrappedParsedRecordWithInput (SourceItem i) (SourceItem e) (SourceItem o)
   data ParsedRecord (WithInput m i e o) = ParsedRecordWithInput i e o

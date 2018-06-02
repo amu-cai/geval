@@ -38,3 +38,7 @@ sepByWhitespaces parser = possibleWhitespace *> parser `sepBy` whitespace <* pos
 possibleWhitespace = many' (satisfy isHorizontalSpace)
 
 whitespace = many1 (satisfy isHorizontalSpace)
+
+indicator :: Bool -> Double
+indicator True = 1.0
+indicator False = 0.0

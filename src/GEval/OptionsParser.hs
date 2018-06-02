@@ -41,6 +41,16 @@ optionsParser = GEvalOptions
                       <> short 'd'
                       <> metavar "OTHER-OUT"
                       <> help "compare results")))
+   <*> ((flag' FirstTheWorst
+         (long "sort"
+          <> short 's'
+          <> help "When in line-by-line or diff mode, sort the results from the worst to the best"))
+        <|>
+        (flag' FirstTheBest
+         (long "reverse-sort"
+          <> short 'r'
+          <> help "When in line-by-line or diff mode, sort the results from the best to the worst"))
+        <|> pure KeepTheOriginalOrder)
    <*> specParser
 
 precisionArgParser :: Parser Int
@@ -90,8 +100,12 @@ specParser = GEvalSpecification
     <> showDefault
     <> metavar "INPUT"
     <> help "The name of the file with the input (applicable only for some metrics)" )
-  <*> metricReader
+  <*> ((flip fromMaybe) <$> altMetricReader <*> metricReader)
   <*> optional precisionArgParser
+
+sel :: Maybe Metric -> Metric -> Metric
+sel Nothing m = m
+sel (Just m) _ = m
 
 metricReader :: Parser Metric
 metricReader = option auto
@@ -100,7 +114,14 @@ metricReader = option auto
                  <> value defaultMetric
                  <> showDefault
                  <> metavar "METRIC"
-                 <> help "Metric to be used - RMSE, MSE, Accuracy, LogLoss, F-measure (specify as F1, F2, F0.25, etc.), MAP, BLEU, NMI, ClippEU, LogLossHashed or CharMatch" )
+                 <> help "Metric to be used - RMSE, MSE, Accuracy, LogLoss, Likelihood, F-measure (specify as F1, F2, F0.25, etc.), MAP, BLEU, NMI, ClippEU, LogLossHashed, LikelihoodHashed, BIO-F1, BIO-F1-Labels or CharMatch" )
+
+altMetricReader :: Parser (Maybe Metric)
+altMetricReader = optional $ option auto
+               ( long "alt-metric"
+                 <> short 'a'
+                 <> metavar "METRIC"
+                 <> help "Alternative metric (overrides --metric option)" )
 
 runGEval :: [String] -> IO (Either (ParserResult GEvalOptions) (Maybe MetricValue))
 runGEval args = do
@@ -145,20 +166,20 @@ attemptToReadOptsFromConfigFile args opts = do
 
 
 runGEval'' :: GEvalOptions -> IO (Maybe MetricValue)
-runGEval'' opts = runGEval''' (geoSpecialCommand opts) (geoSpec opts)
+runGEval'' opts = runGEval''' (geoSpecialCommand opts) (geoResultOrdering opts) (geoSpec opts)
 
-runGEval''' :: Maybe GEvalSpecialCommand -> GEvalSpecification -> IO (Maybe MetricValue)
-runGEval''' Nothing spec = do
+runGEval''' :: Maybe GEvalSpecialCommand -> ResultOrdering -> GEvalSpecification -> IO (Maybe MetricValue)
+runGEval''' Nothing _ spec = do
   val <- geval spec
   return $ Just val
-runGEval''' (Just Init) spec = do
+runGEval''' (Just Init) _ spec = do
   initChallenge spec
   return Nothing
-runGEval''' (Just LineByLine) spec = do
-  runLineByLine spec
+runGEval''' (Just LineByLine) ordering spec = do
+  runLineByLine ordering spec
   return Nothing
-runGEval''' (Just (Diff otherOut)) spec = do
-  runDiff otherOut spec
+runGEval''' (Just (Diff otherOut)) ordering spec = do
+  runDiff ordering otherOut spec
   return Nothing
 
 initChallenge :: GEvalSpecification -> IO ()
@@ -169,11 +190,9 @@ initChallenge spec = case gesExpectedDirectory spec of
 showInitInstructions = do
   putStrLn [here|
 Run:
-    geval --init --expected-directory CHALLENGE
+    geval --init --expected-directory CHALLENGE --metric METRIC-NAME --precision NUMBER-OF-DIGITS
 to create a directory CHALLENGE representing a Gonito challenge.
 
-You can specify a metric with `--metric METRIC-NAME` option.
-
-Note that `--out-directory` option is not taken into account with `--init` option.
+(Note that `--out-directory` option is not taken into account with `--init` option.)
 |]
   exitFailure

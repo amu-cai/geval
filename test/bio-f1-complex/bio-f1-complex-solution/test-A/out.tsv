@@ -1,0 +1,6 @@
+B-wrong
+B-city/LOS I-city/ANGELES O B-city/NEW I-city/YORK
+B-surname/BROWN B-surname/SMITH
+B-month/JULY B-month/JULY O O B-foo/bar
+O B-class I-class I-class
+O B-wrong

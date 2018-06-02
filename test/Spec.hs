@@ -8,10 +8,14 @@ import GEval.BLEU
 import GEval.ClippEU
 import GEval.PrecisionRecall
 import GEval.ClusteringMetrics
+import GEval.BIO
+import GEval.LineByLine
 import Data.Attoparsec.Text
 import Options.Applicative
 import Data.Text
 import Text.EditDistance
+
+import Data.Conduit.List (consume)
 
 import qualified Test.HUnit as HU
 
@@ -101,6 +105,16 @@ main = hspec $ do
       runGEvalTest "log-loss-hashed-simple" `shouldReturnAlmost` 2.398479083333333
     it "example with unnormalized values" $ do
       runGEvalTest "log-loss-hashed-not-normalized" `shouldReturnAlmost` 1.0468455186722887
+    it "with probs instead of log probs" $ do
+      runGEvalTest "log-loss-hashed-probs" `shouldReturnAlmost` 4.11631293099392
+    it "with probs instead of log probs (with normalization)" $ do
+      runGEvalTest "log-loss-hashed-probs-normalized" `shouldReturnAlmost` 1.55537749098853
+    it "with log probs whose probs are summing up to less than 1.0" $ do
+      runGEvalTest "log-loss-hashed-normalization" `shouldReturnAlmost` 5.16395069238851
+  describe "LikelihoodHashed challenge" $ do
+    it "example with unnormalized values" $ do
+      runGEvalTest "likelihood-hashed-not-normalized" `shouldReturnAlmost` 0.351043364110715
+
   describe "reading options" $ do
     it "can get the metric" $ do
       extractMetric "bleu-complex" `shouldReturn` (Just BLEU)
@@ -188,11 +202,105 @@ main = hspec $ do
       runGEvalTest "logloss-simple" `shouldReturnAlmost` 0.31824
     it "perfect" $ do
       runGEvalTest "logloss-perfect" `shouldReturnAlmost` 0.0
+  describe "Likelihood" $ do
+    it "simple" $ do
+      runGEvalTest "likelihood-simple" `shouldReturnAlmost` 0.72742818469866
   describe "evaluating single lines" $ do
     it "RMSE" $ do
       gevalCoreOnSingleLines RMSE (LineInFile "stub1" 1 "blabla")
                                   (LineInFile "stub2" 1 "3.4")
                                   (LineInFile "stub3" 1 "2.6") `shouldReturnAlmost` 0.8
+  describe "BIO format" $ do
+    it "just parse" $ do
+      let (Right r) = parseOnly (bioSequenceParser <* endOfInput) "O B-city/NEW_YORK I-city B-city/KALISZ I-city O B-name"
+      r `shouldBe` [Outside,
+                    Beginning "city" (Just "NEW_YORK"),
+                    Inside "city" Nothing,
+                    Beginning "city" (Just "KALISZ"),
+                    Inside "city" Nothing,
+                    Outside,
+                    Beginning "name" Nothing]
+    it "simplest entity" $ do
+      let (Right ents) = parseBioSequenceIntoEntities "B-city"
+      ents `shouldBe` [TaggedEntity (TaggedSpan 1 1) "city" Nothing]
+    it "multi-word entity" $ do
+      let (Right ents) = parseBioSequenceIntoEntities "B-date I-date"
+      ents `shouldBe` [TaggedEntity (TaggedSpan 1 2) "date" Nothing]
+    it "multi-word entity with normalized text" $ do
+      let (Right ents) = parseBioSequenceIntoEntities "B-date/FOO I-date/BAR"
+      ents `shouldBe` [TaggedEntity (TaggedSpan 1 2) "date" (Just "FOO_BAR")]
+    it "simplest entity with something outside" $ do
+      let (Right ents) = parseBioSequenceIntoEntities "O B-city"
+      ents `shouldBe` [TaggedEntity (TaggedSpan 2 2) "city" Nothing]
+    it "another simple case" $ do
+      let (Right ents) = parseBioSequenceIntoEntities "B-city B-city"
+      ents `shouldBe` [TaggedEntity (TaggedSpan 1 1) "city" Nothing,
+                       TaggedEntity (TaggedSpan 2 2) "city" Nothing]
+    it "just parse into entities" $ do
+      let (Right ents) = parseBioSequenceIntoEntities "O O B-city/LOS_ANGELES I-city B-city/KLUCZBORK O B-name O B-person/JOHN I-person/VON I-person/NEUMANN"
+      ents `shouldBe` [TaggedEntity (TaggedSpan 3 4) "city" (Just "LOS_ANGELES"),
+                       TaggedEntity (TaggedSpan 5 5) "city" (Just "KLUCZBORK"),
+                       TaggedEntity (TaggedSpan 7 7) "name" (Nothing),
+                       TaggedEntity (TaggedSpan 9 11) "person" (Just "JOHN_VON_NEUMANN")]
+    it "another entity parse" $ do
+      let (Right ents) = parseBioSequenceIntoEntities "B-month/JULY B-month/JULY O O B-foo/bar"
+      ents `shouldBe` [TaggedEntity (TaggedSpan 1 1) "month" (Just "JULY"),
+                       TaggedEntity (TaggedSpan 2 2) "month" (Just "JULY"),
+                       TaggedEntity (TaggedSpan 5 5) "foo" (Just "bar")]
+    it "another entity parse" $ do
+      let (Right ents) = parseBioSequenceIntoEntities "B-city/LOS I-city/ANGELES O B-city/NEW I-city/YORK"
+      ents `shouldBe` [TaggedEntity (TaggedSpan 1 2) "city" (Just "LOS_ANGELES"),
+                       TaggedEntity (TaggedSpan 4 5) "city" (Just "NEW_YORK")]
+    it "parse entity" $ do
+      let (Right ents) = parseBioSequenceIntoEntities "B-surname/BROWN B-surname/SMITH"
+      ents `shouldBe` [TaggedEntity (TaggedSpan 1 1) "surname" (Just "BROWN"),
+                       TaggedEntity (TaggedSpan 2 2) "surname" (Just "SMITH")]
+    it "parse entity" $ do
+      let (Right ents) = parseBioSequenceIntoEntities "O B-surname/SMITH"
+      ents `shouldBe` [TaggedEntity (TaggedSpan 2 2) "surname" (Just "SMITH")]
+    it "check counting" $ do
+      gatherCountsForBIO [TaggedEntity (TaggedSpan 2 2) "surname" (Just "SMITH")] [TaggedEntity (TaggedSpan 1 1) "surname" (Just "BROWN"),
+                                                                                   TaggedEntity (TaggedSpan 2 2) "surname" (Just "SMITH")] `shouldBe` (1, 1, 2)
+    it "check F1 on a more complicated example" $ do
+      runGEvalTest "bio-f1-complex" `shouldReturnAlmost` 0.625
+    it "check F1 on labels only" $ do
+      runGEvalTest "bio-f1-complex-labels" `shouldReturnAlmost` 0.6666666666
+    it "calculate F1" $ do
+      runGEvalTest "bio-f1-simple" `shouldReturnAlmost` 0.5
+    it "calculate F1 with underscores rather than minus signs" $ do
+      runGEvalTest "bio-f1-simple-underscores" `shouldReturnAlmost` 0.5
+    it "check perfect score" $ do
+      runGEvalTest "bio-f1-perfect" `shouldReturnAlmost` 1.0
+    it "check inconsistent input" $ do
+      runGEvalTest "bio-f1-error" `shouldThrow` (== UnexpectedData 2 "inconsistent label sequence `B-NAME/JOHN I-FOO/SMITH I-FOO/X`")
+  describe "automatic decompression" $ do
+    it "more complex test" $ do
+      runGEvalTest "charmatch-complex-compressed" `shouldReturnAlmost` 0.1923076923076923
+  describe "line by line mode" $ do
+    let sampleChallenge =
+          GEvalSpecification
+          { gesOutDirectory = "test/likelihood-simple/likelihood-simple-solution",
+            gesExpectedDirectory = Just "test/likelihood-simple/likelihood-simple",
+            gesTestName = "test-A",
+            gesOutFile = "out.tsv",
+            gesExpectedFile = "expected.tsv",
+            gesInputFile = "in.tsv",
+            gesMetric = Likelihood,
+            gesPrecision = Nothing }
+    it "simple test" $ do
+      results <- runLineByLineGeneralized KeepTheOriginalOrder sampleChallenge Data.Conduit.List.consume
+      Prelude.map (\(LineRecord inp _ _ _ _) -> inp) results `shouldBe` ["foo",
+                                                                        "bar",
+                                                                        "baz",
+                                                                        "baq"]
+    it "test sorting" $ do
+      results <- runLineByLineGeneralized FirstTheWorst sampleChallenge Data.Conduit.List.consume
+      Prelude.head (Prelude.map (\(LineRecord inp _ _ _ _) -> inp) results) `shouldBe` "baq"
+  describe "handle --alt-metric option" $ do
+    it "accuracy instead of likelihood" $ do
+      runGEvalTestExtraOptions ["--alt-metric", "Accuracy"] "likelihood-simple" `shouldReturnAlmost` 0.75
+    it "accuracy instead of log loss" $ do
+      runGEvalTestExtraOptions ["--alt-metric", "Accuracy"] "log-loss-hashed-probs" `shouldReturnAlmost` 0.4
   describe "smart sources" $ do
     it "smart specs are parsed" $ do
       parseSmartSpec "" `shouldBe` NoSpec
@@ -217,8 +325,8 @@ main = hspec $ do
       parseSmartSpecInContext ["foo/bar"] Nothing "" `shouldBe` Nothing
     it "sources are accessed" $ do
       readFromSmartSource [] Nothing "test/files/foo.txt" `shouldReturn` ["foo\n"]
-      readFromSmartSource [] Nothing "https://httpbin.org/robots.txt" `shouldReturn`
-        ["User-agent: *\nDisallow: /deny\n"]
+--      readFromSmartSource [] Nothing "https://httpbin.org/robots.txt" `shouldReturn`
+--        ["User-agent: *\nDisallow: /deny\n"]
 
 readFromSmartSource :: [FilePath] -> Maybe FilePath -> String -> IO [String]
 readFromSmartSource defaultDirs defaultFile specS = do
@@ -244,11 +352,13 @@ testMatchFun _ _ = False
 extractVal :: (Either (ParserResult GEvalOptions) (Maybe MetricValue)) -> IO MetricValue
 extractVal (Right (Just val)) = return val
 
-runGEvalTest testName = (runGEval [
+runGEvalTest = runGEvalTestExtraOptions []
+
+runGEvalTestExtraOptions extraOptions testName = (runGEval ([
   "--expected-directory",
   "test/" ++ testName ++ "/" ++ testName,
   "--out-directory",
-  "test/" ++ testName ++ "/" ++ testName ++ "-solution"]) >>= extractVal
+  "test/" ++ testName ++ "/" ++ testName ++ "-solution"] ++ extraOptions)) >>= extractVal
 
 extractMetric :: String -> IO (Maybe Metric)
 extractMetric testName = do

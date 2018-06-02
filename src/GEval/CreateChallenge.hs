@@ -101,6 +101,8 @@ Cluster proverbs for languages.
 This is a sample challenge for flat clustering (unsupervised learning challenge).
 |] ++ (commonReadmeMDContents testName)
 
+readmeMDContents (LikelihoodHashed b) testname = readmeMDContents (LogLossHashed b) testname
+
 readmeMDContents (LogLossHashed _) testName = [i|
 GEval sample challenge — language model evaluation
 ==================================================
@@ -113,6 +115,39 @@ The metric is average log-loss calculated for 10-bit hashes.
 Train file is a just text file (one utterance per line).
 In an input file, left and right contexts (TAB-separated) are given.
 In an expected file, the word to be guessed is given.
+
+Format of the output files
+--------------------------
+
+For each input line, a probability distribution for words in a gap
+must be given:
+
+    word1:logprob1 word2:logprob2 ... wordN:logprobN :logprob0
+
+where *logprobi* is the logarithm of the probability for *wordi* and
+*logprob0* is the logarithm of the probability mass for all the other
+words (it will be spread between all 1024 fingerprint values). If the
+respective probabilities do not sum up to 1:
+
+  * if the sum is larger than 0.0 and smaller than 1.0, and no logprob0
+    is given, log of the remaining probablity mass will be assigned to logprob0,
+  * otherwise they will be normalised with.
+softmax
+
+Note: the separator here is space, not TAB!
+
+### Probs
+
+Probabilities could be given (instead of logprobs):
+
+  * if **all** values look as probs and **at least value** is positive, we treat
+    the values as probs rather then logprobs (single value 0.0 is treated
+    as a logprob, i.e. probability 1.0!);
+  * if their sum is greater than 1.0, then we normalize simply by dividing by the sum;
+  * if the sum is smaller than 1.0 and there is no entry for all the other words,
+    we add such an entry for the missing probability mass;
+  * if the sum is smaller than 1.0 and there is an entry for all the other words,
+    we normalize by dividing by the sum.
 |] ++ (commonReadmeMDContents testName)
 
 readmeMDContents CharMatch testName = [i|
@@ -168,6 +203,29 @@ Give the probability that a sentence expresses a positive sentiment.
 
 This a sample challenge for the log-loss metric.
 
+|] ++ (commonReadmeMDContents testName)
+
+readmeMDContents Likelihood testName = [i|
+Give the probability of a positive sentiment
+============================================
+
+Give the probability that a sentence expresses a positive sentiment.
+
+This a sample challenge for the likelihood metric.
+
+|] ++ (commonReadmeMDContents testName)
+
+readmeMDContents BIOF1Labels testName = readmeMDContents BIOF1 testName
+readmeMDContents BIOF1 testName = [i|
+Tag and normalize names
+=======================
+
+Tag names in the tokenized text and normalized them.
+
+The output should be given in the BIO format with the normalized forms given after slashes (see
+`dev-0/expected.tsv` for an example).
+
+The metric is F1 counted on entities (not labels).
 |] ++ (commonReadmeMDContents testName)
 
 readmeMDContents _ testName = [i|
@@ -239,6 +297,7 @@ trainContents NMI = [hereLit|pl	Kto pod kim dołki kopie, ten sam w nie wpada.
 en	The pen is mightier than the sword.
 pl	Baba z wozu, koniom lżej.
 |]
+trainContents (LikelihoodHashed b) = trainContents (LogLossHashed b)
 trainContents (LogLossHashed _) = [hereLit|Ala ma psa i kota
 Basia ma psa
 Nie kupujemy kota w worku
@@ -254,10 +313,16 @@ honour	GB	honor
 titbit	GB	smakołyk
 tidbit	US	smakołyk
 |]
+trainContents Likelihood = trainContents LogLoss
 trainContents LogLoss = [hereLit|0.0	Hell, no!!!
 0.0	I hate this stuff
 1.0	Lekker!!!
 0.0	Boring, boring, boring
+|]
+trainContents BIOF1Labels = trainContents BIOF1
+trainContents BIOF1 = [hereLit|O O O B-surname/BOND O B-firstname/JAMES B-surname/BOND	My name is Bond , James Bond
+O O O O O	There is no name here
+B-firstname/JOHN I-surname/VON I-surname/NEUMANN	John von Nueman
 |]
 trainContents _ = [hereLit|0.06	0.39	0	0.206
 1.00	1.00	1	0.017
@@ -279,6 +344,7 @@ When the going gets tough, the tough get going.
 devInContents (FMeasure _) = [hereLit|b	b	W	29520	779	-28	-32	a	0	0	0	0	0	0	0	0	0	0
 b	b	W	55200	1259	35	9	a	1	0	1	0	0	0	0	0	4000	4000
 |]
+devInContents (LikelihoodHashed b) = devInContents (LogLossHashed b)
 devInContents (LogLossHashed _) = [hereLit|Nie kupuj	w worku
 Ona	psa
 |]
@@ -290,9 +356,14 @@ devInContents MAP = [hereLit|US	noc
 GB	wózek dziecięcy
 GB	wizualizować
 |]
+devInContents Likelihood = devInContents LogLoss
 devInContents LogLoss = [hereLit|Great stuff!
 Boring stuff
 That's good
+|]
+devInContents BIOF1Labels = devInContents BIOF1
+devInContents BIOF1 = [hereLit|Adam and Eve
+Mr Jan Kowalski
 |]
 devInContents _ = [hereLit|0.72	0	0.007
 9.54	62	0.054
@@ -312,6 +383,7 @@ devExpectedContents NMI = [hereLit|en
 pl
 en
 |]
+devExpectedContents (LikelihoodHashed b) = devExpectedContents (LogLossHashed b)
 devExpectedContents (LogLossHashed _) = [hereLit|kota
 ma
 |]
@@ -323,9 +395,14 @@ devExpectedContents MAP = [hereLit|night	nite
 pram
 visualise
 |]
+devExpectedContents Likelihood = devExpectedContents LogLoss
 devExpectedContents LogLoss = [hereLit|1.0
 0.0
 1.0
+|]
+devExpectedContents BIOF1Labels = devExpectedContents BIOF1
+devExpectedContents BIOF1 = [hereLit|B-firstname/ADAM O B-firstname/EVE
+O B-firstname/JAN B-surname/KOWALSKI
 |]
 devExpectedContents _ = [hereLit|0.82
 95.2
@@ -347,6 +424,7 @@ W marcu, jak w garncu.
 A cada necio agrada su porrada.
 Kwiecień plecień, bo przeplata trochę zimy, trochę lata.
 |]
+testInContents (LikelihoodHashed b) = testInContents (LogLossHashed b)
 testInContents (LogLossHashed _) = [hereLit|Ala	ma
 Ona ma kota	worku
 |]
@@ -358,9 +436,14 @@ testInContents MAP = [hereLit|US	wózek dziecięcy
 GB	słoń
 US	słoń
 |]
+testInContents Likelihood = testInContents LogLoss
 testInContents LogLoss = [hereLit|That's great, ha, ha, I love it!
 Super-duper!!
 That is incredibly boring.
+|]
+testInContents BIOF1Labels = testInContents BIOF1
+testInContents BIOF1 = [hereLit|Alan Tring
+No name here
 |]
 testInContents _ = [hereLit|1.52	2	0.093
 30.06	14	0.009
@@ -382,6 +465,7 @@ pl
 es
 pl
 |]
+testExpectedContents (LikelihoodHashed b) = testExpectedContents (LogLossHashed b)
 testExpectedContents (LogLossHashed _) = [hereLit|ma
 w
 |]
@@ -393,9 +477,14 @@ testExpectedContents MAP = [hereLit|trolley
 elephant
 elephant
 |]
+testExpectedContents Likelihood = testExpectedContents LogLoss
 testExpectedContents LogLoss = [hereLit|1.0
 1.0
 0.0
+|]
+testExpectedContents BIOF1Labels = testExpectedContents BIOF1
+testExpectedContents BIOF1 = [hereLit|B-firstname/ALAN B-surname/TURING
+O O O
 |]
 testExpectedContents _ = [hereLit|0.11
 17.2

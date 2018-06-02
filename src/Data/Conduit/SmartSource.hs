@@ -35,17 +35,17 @@ pureSmartSource _ (FileNameSpec fileName) = sourceFile fileName
 pureSmartSource _ (FilePathSpec fileName) = sourceFile fileName
 pureSmartSource [] (PossiblyGitSpec spec) = sourceFile spec
 pureSmartSource (firstDir:_) (PossiblyGitSpec spec) = sourceFile (firstDir </> spec)
-pureSmartSource _ (Https url) = httpSource url
-pureSmartSource _ (Http url) = httpSource url
+--pureSmartSource _ (Https url) = httpSource url
+--pureSmartSource _ (Http url) = httpSource url
 
-httpSource :: MonadResource m => String -> ConduitM () S.ByteString m ()
-httpSource url = do
-  request <- liftIO $ parseRequest url
-  manager <- liftIO $ newManager tlsManagerSettings
-  response <- lift $ http request manager
-  (httpsource, finalizer) <- lift $ unwrapResumable (responseBody response)
-  httpsource
-  lift finalizer
+-- httpSource :: MonadResource m => String -> ConduitM () S.ByteString m ()
+-- httpSource url = do
+--   request <- liftIO $ parseRequest url
+--   manager <- liftIO $ newManager tlsManagerSettings
+--   response <- lift $ http request manager
+--   (httpsource, finalizer) <- lift $ unwrapResumable (responseBody response)
+--   httpsource
+--   lift finalizer
 
 parseSmartSpec :: FilePath -> SmartSpec
 parseSmartSpec "" = NoSpec

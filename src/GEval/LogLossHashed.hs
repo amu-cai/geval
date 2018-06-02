@@ -1,7 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 module GEval.LogLossHashed
-       (HashedDistribution, parseDistribution, calculateLogLoss)
+       (HashedDistribution, parseDistribution, calculateLogLoss, parseWordSpecs, wordSpecToPair)
        where
 
 import qualified Data.Vector as V
@@ -36,24 +36,41 @@ parseDistribution nbOfBits seed distroSpec =
                             -- a direct list of 2^nbOfBits log probs
                             else parseDistributionFromLogProbList nbOfBits distroSpec
 
+isProbTotalIncorrect :: Double -> Bool
+isProbTotalIncorrect probTotal = probTotal > 1.0 || probTotal < (1.0 - epsilon)
+   where epsilon = 0.00000001
+
 normalizeDistribution :: HashedDistribution -> HashedDistribution
 normalizeDistribution distro =
   -- we do softmax (if needed)
-  if probSum > 1.0 || probSum < (1.0 - epsilon)
+  if isProbTotalIncorrect probSum
   then normalized
   else distro
   where probSum = V.foldl' (\s l -> (s + exp l)) 0.0 distro
         normalized = V.map (\v -> log ((exp v) / probSum)) distro
-        epsilon = 0.00000001
 
 type DistroMonad s = ReaderT (VM.MVector s Double) (ST s)
 
 data WordSpec = AnyWord | SpecificWord T.Text
+                deriving (Eq, Show)
+
+isAnyWord AnyWord = True
+isAnyWord _ = False
+
 data WordSpecWithLogProb = WordSpecWithLogProb WordSpec Double
 
+wordSpecToPair :: WordSpecWithLogProb -> Maybe (Double, T.Text)
+wordSpecToPair (WordSpecWithLogProb AnyWord _) = Nothing
+wordSpecToPair (WordSpecWithLogProb (SpecificWord w) lp) = Just (lp, w)
+
 parseDistributionFromWordList :: Word32 -> Word32 -> T.Text -> Either String HashedDistribution
-parseDistributionFromWordList nbOfBits seed distroSpec = (parseDistributionFromWordList' nbOfBits seed) =<< (
-  processEithers $ map getWordSpecWithLogProb $ T.splitOn " " distroSpec)
+parseDistributionFromWordList nbOfBits seed distroSpec = (parseDistributionFromWordList' nbOfBits seed) =<<
+  normalizeLogProbs =<<
+  lookForProbs =<<
+  (parseWordSpecs distroSpec)
+
+parseWordSpecs :: T.Text -> Either String [WordSpecWithLogProb]
+parseWordSpecs distroSpec = processEithers $ map getWordSpecWithLogProb $ T.splitOn " " distroSpec
 
 getWordSpecWithLogProb :: T.Text -> Either String WordSpecWithLogProb
 getWordSpecWithLogProb t =
@@ -76,6 +93,42 @@ parseDistributionFromWordList' nbOfBits seed specs = runST $ do
   runReaderT (addSpecs nbOfBits seed specs) emp
   frozen <- V.freeze emp
   return $ Right frozen
+
+lookForProbs :: [WordSpecWithLogProb] -> Either String [WordSpecWithLogProb]
+lookForProbs specs
+  | areProbs specs = Right $ toLogProbs $ normalizeProbs specs
+  | otherwise = Right $ specs
+
+areProbs :: [WordSpecWithLogProb] -> Bool
+areProbs specs = all isProb specs && any isPositiveProb specs
+  where isProb (WordSpecWithLogProb _ v) = v >= 0.0 && v <= 1.0
+        isPositiveProb (WordSpecWithLogProb _ p) = p > 0.0 && p <= 1.0
+
+toLogProbs :: [WordSpecWithLogProb] -> [WordSpecWithLogProb]
+toLogProbs = map (\(WordSpecWithLogProb w p) -> (WordSpecWithLogProb w (log p)))
+
+normalizeLogProbs :: [WordSpecWithLogProb] -> Either String [WordSpecWithLogProb]
+normalizeLogProbs specs = if isProbTotalIncorrect probTotal
+                             && probTotal < 1.0 && probTotal > 0.0
+                             && not (any (\(WordSpecWithLogProb w _) -> isAnyWord w) specs)
+                             && all (\(WordSpecWithLogProb _ lp) -> lp <= 0) specs
+                          then
+                            Right ((WordSpecWithLogProb AnyWord (log (1-probTotal))):specs)
+                          else
+                            Right specs
+  where probTotal = sum $ map (\(WordSpecWithLogProb _ logp) -> exp logp) specs
+
+normalizeProbs :: [WordSpecWithLogProb] -> [WordSpecWithLogProb]
+normalizeProbs specs = if isProbTotalIncorrect probTotal
+                         then
+                           if probTotal > 1.0 || any (\(WordSpecWithLogProb w _) -> isAnyWord w) specs
+                             then
+                               map (\(WordSpecWithLogProb w p) -> WordSpecWithLogProb w (p / probTotal)) specs
+                             else
+                               ((WordSpecWithLogProb AnyWord (1-probTotal)):specs)
+                         else
+                           specs
+  where probTotal = sum $ map (\(WordSpecWithLogProb _ p) -> p) specs
 
 addSpecs :: Word32 -> Word32 -> [WordSpecWithLogProb] -> DistroMonad s ()
 addSpecs nbOfBits seed = mapM_ (updateDistro nbOfBits seed)
