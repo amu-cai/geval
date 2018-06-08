@@ -47,7 +47,7 @@ main :: IO ()
 main = hspec $ do
   describe "root mean square error" $ do
     it "simple test" $ do
-      geval (defaultGEvalSpecification {gesExpectedDirectory=Just "test/rmse-simple/rmse-simple", gesOutDirectory="test/rmse-simple/rmse-simple-solution"}) `shouldReturnAlmost` 0.64549722436790
+      (fmap Prelude.head (geval (defaultGEvalSpecification {gesExpectedDirectory=Just "test/rmse-simple/rmse-simple", gesOutDirectory="test/rmse-simple/rmse-simple-solution"}))) `shouldReturnAlmost` 0.64549722436790
   describe "mean square error" $ do
     it "simple test with arguments" $
       runGEvalTest "mse-simple" `shouldReturnAlmost` 0.4166666666666667
@@ -285,7 +285,7 @@ main = hspec $ do
             gesOutFile = "out.tsv",
             gesExpectedFile = "expected.tsv",
             gesInputFile = "in.tsv",
-            gesMetric = Likelihood,
+            gesMetrics = [Likelihood],
             gesPrecision = Nothing }
     it "simple test" $ do
       results <- runLineByLineGeneralized KeepTheOriginalOrder sampleChallenge Data.Conduit.List.consume
@@ -333,8 +333,8 @@ testMatchFun 'b' 1 = True
 testMatchFun 'c' 1 = True
 testMatchFun _ _ = False
 
-extractVal :: (Either (ParserResult GEvalOptions) (Maybe MetricValue)) -> IO MetricValue
-extractVal (Right (Just val)) = return val
+extractVal :: (Either (ParserResult GEvalOptions) (Maybe [MetricValue])) -> IO MetricValue
+extractVal (Right (Just (val:_))) = return val
 
 runGEvalTest = runGEvalTestExtraOptions []
 
@@ -349,7 +349,7 @@ extractMetric testName = do
   result <- getOptions ["--expected-directory", "test/" ++ testName ++ "/" ++ testName]
   return $ case result of
    Left _ -> Nothing
-   Right opts -> Just $ gesMetric $ geoSpec opts
+   Right opts -> Just $ gesMainMetric $ geoSpec opts
 
 class AEq a where
     (=~) :: a -> a -> Bool

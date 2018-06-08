@@ -34,7 +34,8 @@ module GEval.Core
       EvaluationContext(..),
       ParserSpec(..),
       fileAsLineSource,
-      checkAndGetFiles
+      checkAndGetFiles,
+      gesMainMetric
     ) where
 
 import Data.Conduit
@@ -180,8 +181,13 @@ data GEvalSpecification = GEvalSpecification
                             gesOutFile :: String,
                             gesExpectedFile :: String,
                             gesInputFile :: String,
-                            gesMetric :: Metric,
+                            gesMetrics :: [Metric],
                             gesPrecision :: Maybe Int}
+
+gesMainMetric :: GEvalSpecification -> Metric
+gesMainMetric spec = case gesMetrics spec of
+  (metric:_) -> metric
+  otherwise -> error "no metric given"
 
 getExpectedDirectory :: GEvalSpecification -> FilePath
 getExpectedDirectory spec = fromMaybe outDirectory $ gesExpectedDirectory spec
@@ -241,7 +247,7 @@ defaultGEvalSpecification = GEvalSpecification {
   gesOutFile = defaultOutFile,
   gesExpectedFile = defaultExpectedFile,
   gesInputFile = defaultInputFile,
-  gesMetric = defaultMetric,
+  gesMetrics = [defaultMetric],
   gesPrecision = Nothing}
 
 isEmptyFile :: FilePath -> IO (Bool)
@@ -252,11 +258,11 @@ isEmptyFile path = do
 
 data LineSource m = LineSource (Source m Text) SourceSpec Word32
 
-geval :: GEvalSpecification -> IO (MetricValue)
+geval :: GEvalSpecification -> IO [MetricValue]
 geval gevalSpec = do
   (inputSource, expectedSource, outSource) <- checkAndGetFiles False gevalSpec
-  gevalCore metric inputSource expectedSource outSource
-   where metric = gesMetric gevalSpec
+  Prelude.mapM (\metric -> gevalCore metric inputSource expectedSource outSource) metrics
+   where metrics = gesMetrics gevalSpec
 
 checkAndGetFiles :: Bool -> GEvalSpecification -> IO (SourceSpec, SourceSpec, SourceSpec)
 checkAndGetFiles forceInput gevalSpec = do
@@ -279,7 +285,7 @@ checkAndGetFiles forceInput gevalSpec = do
           throwM $ NoExpectedDirectory d
         Right expectedSource -> do
           -- in most cases inputSource is NoSource (unless needed by a metric or in the line-by-line mode)
-          inputSource <- getInputSourceIfNeeded forceInput metric expectedTestDirectory inputFile
+          inputSource <- getInputSourceIfNeeded forceInput metrics expectedTestDirectory inputFile
           return (inputSource, expectedSource, outSource)
    where expectedTestDirectory = expectedDirectory </> testName
          outTestDirectory = outDirectory </> testName
@@ -289,16 +295,16 @@ checkAndGetFiles forceInput gevalSpec = do
          outFile = gesOutFile gevalSpec
          expectedFile = gesExpectedFile gevalSpec
          inputFile = gesInputFile gevalSpec
-         metric = gesMetric gevalSpec
+         metrics = gesMetrics gevalSpec
 
 getOutFile :: GEvalSpecification -> FilePath -> FilePath
 getOutFile gevalSpec out = outDirectory </> testName </> out
   where outDirectory = gesOutDirectory gevalSpec
         testName = gesTestName gevalSpec
 
-getInputSourceIfNeeded :: Bool -> Metric -> FilePath -> FilePath -> IO SourceSpec
-getInputSourceIfNeeded forced metric directory inputFilePath
-   | forced || (isInputNeeded metric) = do
+getInputSourceIfNeeded :: Bool -> [Metric] -> FilePath -> FilePath -> IO SourceSpec
+getInputSourceIfNeeded forced metrics directory inputFilePath
+   | forced || (Prelude.any isInputNeeded metrics) = do
        iss <- getSmartSourceSpec directory "in.tsv" inputFilePath
        case iss of
          Left NoSpecGiven -> throwM $ NoInputFile inputFilePath

@@ -18,7 +18,7 @@ createChallenge :: FilePath -> GEvalSpecification -> IO ()
 createChallenge expectedDirectory spec = do
   D.createDirectoryIfMissing False expectedDirectory
   createFile (expectedDirectory </> "README.md") $ readmeMDContents metric testName
-  createFile (expectedDirectory </> configFileName) $ configContents metric precision testName
+  createFile (expectedDirectory </> configFileName) $ configContents metrics precision testName
   D.createDirectoryIfMissing False trainDirectory
   createFile (trainDirectory </> "train.tsv") $ trainContents metric
   D.createDirectoryIfMissing False devDirectory
@@ -28,7 +28,8 @@ createChallenge expectedDirectory spec = do
   createFile (testDirectory </> "in.tsv") $ testInContents metric
   createFile (testDirectory </> expectedFile) $ testExpectedContents metric
   createFile (expectedDirectory </> ".gitignore") $ gitignoreContents
-  where metric = gesMetric spec
+  where metric = gesMainMetric spec
+        metrics = gesMetrics spec
         precision = gesPrecision spec
         testName = gesTestName spec
         trainDirectory = expectedDirectory </> "train"
@@ -256,9 +257,8 @@ Directory structure
 |]
 
 
-configContents :: Metric -> Maybe Int -> String -> String
-configContents metric precision testName = "--metric " ++
-                                 (show metric) ++
+configContents :: [Metric] -> Maybe Int -> String -> String
+configContents metrics precision testName = unwords (Prelude.map (\metric -> ("--metric " ++ (show metric))) metrics) ++
                                  (if testName /= defaultTestName
                                      then
                                         " --test-name " ++ testName

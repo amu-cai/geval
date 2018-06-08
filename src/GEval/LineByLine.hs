@@ -58,7 +58,7 @@ runLineByLineGeneralized :: ResultOrdering -> GEvalSpecification -> ConduitT Lin
 runLineByLineGeneralized ordering spec consum = do
   (inputFilePath, expectedFilePath, outFilePath) <- checkAndGetFiles True spec
   gevalLineByLineCore metric inputFilePath expectedFilePath outFilePath (sorter ordering .| consum)
-  where metric = gesMetric spec
+  where metric = gesMainMetric spec
         sorter KeepTheOriginalOrder = doNothing
         sorter ordering = gobbleAndDo $ sortBy (sortOrder ordering (getMetricOrdering metric))
         sortOrder FirstTheWorst TheHigherTheBetter = compareScores
@@ -101,7 +101,7 @@ runDiffGeneralized ordering otherOut spec consum = do
         ((getZipSource $ (,)
           <$> ZipSource sourceA
           <*> ZipSource sourceB) .| sorter ordering .| consum)
-  where metric = gesMetric spec
+  where metric = gesMainMetric spec
         sorter KeepTheOriginalOrder = doNothing
         sorter ordering = gobbleAndDo $ sortBy (sortOrder ordering (getMetricOrdering metric))
         sortOrder FirstTheWorst TheHigherTheBetter = compareScores

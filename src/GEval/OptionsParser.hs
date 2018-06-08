@@ -100,19 +100,21 @@ specParser = GEvalSpecification
     <> showDefault
     <> metavar "INPUT"
     <> help "The name of the file with the input (applicable only for some metrics)" )
-  <*> ((flip fromMaybe) <$> altMetricReader <*> metricReader)
+  <*> ((flip fromMaybe) <$> (singletonMaybe <$> altMetricReader) <*> metricReader)
   <*> optional precisionArgParser
+
+singletonMaybe :: Maybe a -> Maybe [a]
+singletonMaybe (Just x) = Just [x]
+singletonMaybe Nothing = Nothing
 
 sel :: Maybe Metric -> Metric -> Metric
 sel Nothing m = m
 sel (Just m) _ = m
 
-metricReader :: Parser Metric
-metricReader = option auto
-               ( long "metric"
+metricReader :: Parser [Metric]
+metricReader = many $ option auto         -- actually `some` should be used instead of `many`, the problem is that
+               ( long "metric"            -- --metric might be in the config.txt file...
                  <> short 'm'
-                 <> value defaultMetric
-                 <> showDefault
                  <> metavar "METRIC"
                  <> help "Metric to be used - RMSE, MSE, Accuracy, LogLoss, Likelihood, F-measure (specify as F1, F2, F0.25, etc.), MAP, BLEU, NMI, ClippEU, LogLossHashed, LikelihoodHashed, BIO-F1, BIO-F1-Labels or CharMatch" )
 
@@ -123,14 +125,14 @@ altMetricReader = optional $ option auto
                  <> metavar "METRIC"
                  <> help "Alternative metric (overrides --metric option)" )
 
-runGEval :: [String] -> IO (Either (ParserResult GEvalOptions) (Maybe MetricValue))
+runGEval :: [String] -> IO (Either (ParserResult GEvalOptions) (Maybe [MetricValue]))
 runGEval args = do
   ret <- runGEvalGetOptions args
   case ret of
     Left e -> return $ Left e
     Right (_, mmv) -> return $ Right mmv
 
-runGEvalGetOptions :: [String] -> IO (Either (ParserResult GEvalOptions) (GEvalOptions, Maybe MetricValue))
+runGEvalGetOptions :: [String] -> IO (Either (ParserResult GEvalOptions) (GEvalOptions, Maybe [MetricValue]))
 runGEvalGetOptions args = do
   optionExtractionResult <- getOptions args
   case optionExtractionResult of
@@ -141,6 +143,7 @@ runGEvalGetOptions args = do
 
 getOptions :: [String] -> IO (Either (ParserResult GEvalOptions) GEvalOptions)
 getOptions = getOptions' True
+
 
 -- the first argument: whether to try to read from the config file
 getOptions' :: Bool -> [String] -> IO (Either (ParserResult GEvalOptions) GEvalOptions)
@@ -165,13 +168,13 @@ attemptToReadOptsFromConfigFile args opts = do
   where configFilePath = (getExpectedDirectory $ geoSpec opts) </> configFileName
 
 
-runGEval'' :: GEvalOptions -> IO (Maybe MetricValue)
+runGEval'' :: GEvalOptions -> IO (Maybe [MetricValue])
 runGEval'' opts = runGEval''' (geoSpecialCommand opts) (geoResultOrdering opts) (geoSpec opts)
 
-runGEval''' :: Maybe GEvalSpecialCommand -> ResultOrdering -> GEvalSpecification -> IO (Maybe MetricValue)
+runGEval''' :: Maybe GEvalSpecialCommand -> ResultOrdering -> GEvalSpecification -> IO (Maybe [MetricValue])
 runGEval''' Nothing _ spec = do
-  val <- geval spec
-  return $ Just val
+  vals <- geval spec
+  return $ Just vals
 runGEval''' (Just Init) _ spec = do
   initChallenge spec
   return Nothing
