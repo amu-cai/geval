@@ -170,6 +170,9 @@ main = hspec $ do
   describe "NMI challenge" $ do
     it "complex test" $ do
       runGEvalTest "nmi-complex" `shouldReturnAlmost` 0.36456
+  describe "Purity metric (in flat clustering)" $ do
+    it "\"Introduction to Information Retrieval\" example" $ do
+      runGEvalTest "purity-introduction-to-information-retrieval-example" `shouldReturnAlmost` 70588235294117
   describe "LogLossHashed challenge" $ do
     it "simple example" $ do
       runGEvalTest "log-loss-hashed-simple" `shouldReturnAlmost` 2.398479083333333
