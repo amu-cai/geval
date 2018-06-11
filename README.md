@@ -13,6 +13,10 @@ The official repository is `git://gonito.net/geval`, browsable at
 ## Installing
 
 You need [Haskell Stack](https://github.com/commercialhaskell/stack).
+You could install Stack with your package manager or with:
+
+    curl -sSL https://get.haskellstack.org/ | sh
+
 When you've got Haskell Stack, install GEval with:
 
     git clone git://gonito.net/geval
@@ -20,11 +24,22 @@ When you've got Haskell Stack, install GEval with:
     stack setup
     stack install
 
+(Note that when you're running Haskell Stack for the first time it
+will take some time and a couple of gigabytes on your disk.)
+
 By default, `geval` binary is installed in `$HOME/.local/bin`, so in
 order to run `geval` you need to either add `$HOME/.local/bin` to
-`$PATH` or to type:
+`$PATH` in your configuration or to type:
 
     PATH="$HOME/.local/bin" geval ...
+
+### Plan B — just download the GEval binary
+
+(Assuming you have a standard 64-bit Linux.)
+
+    wget https://gonito.net/get/bin/geval
+    chmod u+x geval
+    ./geval --help
 
 ## Preparing a Gonito challenge
 
@@ -157,29 +172,48 @@ Then let Gonito pull them and evaluate your results.
 
 ## `geval` options
 
-    geval [--init] [--precision PRECISION] [--out-directory OUT-DIRECTORY]
-          [--expected-directory EXPECTED-DIRECTORY] [--test-name NAME]
-          [--out-file OUT] [--expected-file EXPECTED] [--metric METRIC]
+Usage: geval ([--init] | [-l|--line-by-line] | [-d|--diff OTHER-OUT])
+             ([-s|--sort] | [-r|--reverse-sort]) [--out-directory OUT-DIRECTORY]
+             [--expected-directory EXPECTED-DIRECTORY] [-t|--test-name NAME]
+             [-o|--out-file OUT] [-e|--expected-file EXPECTED]
+             [-i|--input-file INPUT] [-a|--alt-metric METRIC]
+             [-m|--metric METRIC] [-p|--precision NUMBER-OF-FRACTIONAL-DIGITS]
+  Run evaluation for tests in Gonito platform
 
-    -h,--help                Show this help text
-    --init                   Init a sample Gonito challenge rather than run an
-                             evaluation
-    --precision PRECISION    Precision with which the evaluation results should be
-                             shown
-    --out-directory OUT-DIRECTORY
-                             Directory with test results to be
-                             evaluated (default: ".")
-    --expected-directory EXPECTED-DIRECTORY
-                             Directory with expected test results (the same as
-                             OUT-DIRECTORY, if not given)
-    --test-name NAME         Test name (i.e. subdirectory with results or expected
-                             results) (default: "test-A")
-    --out-file OUT           The name of the file to be
-                             evaluated (default: "out.tsv")
-    --expected-file EXPECTED The name of the file with expected
-                             results (default: "expected.tsv")
-    --metric METRIC          Metric to be used - RMSE, MSE, Accuracy or
-                             BLEU (default: RMSE)
+Available options:
+  -h,--help                Show this help text
+  --init                   Init a sample Gonito challenge rather than run an
+                           evaluation
+  -l,--line-by-line        Give scores for each line rather than the whole test
+                           set
+  -d,--diff OTHER-OUT      compare results
+  -s,--sort                When in line-by-line or diff mode, sort the results
+                           from the worst to the best
+  -r,--reverse-sort        When in line-by-line or diff mode, sort the results
+                           from the best to the worst
+  --out-directory OUT-DIRECTORY
+                           Directory with test results to be
+                           evaluated (default: ".")
+  --expected-directory EXPECTED-DIRECTORY
+                           Directory with expected test results (the same as
+                           OUT-DIRECTORY, if not given)
+  -t,--test-name NAME      Test name (i.e. subdirectory with results or expected
+                           results) (default: "test-A")
+  -o,--out-file OUT        The name of the file to be
+                           evaluated (default: "out.tsv")
+  -e,--expected-file EXPECTED
+                           The name of the file with expected
+                           results (default: "expected.tsv")
+  -i,--input-file INPUT    The name of the file with the input (applicable only
+                           for some metrics) (default: "in.tsv")
+  -a,--alt-metric METRIC   Alternative metric (overrides --metric option)
+  -m,--metric METRIC       Metric to be used - RMSE, MSE, Accuracy, LogLoss,
+                           Likelihood, F-measure (specify as F1, F2, F0.25,
+                           etc.), MAP, BLEU, NMI, ClippEU, LogLossHashed,
+                           LikelihoodHashed, BIO-F1, BIO-F1-Labels or CharMatch
+  -p,--precision NUMBER-OF-FRACTIONAL-DIGITS
+                           Arithmetic precision, i.e. the number of fractional
+                           digits to be shown
 
 If you need another metric, let me know, or do it yourself!
 
