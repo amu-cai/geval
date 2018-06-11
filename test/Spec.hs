@@ -158,6 +158,9 @@ main = hspec $ do
   describe "purity (in flat clustering)" $ do
     it "the example from Information Retrieval Book" $ do
       purity informationRetrievalBookExample `shouldBeAlmost` 0.70588
+  describe "RI (Rand index) challenge" $ do
+    it "complex test" $ do
+      runGEvalTest "ri-introduction-to-information-retrieval-example" `shouldReturnAlmost` 0.676470588235294
   describe "NMI (in flat clustering)" $ do
     it "the example from Information Retrieval Book" $ do
       normalizedMutualInformation informationRetrievalBookExample `shouldBeAlmost` 0.36456
