@@ -22,6 +22,7 @@ When you've got Haskell Stack, install GEval with:
     git clone git://gonito.net/geval
     cd geval
     stack setup
+    stack test
     stack install
 
 (Note that when you're running Haskell Stack for the first time it
