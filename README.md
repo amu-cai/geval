@@ -52,7 +52,29 @@ Let us download a Gonito.net challenge:
 
 The task is to predict the sentiment of a Polish short text -- whether
 it is positive or negative (or to be precise: to guess whether a
-positive or negative emoticon was used).
+positive or negative emoticon was used). The train set is given
+in the `train/train.tsv.xz` file, each item is given in a separate file,
+have a look at the first 5 items:
+
+    xzcat train/train.tsv.xz | head -n 5
+
+Now let's try to evaluate some solution to this challenge. Let's fetch it:
+
+    git fetch git://gonito.net/sentiment-by-emoticons submission-01865
+    git reset --hard FECH_HEAD
+
+and now run geval:
+
+    geval -t dev-0
+
+(You need to run `dev-0` test as the expected results for the `test-A`
+test is hidden from you.) The evaluation result is 0.47481. This might
+be hard to interpret, so you could try other metrics.
+
+    geval -t dev-0 --metric Accuracy --metric Likelihood
+
+So now you can see that the accuracy is over 78% and the likelihood
+(i.e. geometric mean of probabilities of the correct classes) is 0.62.
 
 ## Preparing a Gonito challenge
 

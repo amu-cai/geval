@@ -85,8 +85,10 @@ type MetricValue = Double
 defaultLogLossHashedSize :: Word32
 defaultLogLossHashedSize = 10
 
-data Metric = RMSE | MSE | BLEU | Accuracy | ClippEU | FMeasure Double | NMI | LogLossHashed Word32 | CharMatch
-              | MAP | LogLoss | Likelihood | BIOF1 | BIOF1Labels | LikelihoodHashed Word32
+-- | evaluation metric
+data Metric = RMSE | MSE | BLEU | Accuracy | ClippEU | FMeasure Double | NMI
+              | LogLossHashed Word32 | CharMatch | MAP | LogLoss | Likelihood
+              | BIOF1 | BIOF1Labels | LikelihoodHashed Word32
               deriving (Eq)
 
 instance Show Metric where
@@ -141,6 +143,7 @@ instance Read Metric where
 
 data MetricOrdering = TheLowerTheBetter | TheHigherTheBetter
 
+-- | Returns what is preferred for a given metric: high values or low values.
 getMetricOrdering :: Metric -> MetricOrdering
 getMetricOrdering RMSE     = TheLowerTheBetter
 getMetricOrdering MSE      = TheLowerTheBetter
@@ -174,6 +177,7 @@ defaultMetric = RMSE
 configFileName :: FilePath
 configFileName = "config.txt"
 
+-- | Specification of an evaluation task to be done.
 data GEvalSpecification = GEvalSpecification
                           { gesOutDirectory :: FilePath,
                             gesExpectedDirectory :: Maybe FilePath,
@@ -327,7 +331,15 @@ singleLineAsLineSource :: LineInFile -> LineSource (ResourceT IO)
 singleLineAsLineSource (LineInFile sourceSpec lineNo line) =
   LineSource (CL.sourceList [line]) sourceSpec lineNo
 
-gevalCore :: Metric -> SourceSpec -> SourceSpec -> SourceSpec -> IO (MetricValue)
+-- | Runs evaluation for a given metric using the sources specified
+-- for input, expected output and output. Returns the metric value.
+-- Throws @GEvalException@ if something was wrong in the data (e.g.
+-- inconsistent number of lines in the sources).
+gevalCore :: Metric           -- ^ evaluation metric
+          -> SourceSpec       -- ^ source specification for the input values
+          -> SourceSpec       -- ^ source specification for the expected output
+          -> SourceSpec       -- ^ source specification for the output
+          -> IO (MetricValue) -- ^ metric value for the output against the expected output
 gevalCore metric inputSource expectedSource outSource = do
   whenM (isEmptyFileSource outSource) $ throwM $ EmptyOutput
   gevalCoreOnSources metric
@@ -341,11 +353,25 @@ isEmptyFileSource _ = return False
 
 logLossToLikehood logLoss = exp (-logLoss)
 
-gevalCoreOnSources :: (MonadIO m, MonadThrow m, MonadUnliftIO m) => Metric
-                     -> LineSource (ResourceT m)
-                     -> LineSource (ResourceT m)
-                     -> LineSource (ResourceT m)
-                     -> m (MetricValue)
+-- | Runs evaluation for a given metric using the sources given
+-- for input, expected output and output. Returns the metric value.
+-- Throws @GEvalException@ if something was wrong in the data (e.g.
+-- inconsistent number of lines in the sources).
+--
+-- The difference between this and @gevalCore@ is that it operates on Conduit
+-- sources (rather than source specification).
+--
+-- This could be specialised for particular metrics, if they could be
+-- calculated from other metrics in a trivial fashion (e.g. @RMSE@
+-- which is just a square root of @MSE@). Otherwise a metric should be
+-- defined in @gevalCore'@ and @gevalCoreWithoutInput@ helper
+-- functions.
+gevalCoreOnSources :: (MonadIO m, MonadThrow m, MonadUnliftIO m) =>
+                     Metric                      -- ^ evaluation metric
+                     -> LineSource (ResourceT m)  -- ^ source of the input values
+                     -> LineSource (ResourceT m)  -- ^ source to read the expected output
+                     -> LineSource (ResourceT m)  -- ^ source to read the output
+                     -> m (MetricValue)           -- ^ metric values for the output against the expected output
 gevalCoreOnSources RMSE inputLineSource expectedLineSource outLineSource = do
   mse <- gevalCoreOnSources MSE inputLineSource expectedLineSource outLineSource
   return $ mse ** 0.5
@@ -363,7 +389,20 @@ gevalCoreOnSources metric inputLineSource expectedLineSource outLineSource = do
 
 data LineInFile = LineInFile SourceSpec Word32 Text
 
-gevalCore' :: (MonadIO m, MonadThrow m, MonadUnliftIO m) => Metric -> LineSource (ResourceT m) -> LineSource (ResourceT m) -> LineSource (ResourceT m) -> m (MetricValue)
+-- | Runs evaluation for a given metric using the sources given
+-- for input, expected output and output. Returns the metric value.
+-- Throws @GEvalException@ if something was wrong in the data (e.g.
+-- inconsistent number of lines in the sources).
+--
+-- Metrics are starting to be really defined here, though when the
+-- input is not needed for doing the evaluation (which is not in most
+-- cases), the work is delegated to @gevalCoreWithoutInput@ function.
+gevalCore' :: (MonadIO m, MonadThrow m, MonadUnliftIO m) =>
+           Metric                      -- ^ evaluation metric
+           -> LineSource (ResourceT m)  -- ^ source of the input values
+           -> LineSource (ResourceT m)  -- ^ source to read the expected output
+           -> LineSource (ResourceT m)  -- ^ source to read the output
+           -> m (MetricValue)           -- ^ metric values for the output against the expected output
 gevalCore' MSE _ = gevalCoreWithoutInput outParser outParser itemError averageC id
   where outParser = getValue . TR.double
 
@@ -479,7 +518,19 @@ data SourceItem a = Got a | Wrong String | Done
 skipLineNumber :: (x -> c) -> ((Word32, x) -> c)
 skipLineNumber fun = fun . snd
 
-gevalCoreWithoutInput :: (MonadUnliftIO m, MonadThrow m, MonadIO m) => (Text -> Either String a) -> (Text -> Either String b) -> ((a, b) -> c) -> (Sink c (ResourceT m) d) -> (d -> Double) -> LineSource (ResourceT m) -> LineSource (ResourceT m) -> m (MetricValue)
+-- | A helper function to run evaluation when the input is not needed to calculate the metric value.
+gevalCoreWithoutInput :: (MonadUnliftIO m, MonadThrow m, MonadIO m) =>
+                      (Text -> Either String a) ->  -- ^ parser for values in the expected output
+                      (Text -> Either String b) ->  -- ^ parser for values in the output
+                      ((a, b) -> c) ->              -- ^ function which combines parsed values into a single value
+                                                  -- (will be launched for each item, e.g. an error/cost function
+                                                  -- could be calculated here)
+                      (Sink c (ResourceT m) d) ->  -- ^ a Conduit which aggregates all the combined values into
+                                                  -- a "total" value
+                      (d -> Double) ->              -- ^ function to transform the "total" value into the final score
+                      LineSource (ResourceT m) ->  -- ^ source to read the expected output
+                      LineSource (ResourceT m) ->  -- ^ source to read the output
+                      m (MetricValue)             -- ^ metric values for the output against the expected output
 gevalCoreWithoutInput expParser outParser itemStep aggregator finalStep expectedLineStream outLineStream =
   gevalCoreGeneralized (ParserSpecWithoutInput expParser outParser) (trans itemStep) aggregator finalStep (WithoutInput expectedLineStream outLineStream)
  where
@@ -493,7 +544,18 @@ gevalCore''' parserSpec itemStep aggregator finalStep context =
    trans :: ((Word32, (a, b)) -> c) -> (Word32, ParsedRecord (WithoutInput m a b)) -> c
    trans step (n, ParsedRecordWithoutInput x y) = step (n, (x, y))
 
-gevalCoreGeneralized :: (EvaluationContext ctxt m, MonadUnliftIO m, MonadThrow m, MonadIO m) => ParserSpec ctxt -> (ParsedRecord ctxt -> c) -> (Sink c (ResourceT m) d) -> (d -> Double) -> ctxt -> m (MetricValue)
+-- | General function to run the evaluation, no matter which particular metric
+-- was used. It could be seen as the "engine" to run the evaluation.
+-- If you are defining a new metric, you usually don't have to change anything
+-- here.
+gevalCoreGeneralized :: (EvaluationContext ctxt m, MonadUnliftIO m, MonadThrow m, MonadIO m) =>
+                     ParserSpec ctxt ->           -- ^ parsers to parse data
+                     (ParsedRecord ctxt -> c) ->   -- ^ function to go from the parsed value into
+                                                 -- some "local" score calculated for each line (item)
+                     (Sink c (ResourceT m) d) ->  -- ^ a Conduit to aggregate score into a "total"
+                     (d -> Double) ->              -- ^ function to transform the "total" value into the final score
+                     ctxt ->                      -- ^ "context", i.e. 2 or 3 sources needed to operate
+                     m (MetricValue)
 gevalCoreGeneralized parserSpec itemStep aggregator finalStep context =
   gevalCoreGeneralized' parserSpec (skipLineNumber itemStep) aggregator finalStep context
 
@@ -502,9 +564,14 @@ gevalCoreGeneralized' parserSpec itemStep aggregator finalStep context = do
    v <- runResourceT $
      (((getZipSource $ (,)
        <$> ZipSource (CL.sourceList [(getFirstLineNo (Proxy :: Proxy m) context)..])
-       <*> (ZipSource $ recordSource context parserSpec)) =$= CL.map (checkStep (Proxy :: Proxy m) itemStep)) $$ CL.catMaybes =$ aggregator)
+       <*> (ZipSource $ recordSource context parserSpec)) .| CL.map (checkStep (Proxy :: Proxy m) itemStep)) $$ CL.catMaybes =$ aggregator)
    return $ finalStep v
 
+-- | A type family to handle all the evaluation "context".
+--
+-- This is needed as for some metrics the output and the expected metric is enough
+-- (see the @WithoutInput@ instance), but for some the input is also needed to do
+-- the evaluation (see the @WithInput@ instance).
 class EvaluationContext ctxt m where
   data ParserSpec ctxt :: *
   data WrappedParsedRecord ctxt :: *
