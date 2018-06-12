@@ -173,6 +173,7 @@ Then let Gonito pull them and evaluate your results.
 
 ## `geval` options
 
+```
 Usage: geval ([--init] | [-l|--line-by-line] | [-d|--diff OTHER-OUT])
              ([-s|--sort] | [-r|--reverse-sort]) [--out-directory OUT-DIRECTORY]
              [--expected-directory EXPECTED-DIRECTORY] [-t|--test-name NAME]
@@ -215,6 +216,7 @@ Available options:
   -p,--precision NUMBER-OF-FRACTIONAL-DIGITS
                            Arithmetic precision, i.e. the number of fractional
                            digits to be shown
+```
 
 If you need another metric, let me know, or do it yourself!
 
