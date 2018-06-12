@@ -2,7 +2,9 @@
 
 GEval is a Haskell library and a stand-alone tool for evaluating the
 results of solutions to machine learning challenges as defined on the
-[Gonito](http://gonito.net) platform.
+[Gonito](http://gonito.net) platform. Also could be used outside the
+context of Gonito.net challenges, assuming the test data is given in
+simple TSV (tab-separated values) files.
 
 Note that GEval is only about machine learning evaluation. No actual
 machine learning algorithms are available here.
@@ -41,6 +43,16 @@ order to run `geval` you need to either add `$HOME/.local/bin` to
     wget https://gonito.net/get/bin/geval
     chmod u+x geval
     ./geval --help
+
+## Examples
+
+Let us download a Gonito.net challenge:
+
+    git clone git://gonito.net/sentiment-by-emoticons
+
+The task is to predict the sentiment of a Polish short text -- whether
+it is positive or negative (or to be precise: to guess whether a
+positive or negative emoticon was used).
 
 ## Preparing a Gonito challenge
 
