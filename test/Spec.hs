@@ -60,6 +60,9 @@ main = hspec $ do
       runGEvalTest "bleu-perfect" `shouldReturnAlmost` 1.0000
     it "empty translation" $
       runGEvalTest "bleu-empty" `shouldReturnAlmost` 0.0000
+  describe "WER" $ do
+    it "simple example" $
+      runGEvalTest "wer-simple" `shouldReturnAlmost` 0.4
   describe "Accuracy" $ do
     it "simple example" $
       runGEvalTest "accuracy-simple" `shouldReturnAlmost` 0.6
