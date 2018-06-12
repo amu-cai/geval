@@ -290,6 +290,8 @@ main = hspec $ do
       runGEvalTest "charmatch-complex" `shouldReturnAlmost` 0.1923076923076923
     it "broken test without input" $ do
       runGEvalTest "charmatch-no-input" `shouldThrow` (== NoInputFile "test/charmatch-no-input/charmatch-no-input/test-A/in.tsv")
+    it "files with headers" $ do
+      runGEvalTest "charmatch-with-header" `shouldReturnAlmost` 0.3571428571428571
   describe "MAP" $ do
     it "one result" $ do
       (calculateMAPForOneResult ["Berlin", "London", "Warsaw"]
