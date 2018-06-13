@@ -1,5 +1,5 @@
 name:                geval
-version:             1.0.0.0
+version:             1.0.0.1
 synopsis:            Machine learning evaluation tools
 description:         Please see README.md
 homepage:            http://github.com/name/project
@@ -29,6 +29,7 @@ library
                      , GEval.BIO
                      , Data.Conduit.AutoDecompress
                      , Data.Conduit.SmartSource
+                     , Paths_geval
   build-depends:       base >= 4.7 && < 5
                      , cond
                      , conduit >= 1.3.0
