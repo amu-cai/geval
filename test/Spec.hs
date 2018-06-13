@@ -51,6 +51,9 @@ main = hspec $ do
   describe "mean square error" $ do
     it "simple test with arguments" $
       runGEvalTest "mse-simple" `shouldReturnAlmost` 0.4166666666666667
+  describe "mean absolute error" $ do
+    it "simple test with arguments" $
+      runGEvalTest "mae-simple" `shouldReturnAlmost` 1.5
   describe "BLEU" $ do
     it "trivial example from Wikipedia" $
       runGEvalTest "bleu-trivial" `shouldReturnAlmost` 0.0
