@@ -29,7 +29,12 @@ f2Measure = fMeasure 2.0
 f1Measure :: (a -> b -> Bool) -> [a] -> [b] -> Double
 f1Measure = fMeasure 1.0
 
-fMeasure :: Double -> (a -> b -> Bool) -> [a] -> [b] -> Double
+-- | Calculates both generalized) F-measure
+fMeasure :: Double
+         -> (a -> b -> Bool)  -- ^ beta parameter
+         -> [a]             -- ^ the ground truth
+         -> [b]             -- ^ what we got
+         -> Double          -- ^ f-Measure
 fMeasure beta matchingFun expected got =
   (1 + betaSquared) * p * r `safeDoubleDiv` (betaSquared * p + r)
   where betaSquared = beta ^ 2
@@ -50,7 +55,13 @@ fMeasureOnCounts beta (tp, nbExpected, nbGot) =
 countFolder :: (Int, Int, Int) -> (Int, Int, Int) -> (Int, Int, Int)
 countFolder (a1, a2, a3) (b1, b2, b3) = (a1+b1, a2+b2, a3+b3)
 
-precisionAndRecall :: (a -> b -> Bool) -> [a] -> [b] -> (Double, Double)
+-- | Calculates both precision and recall.
+--
+-- (See https://en.wikipedia.org/wiki/Precision_and_recall)
+precisionAndRecall :: (a -> b -> Bool) -- ^ matching function (whether you've got a success)
+                   -> [a]            -- ^ ground truth
+                   -> [b]            -- ^ what was returned by the system
+                   -> (Double, Double) -- ^ returns precision and recall
 precisionAndRecall matchFun expected got
   = precisionAndRecallFromCounts (tp, length expected, length got)
     where tp = maxMatch matchFun expected got
