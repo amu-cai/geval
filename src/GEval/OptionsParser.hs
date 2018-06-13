@@ -6,6 +6,9 @@ module GEval.OptionsParser
         runGEvalGetOptions,
         getOptions) where
 
+import Paths_geval (version)
+import Data.Version (showVersion)
+
 import Options.Applicative
 import qualified System.Directory as D
 import System.FilePath
@@ -30,6 +33,11 @@ optionsParser = GEvalOptions
    <$> optional ((flag' Init
                  ( long "init"
                    <> help "Init a sample Gonito challenge rather than run an evaluation" ))
+                 <|>
+                 (flag' PrintVersion
+                 ( long "version"
+                   <> short 'v'
+                   <> help "Print GEval version" ))
                  <|>
                  (flag' LineByLine
                  ( long "line-by-line"
@@ -177,6 +185,9 @@ runGEval''' Nothing _ spec = do
   return $ Just vals
 runGEval''' (Just Init) _ spec = do
   initChallenge spec
+  return Nothing
+runGEval''' (Just PrintVersion) _ _ = do
+  putStrLn ("geval " ++ showVersion version)
   return Nothing
 runGEval''' (Just LineByLine) ordering spec = do
   runLineByLine ordering spec
