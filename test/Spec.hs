@@ -20,10 +20,12 @@ import Data.Conduit.List (consume)
 import qualified Test.HUnit as HU
 
 import Data.Conduit.SmartSource
+import Data.Conduit.Ranking
 import qualified Data.Conduit.Text as CT
 import Data.Conduit
 import Control.Monad.Trans.Resource
 import qualified Data.Conduit.List as CL
+import qualified Data.Conduit.Combinators as CC
 
 informationRetrievalBookExample :: [(String, Int)]
 informationRetrievalBookExample = [("o", 2), ("o", 2), ("d", 2), ("x", 3), ("d", 3),
@@ -311,6 +313,9 @@ main = hspec $ do
       readFromSmartSource "baz" "out.tsv" "test/files/foo.txt" `shouldReturn` ["foo\n"]
       readFromSmartSource "" "" "https://httpbin.org/robots.txt" `shouldReturn`
         ["User-agent: *\nDisallow: /deny\n"]
+  describe "ranking conduit" $ do
+    it "simple example" $ do
+      (runConduitPure $ CC.yieldMany [3, 5, 5, 5, 5, 8] .| ranker .| CC.sinkList) `shouldBe` [(1, 3), (3.5, 5), (3.5, 5), (3.5, 5), (3.5, 5), (6, 8)]
 
 readFromSmartSource :: FilePath -> FilePath -> String -> IO [String]
 readFromSmartSource defaultDir defaultFile specS = do
