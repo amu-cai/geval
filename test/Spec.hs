@@ -319,7 +319,7 @@ readFromSmartSource :: FilePath -> FilePath -> String -> IO [String]
 readFromSmartSource defaultDir defaultFile specS = do
   (Right spec) <- getSmartSourceSpec defaultDir defaultFile specS
   let source = smartSource spec
-  contents <- runResourceT (source $$ CT.decodeUtf8Lenient =$ CL.consume)
+  contents <- runResourceT $ runConduit (source .| CT.decodeUtf8Lenient .| CL.consume)
   return $ Prelude.map unpack contents
 
 neverMatch :: Char -> Int -> Bool
