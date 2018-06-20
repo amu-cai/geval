@@ -266,7 +266,7 @@ isEmptyFile path = do
     return ((fileSize stat) == 0)
 
 
-data LineSource m = LineSource (Source m Text) SourceSpec Word32
+data LineSource m = LineSource (ConduitT () Text m ()) SourceSpec Word32
 
 geval :: GEvalSpecification -> IO [MetricValue]
 geval gevalSpec = do
@@ -325,7 +325,7 @@ getInputSourceIfNeeded forced metrics directory inputFilePath
 
 fileAsLineSource :: SourceSpec -> LineSource (ResourceT IO)
 fileAsLineSource spec =
-  LineSource ((smartSource spec) $= autoDecompress $= CT.decodeUtf8Lenient =$= CT.lines) spec 1
+  LineSource ((smartSource spec) .| autoDecompress .| CT.decodeUtf8Lenient .| CT.lines) spec 1
 
 gevalCoreOnSingleLines :: Metric -> LineInFile -> LineInFile -> LineInFile -> IO (MetricValue)
 gevalCoreOnSingleLines metric inpLine expLine outLine =
@@ -535,7 +535,7 @@ gevalCoreWithoutInput :: (MonadUnliftIO m, MonadThrow m, MonadIO m) =>
                       ((a, b) -> c) ->              -- ^ function which combines parsed values into a single value
                                                   -- (will be launched for each item, e.g. an error/cost function
                                                   -- could be calculated here)
-                      (Sink c (ResourceT m) d) ->  -- ^ a Conduit which aggregates all the combined values into
+                      (ConduitT c Void (ResourceT m) d) ->  -- ^ a Conduit which aggregates all the combined values into
                                                   -- a "total" value
                       (d -> Double) ->              -- ^ function to transform the "total" value into the final score
                       LineSource (ResourceT m) ->  -- ^ source to read the expected output
@@ -547,7 +547,7 @@ gevalCoreWithoutInput expParser outParser itemStep aggregator finalStep expected
    trans :: ((a, b) -> c) -> ParsedRecord (WithoutInput m a b) -> c
    trans step (ParsedRecordWithoutInput x y) = step (x, y)
 
-gevalCore''' :: (MonadUnliftIO m, MonadThrow m, MonadIO m) => ParserSpec (WithoutInput m a b) -> ((Word32, (a, b)) -> c) -> (Sink c (ResourceT m) d) -> (d -> Double) -> WithoutInput m a b -> m (MetricValue)
+gevalCore''' :: (MonadUnliftIO m, MonadThrow m, MonadIO m) => ParserSpec (WithoutInput m a b) -> ((Word32, (a, b)) -> c) -> (ConduitT c Void (ResourceT m) d) -> (d -> Double) -> WithoutInput m a b -> m (MetricValue)
 gevalCore''' parserSpec itemStep aggregator finalStep context =
   gevalCoreGeneralized' parserSpec (trans itemStep) aggregator finalStep context
  where
@@ -559,22 +559,22 @@ gevalCore''' parserSpec itemStep aggregator finalStep context =
 -- If you are defining a new metric, you usually don't have to change anything
 -- here.
 gevalCoreGeneralized :: (EvaluationContext ctxt m, MonadUnliftIO m, MonadThrow m, MonadIO m) =>
-                     ParserSpec ctxt ->           -- ^ parsers to parse data
-                     (ParsedRecord ctxt -> c) ->   -- ^ function to go from the parsed value into
-                                                 -- some "local" score calculated for each line (item)
-                     (Sink c (ResourceT m) d) ->  -- ^ a Conduit to aggregate score into a "total"
-                     (d -> Double) ->              -- ^ function to transform the "total" value into the final score
-                     ctxt ->                      -- ^ "context", i.e. 2 or 3 sources needed to operate
+                     ParserSpec ctxt ->                   -- ^ parsers to parse data
+                     (ParsedRecord ctxt -> c) ->          -- ^ function to go from the parsed value into
+                                                          --   some "local" score calculated for each line (item)
+                     (ConduitT c Void (ResourceT m) d) -> -- ^ a Conduit to aggregate score into a "total"
+                     (d -> Double) ->                     -- ^ function to transform the "total" value into the final score
+                     ctxt ->                              -- ^ "context", i.e. 2 or 3 sources needed to operate
                      m (MetricValue)
 gevalCoreGeneralized parserSpec itemStep aggregator finalStep context =
   gevalCoreGeneralized' parserSpec (skipLineNumber itemStep) aggregator finalStep context
 
-gevalCoreGeneralized' :: forall m ctxt c d . (EvaluationContext ctxt m, MonadUnliftIO m, MonadThrow m, MonadIO m) => ParserSpec ctxt -> ((Word32, ParsedRecord ctxt) -> c) -> (Sink c (ResourceT m) d) -> (d -> Double) -> ctxt -> m (MetricValue)
+gevalCoreGeneralized' :: forall m ctxt c d . (EvaluationContext ctxt m, MonadUnliftIO m, MonadThrow m, MonadIO m) => ParserSpec ctxt -> ((Word32, ParsedRecord ctxt) -> c) -> (ConduitT c Void (ResourceT m) d) -> (d -> Double) -> ctxt -> m (MetricValue)
 gevalCoreGeneralized' parserSpec itemStep aggregator finalStep context = do
-   v <- runResourceT $
+   v <- runResourceT $ runConduit $
      (((getZipSource $ (,)
        <$> ZipSource (CL.sourceList [(getFirstLineNo (Proxy :: Proxy m) context)..])
-       <*> (ZipSource $ recordSource context parserSpec)) .| CL.map (checkStep (Proxy :: Proxy m) itemStep)) $$ CL.catMaybes =$ aggregator)
+       <*> (ZipSource $ recordSource context parserSpec)) .| CL.map (checkStep (Proxy :: Proxy m) itemStep)) .| CL.catMaybes .| aggregator)
    return $ finalStep v
 
 -- | A type family to handle all the evaluation "context".
@@ -586,7 +586,7 @@ class EvaluationContext ctxt m where
   data ParserSpec ctxt :: *
   data WrappedParsedRecord ctxt :: *
   data ParsedRecord ctxt :: *
-  recordSource :: ctxt -> ParserSpec ctxt -> Source (ResourceT m) (WrappedParsedRecord ctxt)
+  recordSource :: ctxt -> ParserSpec ctxt -> ConduitT () (WrappedParsedRecord ctxt) (ResourceT m) ()
   getFirstLineNo :: Proxy m -> ctxt -> Word32
   getExpectedSource :: ctxt -> SourceSpec
   getOutSource :: ctxt -> SourceSpec
@@ -658,15 +658,15 @@ instance (MonadUnliftIO m, MonadIO m, MonadThrow m) => EvaluationContext (WithIn
 
 
 
-averageC :: MonadResource m => Sink Double m Double
+averageC :: MonadResource m => ConduitT Double Void m Double
 averageC = getZipSink
     $ (\total count -> total / fromIntegral count)
   <$> ZipSink CC.sum
   <*> ZipSink CC.length
 
-items :: MonadResource m => LineSource m -> (Text -> Either String a) -> Source m (SourceItem a)
+items :: MonadResource m => LineSource m -> (Text -> Either String a) -> ConduitT () (SourceItem a) m ()
 items (LineSource lineSource _ _) parser =
-  (lineSource =$= CL.map (toItem . parser)) >> yield Done
+  (lineSource .| CL.map (toItem . parser)) >> yield Done
   where toItem (Right x) = Got x
         toItem (Left m) = Wrong m
 
