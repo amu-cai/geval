@@ -37,6 +37,7 @@ module GEval.Core
       fileAsLineSource,
       checkAndGetFiles,
       checkAndGetFilesSingleOut,
+      checkMultipleOuts,
       gesMainMetric
     ) where
 
