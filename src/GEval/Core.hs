@@ -58,6 +58,8 @@ import System.FilePath
 import Data.Maybe
 import Data.Tuple
 import qualified Data.List.Split as DLS
+import Data.List (sortBy)
+import Text.NaturalComp
 
 import Control.Monad.IO.Class
 import Control.Monad ((<=<), filterM)
@@ -276,7 +278,8 @@ data LineSource m = LineSource (Source m Text) SourceSpec Word32
 geval :: GEvalSpecification -> IO [(SourceSpec, [MetricValue])]
 geval gevalSpec = do
   (inputSource, expectedSource, outSources) <- checkAndGetFiles False gevalSpec
-  Prelude.mapM (gevalOnSingleOut gevalSpec inputSource expectedSource) outSources
+  results <- Prelude.mapM (gevalOnSingleOut gevalSpec inputSource expectedSource) outSources
+  return $ sortBy (\a b ->  (show $ fst a) `naturalComp` (show $ fst b)) results
 
 gevalOnSingleOut :: GEvalSpecification -> SourceSpec -> SourceSpec -> SourceSpec -> IO (SourceSpec, [MetricValue])
 gevalOnSingleOut gevalSpec inputSource expectedSource outSource = do

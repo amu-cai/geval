@@ -61,6 +61,7 @@ library
                      , bzlib-conduit
                      , lzma-conduit
                      , Glob
+                     , naturalcomp
   default-language:    Haskell2010
 
 executable geval
