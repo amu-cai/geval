@@ -23,6 +23,8 @@ import GEval.Core
 import GEval.CreateChallenge
 import GEval.LineByLine
 
+import Data.Conduit.SmartSource
+
 fullOptionsParser = info (helper <*> optionsParser)
        (fullDesc
         <> progDesc "Run evaluation for tests in Gonito platform"
@@ -133,14 +135,14 @@ altMetricReader = optional $ option auto
                  <> metavar "METRIC"
                  <> help "Alternative metric (overrides --metric option)" )
 
-runGEval :: [String] -> IO (Either (ParserResult GEvalOptions) (Maybe [MetricValue]))
+runGEval :: [String] -> IO (Either (ParserResult GEvalOptions) (Maybe [(SourceSpec, [MetricValue])]))
 runGEval args = do
   ret <- runGEvalGetOptions args
   case ret of
     Left e -> return $ Left e
     Right (_, mmv) -> return $ Right mmv
 
-runGEvalGetOptions :: [String] -> IO (Either (ParserResult GEvalOptions) (GEvalOptions, Maybe [MetricValue]))
+runGEvalGetOptions :: [String] -> IO (Either (ParserResult GEvalOptions) (GEvalOptions, Maybe [(SourceSpec, [MetricValue])]))
 runGEvalGetOptions args = do
   optionExtractionResult <- getOptions args
   case optionExtractionResult of
@@ -176,10 +178,10 @@ attemptToReadOptsFromConfigFile args opts = do
   where configFilePath = (getExpectedDirectory $ geoSpec opts) </> configFileName
 
 
-runGEval'' :: GEvalOptions -> IO (Maybe [MetricValue])
+runGEval'' :: GEvalOptions -> IO (Maybe [(SourceSpec, [MetricValue])])
 runGEval'' opts = runGEval''' (geoSpecialCommand opts) (geoResultOrdering opts) (geoSpec opts)
 
-runGEval''' :: Maybe GEvalSpecialCommand -> ResultOrdering -> GEvalSpecification -> IO (Maybe [MetricValue])
+runGEval''' :: Maybe GEvalSpecialCommand -> ResultOrdering -> GEvalSpecification -> IO (Maybe [(SourceSpec, [MetricValue])])
 runGEval''' Nothing _ spec = do
   vals <- geval spec
   return $ Just vals

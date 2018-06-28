@@ -268,11 +268,12 @@ isEmptyFile path = do
 
 data LineSource m = LineSource (Source m Text) SourceSpec Word32
 
-geval :: GEvalSpecification -> IO [MetricValue]
+geval :: GEvalSpecification -> IO [(SourceSpec, [MetricValue])]
 geval gevalSpec = do
   (inputSource, expectedSource, outSource) <- checkAndGetFiles False gevalSpec
-  Prelude.mapM (\metric -> gevalCore metric inputSource expectedSource outSource) metrics
-   where metrics = gesMetrics gevalSpec
+  results <- Prelude.mapM (\metric -> gevalCore metric inputSource expectedSource outSource) metrics
+  return [(outSource, results)]
+    where metrics = gesMetrics gevalSpec
 
 checkAndGetFiles :: Bool -> GEvalSpecification -> IO (SourceSpec, SourceSpec, SourceSpec)
 checkAndGetFiles forceInput gevalSpec = do

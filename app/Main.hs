@@ -11,6 +11,8 @@ import Text.Printf
 import System.IO
 import System.Exit
 
+import Data.Conduit.SmartSource
+
 main :: IO ()
 main = do
   args <- getArgs
@@ -20,14 +22,17 @@ main = do
     Right (opts, Just results) -> showTheResult opts results
     Right (_, Nothing) -> return ()
 
-showTheResult :: GEvalOptions -> [MetricValue] -> IO ()
+showTheResult :: GEvalOptions -> [(SourceSpec, [MetricValue])] -> IO ()
+showTheResult opts [(_, vals)] = showTheResult' opts vals
+showTheResult _ _ = error "multiple outputs not handled yet"
+
+showTheResult' :: GEvalOptions -> [MetricValue] -> IO ()
 -- do not show the metric if just one was given
-showTheResult opts [val] = putStrLn $ formatTheResult (gesPrecision $ geoSpec opts) val
-showTheResult opts [] = do
+showTheResult' opts [val] = putStrLn $ formatTheResult (gesPrecision $ geoSpec opts) val
+showTheResult' opts [] = do
   hPutStrLn stderr "no metric given, use --metric option"
   exitFailure
-
-showTheResult opts vals =  mapM_ putStrLn $ map (formatTheMetricAndResult (gesPrecision $ geoSpec opts)) $ zip (gesMetrics $ geoSpec opts) vals
+showTheResult' opts vals =  mapM_ putStrLn $ map (formatTheMetricAndResult (gesPrecision $ geoSpec opts)) $ zip (gesMetrics $ geoSpec opts) vals
 
 formatTheMetricAndResult :: Maybe Int -> (Metric, MetricValue) -> String
 formatTheMetricAndResult mPrecision (metric, val) = (show metric) ++ "\t" ++ (formatTheResult mPrecision val)
