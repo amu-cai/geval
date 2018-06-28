@@ -36,6 +36,7 @@ module GEval.Core
       ParserSpec(..),
       fileAsLineSource,
       checkAndGetFiles,
+      checkAndGetFilesSingleOut,
       gesMainMetric
     ) where
 
@@ -80,6 +81,8 @@ import qualified Data.HashMap.Strict as M
 import Data.Proxy
 
 import Data.Word
+
+import System.FilePath.Glob
 
 type MetricValue = Double
 
@@ -226,6 +229,7 @@ data GEvalException = NoExpectedFile FilePath
                       | TooManyLinesInInput
                       | EmptyOutput
                       | UnexpectedData Word32 String
+                      | UnexpectedMultipleOutputs
                       deriving (Eq)
 
 instance Exception GEvalException
@@ -245,6 +249,7 @@ instance Show GEvalException where
   show TooManyLinesInInput = "Too many lines in the input file"
   show EmptyOutput = "The output file is empty"
   show (UnexpectedData lineNo message) = "Line " ++ (show lineNo) ++ ": Unexpected data [" ++ message ++ "]"
+  show UnexpectedMultipleOutputs = "Multiple outputs are not possible in this mode"
 
 somethingWrongWithFilesMessage :: String -> FilePath -> String
 somethingWrongWithFilesMessage msg filePath = Prelude.concat
@@ -270,43 +275,75 @@ data LineSource m = LineSource (Source m Text) SourceSpec Word32
 
 geval :: GEvalSpecification -> IO [(SourceSpec, [MetricValue])]
 geval gevalSpec = do
-  (inputSource, expectedSource, outSource) <- checkAndGetFiles False gevalSpec
-  results <- Prelude.mapM (\metric -> gevalCore metric inputSource expectedSource outSource) metrics
-  return [(outSource, results)]
-    where metrics = gesMetrics gevalSpec
+  (inputSource, expectedSource, outSources) <- checkAndGetFiles False gevalSpec
+  case outSources of
+    [outSource] -> do
+      results <- Prelude.mapM (\metric -> gevalCore metric inputSource expectedSource outSource) metrics
+      return [(outSource, results)]
+    _ -> error $ "multiple outputs not handled yet"
+  where metrics = gesMetrics gevalSpec
 
-checkAndGetFiles :: Bool -> GEvalSpecification -> IO (SourceSpec, SourceSpec, SourceSpec)
+checkAndGetFilesSingleOut :: Bool -> GEvalSpecification -> IO (SourceSpec, SourceSpec, SourceSpec)
+checkAndGetFilesSingleOut forceInput gevalSpec = do
+  res <- checkAndGetFiles forceInput gevalSpec
+  case res of
+    (inputSource, expectedSource, [outSource]) -> return (inputSource, expectedSource, outSource)
+    _ -> throwM $ UnexpectedMultipleOutputs
+
+checkAndGetFiles :: Bool -> GEvalSpecification -> IO (SourceSpec, SourceSpec, [SourceSpec])
 checkAndGetFiles forceInput gevalSpec = do
-  oss <- getSmartSourceSpec outTestDirectory "out.tsv" outFile
-  case oss of
-    Left NoSpecGiven -> throwM $ NoOutFile outFile
-    Left (NoFile fp) -> throwM $ NoOutFile fp
+  ess <- getSmartSourceSpec expectedTestDirectory "expected.tsv" expectedFile
+  case ess of
+    Left NoSpecGiven -> throwM $ NoExpectedFile expectedFile
+    Left (NoFile fp) -> throwM $ NoExpectedFile fp
     Left (NoDirectory d) -> do
-        unlessM (D.doesDirectoryExist outDirectory) $ throwM $ NoOutDirectory outDirectory
-        unlessM (D.doesDirectoryExist outTestDirectory) $ throwM $ NoOutTestDirectory outTestDirectory
-        throwM $ NoOutFile outFile
-    Right outSource -> do
-      ess <- getSmartSourceSpec expectedTestDirectory "expected.tsv" expectedFile
-      case ess of
-        Left NoSpecGiven -> throwM $ NoExpectedFile expectedFile
-        Left (NoFile fp) -> throwM $ NoExpectedFile fp
-        Left (NoDirectory d) -> do
-          unlessM (D.doesDirectoryExist expectedDirectory) $ throwM $ NoExpectedDirectory expectedDirectory
-          unlessM (D.doesDirectoryExist expectedTestDirectory) $ throwM $ NoExpectedTestDirectory expectedTestDirectory
-          throwM $ NoExpectedDirectory d
-        Right expectedSource -> do
-          -- in most cases inputSource is NoSource (unless needed by a metric or in the line-by-line mode)
-          inputSource <- getInputSourceIfNeeded forceInput metrics expectedTestDirectory inputFile
-          return (inputSource, expectedSource, outSource)
-   where expectedTestDirectory = expectedDirectory </> testName
-         outTestDirectory = outDirectory </> testName
-         expectedDirectory = getExpectedDirectory gevalSpec
-         outDirectory = gesOutDirectory gevalSpec
-         testName = gesTestName gevalSpec
-         outFile = gesOutFile gevalSpec
-         expectedFile = gesExpectedFile gevalSpec
-         inputFile = gesInputFile gevalSpec
-         metrics = gesMetrics gevalSpec
+       unlessM (D.doesDirectoryExist expectedDirectory) $ throwM $ NoExpectedDirectory expectedDirectory
+       unlessM (D.doesDirectoryExist expectedTestDirectory) $ throwM $ NoExpectedTestDirectory expectedTestDirectory
+       throwM $ NoExpectedDirectory d
+    Right expectedSource -> do
+       -- in most cases inputSource is NoSource (unless needed by a metric or in the line-by-line mode)
+       inputSource <- getInputSourceIfNeeded forceInput metrics expectedTestDirectory inputFile
+
+       mMultipleOuts <- checkMultipleOuts gevalSpec
+       osss <- case mMultipleOuts of
+         Just filePaths -> return $ Prelude.map (\fp -> FilePathSpec fp) filePaths
+         Nothing -> do
+           oss <- getSmartSourceSpec outTestDirectory "out.tsv" outFile
+           case oss of
+             Left NoSpecGiven -> throwM $ NoOutFile outFile
+             Left (NoFile fp) -> throwM $ NoOutFile fp
+             Left (NoDirectory d) -> do
+               unlessM (D.doesDirectoryExist outDirectory) $ throwM $ NoOutDirectory outDirectory
+               unlessM (D.doesDirectoryExist outTestDirectory) $ throwM $ NoOutTestDirectory outTestDirectory
+               throwM $ NoOutFile outFile
+             Right outSource -> do
+               return [outSource]
+       return (inputSource, expectedSource, osss)
+    where expectedTestDirectory = expectedDirectory </> testName
+          outTestDirectory = outDirectory </> testName
+          expectedDirectory = getExpectedDirectory gevalSpec
+          outDirectory = gesOutDirectory gevalSpec
+          testName = gesTestName gevalSpec
+          outFile = gesOutFile gevalSpec
+          expectedFile = gesExpectedFile gevalSpec
+          inputFile = gesInputFile gevalSpec
+          metrics = gesMetrics gevalSpec
+
+checkMultipleOuts :: GEvalSpecification -> IO (Maybe [FilePath])
+checkMultipleOuts gevalSpec = do
+  isSimpleOutThere <- D.doesFileExist (outTestDirectory </> outFile)
+  let patterns = Prelude.map (\ext -> compile ("out-*" ++ ext)) ["", ".gz", ".bz2", ".xz"]
+  multipleOuts <- Prelude.concat <$> globDir patterns outTestDirectory
+  if outFile == "out.tsv" && not isSimpleOutThere && multipleOuts /= []
+    then
+      return $ Just multipleOuts
+    else
+      return Nothing
+
+  where outFile = gesOutFile gevalSpec
+        outTestDirectory = outDirectory </> testName
+        outDirectory = gesOutDirectory gevalSpec
+        testName = gesTestName gevalSpec
 
 getOutFile :: GEvalSpecification -> FilePath -> FilePath
 getOutFile gevalSpec out = outDirectory </> testName </> out

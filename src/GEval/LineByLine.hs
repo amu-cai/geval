@@ -56,7 +56,7 @@ runLineByLine ordering spec = runLineByLineGeneralized ordering spec consum
 
 runLineByLineGeneralized :: ResultOrdering -> GEvalSpecification -> ConduitT LineRecord Void (ResourceT IO) a -> IO a
 runLineByLineGeneralized ordering spec consum = do
-  (inputFilePath, expectedFilePath, outFilePath) <- checkAndGetFiles True spec
+  (inputFilePath, expectedFilePath, outFilePath) <- checkAndGetFilesSingleOut True spec
   gevalLineByLineCore metric inputFilePath expectedFilePath outFilePath (sorter ordering .| consum)
   where metric = gesMainMetric spec
         sorter KeepTheOriginalOrder = doNothing
@@ -88,7 +88,7 @@ runDiff ordering otherOut spec = runDiffGeneralized ordering otherOut spec consu
 
 runDiffGeneralized :: ResultOrdering -> FilePath -> GEvalSpecification -> ConduitT (LineRecord, LineRecord) Void (ResourceT IO) a -> IO a
 runDiffGeneralized ordering otherOut spec consum = do
-  (inputSource, expectedSource, outSource) <- checkAndGetFiles True spec
+  (inputSource, expectedSource, outSource) <- checkAndGetFilesSingleOut True spec
   ooss <- getSmartSourceSpec ((gesOutDirectory spec) </> (gesTestName spec)) "out.tsv" otherOut
   case ooss of
     Left NoSpecGiven -> throwM $ NoOutFile otherOut
