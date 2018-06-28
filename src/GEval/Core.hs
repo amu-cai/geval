@@ -276,11 +276,12 @@ data LineSource m = LineSource (Source m Text) SourceSpec Word32
 geval :: GEvalSpecification -> IO [(SourceSpec, [MetricValue])]
 geval gevalSpec = do
   (inputSource, expectedSource, outSources) <- checkAndGetFiles False gevalSpec
-  case outSources of
-    [outSource] -> do
-      results <- Prelude.mapM (\metric -> gevalCore metric inputSource expectedSource outSource) metrics
-      return [(outSource, results)]
-    _ -> error $ "multiple outputs not handled yet"
+  Prelude.mapM (gevalOnSingleOut gevalSpec inputSource expectedSource) outSources
+
+gevalOnSingleOut :: GEvalSpecification -> SourceSpec -> SourceSpec -> SourceSpec -> IO (SourceSpec, [MetricValue])
+gevalOnSingleOut gevalSpec inputSource expectedSource outSource = do
+  vals <- Prelude.mapM (\metric -> gevalCore metric inputSource expectedSource outSource) metrics
+  return (outSource, vals)
   where metrics = gesMetrics gevalSpec
 
 checkAndGetFilesSingleOut :: Bool -> GEvalSpecification -> IO (SourceSpec, SourceSpec, SourceSpec)
@@ -332,7 +333,7 @@ checkAndGetFiles forceInput gevalSpec = do
 checkMultipleOuts :: GEvalSpecification -> IO (Maybe [FilePath])
 checkMultipleOuts gevalSpec = do
   isSimpleOutThere <- D.doesFileExist (outTestDirectory </> outFile)
-  let patterns = Prelude.map (\ext -> compile ("out-*" ++ ext)) ["", ".gz", ".bz2", ".xz"]
+  let patterns = Prelude.map (\ext -> compile ("out-*.tsv" ++ ext)) ["", ".gz", ".bz2", ".xz"]
   multipleOuts <- Prelude.concat <$> globDir patterns outTestDirectory
   if outFile == "out.tsv" && not isSimpleOutThere && multipleOuts /= []
     then

@@ -71,6 +71,7 @@ executable geval
                      , geval
                      , optparse-applicative
                      , fgl
+                     , filepath
   default-language:    Haskell2010
 
 test-suite geval-test
