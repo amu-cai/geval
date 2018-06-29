@@ -336,9 +336,13 @@ checkAndGetFiles forceInput gevalSpec = do
 
 checkMultipleOuts :: GEvalSpecification -> IO (Maybe [FilePath])
 checkMultipleOuts gevalSpec = do
-  isSimpleOutThere <- D.doesFileExist (outTestDirectory </> outFile)
+  -- if the out.tsv is there, just use it
+  outFilePath <- lookForCompressedFiles (outTestDirectory </> outFile)
+  isSimpleOutThere <- D.doesFileExist outFilePath
+
   let patterns = Prelude.map (\ext -> compile ("out-*.tsv" ++ ext)) ["", ".gz", ".bz2", ".xz"]
   multipleOuts <- Prelude.concat <$> globDir patterns outTestDirectory
+
   if outFile == "out.tsv" && not isSimpleOutThere && multipleOuts /= []
     then
       return $ Just multipleOuts
