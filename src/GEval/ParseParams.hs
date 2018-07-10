@@ -1,6 +1,8 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module GEval.ParseParams(parseParamsFromFilePath,OutputFileParsed(..))
+module GEval.ParseParams(parseParamsFromFilePath,
+                         parseParamsFromSourceSpec,
+                         OutputFileParsed(..))
        where
 
 import Data.Map.Strict as M
@@ -9,8 +11,14 @@ import Data.Attoparsec.Text
 
 import System.FilePath
 
+import Data.Conduit.SmartSource (SourceSpec(..), recoverPath)
+
 data OutputFileParsed = OutputFileParsed String (M.Map Text Text)
                         deriving (Eq, Show)
+
+parseParamsFromSourceSpec :: SourceSpec -> OutputFileParsed
+parseParamsFromSourceSpec (FilePathSpec filePath) = parseParamsFromFilePath filePath
+parseParamsFromSourceSpec spec = OutputFileParsed (recoverPath spec) M.empty
 
 parseParamsFromFilePath :: FilePath -> OutputFileParsed
 parseParamsFromFilePath filePath = parseParamsFromBaseName fileBaseName
