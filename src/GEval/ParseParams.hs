@@ -36,5 +36,5 @@ parseParam :: Parser (Text, Text)
 parseParam = do
   param <- many1 $ satisfy (\c -> c /= '=' && c /= ',')
   "="
-  val <- many1 $ notChar ','
-  pure $ (strip $ pack param, strip $ pack val)
+  val <- Data.Attoparsec.Text.takeWhile (/= ',')
+  pure $ (strip $ pack param, strip val)

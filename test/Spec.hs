@@ -333,6 +333,11 @@ main = hspec $ do
         OutputFileParsed "out" (Data.Map.Strict.fromList [("nb_epochs", "12"),
                                                           ("foo", "off"),
                                                           ("bar-baz", "10")])
+    it "empty val" $ do
+      parseParamsFromFilePath "out-nb_epochs=1,foo=,bar-baz=8.tsv" `shouldBe`
+        OutputFileParsed "out" (Data.Map.Strict.fromList [("nb_epochs", "1"),
+                                                          ("foo", ""),
+                                                          ("bar-baz", "8")])
 
 
 
