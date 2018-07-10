@@ -10,10 +10,13 @@ import GEval.PrecisionRecall
 import GEval.ClusteringMetrics
 import GEval.BIO
 import GEval.LineByLine
+import GEval.ParseParams
 import Data.Attoparsec.Text
 import Options.Applicative
 import Data.Text
 import Text.EditDistance
+
+import Data.Map.Strict
 
 import Data.Conduit.List (consume)
 
@@ -315,6 +318,24 @@ main = hspec $ do
       readFromSmartSource "baz" "out.tsv" "test/files/foo.txt" `shouldReturn` ["foo\n"]
       readFromSmartSource "" "" "https://httpbin.org/robots.txt" `shouldReturn`
         ["User-agent: *\nDisallow: /deny\n"]
+  describe "parse model params from filenames" $ do
+    it "no params 1" $ do
+      parseParamsFromFilePath "out.tsv" `shouldBe` OutputFileParsed "out" Data.Map.Strict.empty
+    it "no params 2" $ do
+      parseParamsFromFilePath "out.tsv.xz" `shouldBe` OutputFileParsed "out" Data.Map.Strict.empty
+    it "no params 3" $ do
+      parseParamsFromFilePath "out-test-foo_bar.tsv" `shouldBe` OutputFileParsed "out-test-foo_bar" Data.Map.Strict.empty
+    it "one parameter" $ do
+      parseParamsFromFilePath "out-nb_epochs=123.tsv" `shouldBe`
+        OutputFileParsed "out" (Data.Map.Strict.fromList [("nb_epochs", "123")])
+    it "complex" $ do
+      parseParamsFromFilePath "out-nb_epochs = 12,foo=off, bar-baz =10.tsv" `shouldBe`
+        OutputFileParsed "out" (Data.Map.Strict.fromList [("nb_epochs", "12"),
+                                                          ("foo", "off"),
+                                                          ("bar-baz", "10")])
+
+
+
 
 readFromSmartSource :: FilePath -> FilePath -> String -> IO [String]
 readFromSmartSource defaultDir defaultFile specS = do
