@@ -38,6 +38,7 @@ module GEval.Core
       checkAndGetFiles,
       checkAndGetFilesSingleOut,
       checkMultipleOuts,
+      checkMultipleOutsCore,
       gesMainMetric
     ) where
 
@@ -335,7 +336,13 @@ checkAndGetFiles forceInput gevalSpec = do
           metrics = gesMetrics gevalSpec
 
 checkMultipleOuts :: GEvalSpecification -> IO (Maybe [FilePath])
-checkMultipleOuts gevalSpec = do
+checkMultipleOuts gevalSpec = checkMultipleOutsCore outDirectory testName outFile
+  where outFile = gesOutFile gevalSpec
+        outDirectory = gesOutDirectory gevalSpec
+        testName = gesTestName gevalSpec
+
+checkMultipleOutsCore :: FilePath -> FilePath -> FilePath -> IO (Maybe [FilePath])
+checkMultipleOutsCore outDirectory testName outFile = do
   -- if the out.tsv is there, just use it
   outFilePath <- lookForCompressedFiles (outTestDirectory </> outFile)
   isSimpleOutThere <- D.doesFileExist outFilePath
@@ -349,10 +356,7 @@ checkMultipleOuts gevalSpec = do
     else
       return Nothing
 
-  where outFile = gesOutFile gevalSpec
-        outTestDirectory = outDirectory </> testName
-        outDirectory = gesOutDirectory gevalSpec
-        testName = gesTestName gevalSpec
+  where outTestDirectory = outDirectory </> testName
 
 getOutFile :: GEvalSpecification -> FilePath -> FilePath
 getOutFile gevalSpec out = outDirectory </> testName </> out
