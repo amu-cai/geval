@@ -96,7 +96,7 @@ defaultLogLossHashedSize = 10
 -- | evaluation metric
 data Metric = RMSE | MSE | BLEU | Accuracy | ClippEU | FMeasure Double | NMI
               | LogLossHashed Word32 | CharMatch | MAP | LogLoss | Likelihood
-              | BIOF1 | BIOF1Labels | LikelihoodHashed Word32 | MAE
+              | BIOF1 | BIOF1Labels | LikelihoodHashed Word32 | MAE | MultiLabelFMeasure Double
               deriving (Eq)
 
 instance Show Metric where
@@ -126,8 +126,7 @@ instance Show Metric where
   show BIOF1 = "BIO-F1"
   show BIOF1Labels = "BIO-F1-Labels"
   show MAE = "MAE"
-
-
+  show (MultiLabelFMeasure beta) = "MultiLabel-F" ++ (show beta)
 
 instance Read Metric where
   readsPrec _ ('R':'M':'S':'E':theRest) = [(RMSE, theRest)]
@@ -138,6 +137,9 @@ instance Read Metric where
   readsPrec _ ('N':'M':'I':theRest) = [(NMI, theRest)]
   readsPrec p ('F':theRest) = case readsPrec p theRest of
     [(beta, theRest)] -> [(FMeasure beta, theRest)]
+    _ -> []
+  readsPrec p ('M':'u':'l':'t':'i':'L':'a':'b':'e':'l':'-':'F':theRest) = case readsPrec p theRest of
+    [(beta, theRest)] -> [(MultiLabelFMeasure beta, theRest)]
     _ -> []
   readsPrec p ('L':'o':'g':'L':'o':'s':'s':'H':'a':'s':'h':'e':'d':theRest) = case readsPrec p theRest of
     [(nbOfBits, theRest)] -> [(LogLossHashed nbOfBits, theRest)]
@@ -173,6 +175,7 @@ getMetricOrdering Likelihood = TheHigherTheBetter
 getMetricOrdering BIOF1 = TheHigherTheBetter
 getMetricOrdering BIOF1Labels = TheHigherTheBetter
 getMetricOrdering MAE = TheLowerTheBetter
+getMetricOrdering (MultiLabelFMeasure _) = TheHigherTheBetter
 
 isInputNeeded :: Metric -> Bool
 isInputNeeded CharMatch = True
@@ -521,7 +524,6 @@ gevalCore' (FMeasure beta) _ = gevalCoreWithoutInput outParser outParser getCoun
         getCount (True, False)  = (0, 1, 0)
         getCount (False, True)  = (0, 0, 1)
         getCount (False, False) = (0, 0, 0)
-        countAgg = CC.foldl countFolder (0, 0, 0)
 
 gevalCore' ClippEU _ = gevalCoreWithoutInput parseClippingSpecs parseClippings matchStep clippeuAgg finalStep
   where
@@ -565,6 +567,13 @@ gevalCore' BIOF1Labels _ = gevalCoreWithoutInput parseBioSequenceIntoEntitiesWit
    where parseBioSequenceIntoEntitiesWithoutNormalization s = do
            entities <- parseBioSequenceIntoEntities s
            return $ Prelude.map eraseNormalisation entities
+
+gevalCore' (MultiLabelFMeasure beta) _ = gevalCoreWithoutInput intoWords
+                                                               intoWords
+                                                               (getCounts (==))
+                                                               countAgg
+                                                               (fMeasureOnCounts beta)
+    where intoWords = Right . (Prelude.map unpack) . Data.Text.words
 
 countAgg :: Monad m => ConduitM (Int, Int, Int) o m (Int, Int, Int)
 countAgg = CC.foldl countFolder (0, 0, 0)

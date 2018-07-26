@@ -229,6 +229,22 @@ The output should be given in the BIO format with the normalized forms given aft
 The metric is F1 counted on entities (not labels).
 |] ++ (commonReadmeMDContents testName)
 
+readmeMDContents (MultiLabelFMeasure beta) testName = [i|
+Tag names and their component
+=============================
+
+Tag names and their components (first name/surname) in a text.
+
+Tags:
+* person
+* surname
+* first-name
+
+For each tag a sequence of token IDs separated with commas should be given (after a colon).
+
+The metric is F1 on labels.
+|] ++ (commonReadmeMDContents testName)
+
 readmeMDContents _ testName = [i|
 GEval sample challenge
 ======================
@@ -324,6 +340,10 @@ trainContents BIOF1 = [hereLit|O O O B-surname/BOND O B-firstname/JAMES B-surnam
 O O O O O	There is no name here
 B-firstname/JOHN I-surname/VON I-surname/NEUMANN	John von Nueman
 |]
+trainContents (MultiLabelFMeasure _) = [hereLit|I know Mr John Smith	person:3,4,5 first-name:4 surname:5
+Steven bloody Brown	person:1,3 first-name:1 surname:3
+James and James	first-name:1 firstname:3
+|]
 trainContents _ = [hereLit|0.06	0.39	0	0.206
 1.00	1.00	1	0.017
 317.8	5.20	67	0.048
@@ -365,6 +385,10 @@ devInContents BIOF1Labels = devInContents BIOF1
 devInContents BIOF1 = [hereLit|Adam and Eve
 Mr Jan Kowalski
 |]
+devInContents (MultiLabelFMeasure _) = [hereLit|Jan Kowalski is here
+I see him
+Barbara
+|]
 devInContents _ = [hereLit|0.72	0	0.007
 9.54	62	0.054
 |]
@@ -403,6 +427,10 @@ devExpectedContents LogLoss = [hereLit|1.0
 devExpectedContents BIOF1Labels = devExpectedContents BIOF1
 devExpectedContents BIOF1 = [hereLit|B-firstname/ADAM O B-firstname/EVE
 O B-firstname/JAN B-surname/KOWALSKI
+|]
+devExpectedContents (MultiLabelFMeasure _) = [hereLit|person:1,2 first-name:1 surname:2
+
+first-name:1
 |]
 devExpectedContents _ = [hereLit|0.82
 95.2
@@ -445,6 +473,10 @@ testInContents BIOF1Labels = testInContents BIOF1
 testInContents BIOF1 = [hereLit|Alan Tring
 No name here
 |]
+testInContents (MultiLabelFMeasure _) = [hereLit|John bloody Smith
+Nobody is there
+I saw Marketa
+|]
 testInContents _ = [hereLit|1.52	2	0.093
 30.06	14	0.009
 |]
@@ -485,6 +517,10 @@ testExpectedContents LogLoss = [hereLit|1.0
 testExpectedContents BIOF1Labels = testExpectedContents BIOF1
 testExpectedContents BIOF1 = [hereLit|B-firstname/ALAN B-surname/TURING
 O O O
+|]
+testExpectedContents (MultiLabelFMeasure _) = [hereLit|person:1,3 first-name:1 surname:3
+
+first-name:3
 |]
 testExpectedContents _ = [hereLit|0.11
 17.2

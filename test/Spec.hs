@@ -212,6 +212,11 @@ main = hspec $ do
   describe "Likelihood" $ do
     it "simple" $ do
       runGEvalTest "likelihood-simple" `shouldReturnAlmost` 0.72742818469866
+  describe "MultiLabel-F" $ do
+    it "simple" $ do
+      runGEvalTest "multilabel-f1-simple" `shouldReturnAlmost` 0.66666666666
+    it "simple F2" $ do
+      runGEvalTest "multilabel-f2-simple" `shouldReturnAlmost` 0.441176470588235
   describe "evaluating single lines" $ do
     it "RMSE" $ do
       gevalCoreOnSingleLines RMSE (LineInFile (FilePathSpec "stub1") 1 "blabla")

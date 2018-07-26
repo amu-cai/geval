@@ -3,7 +3,8 @@
 module GEval.PrecisionRecall(calculateMAPForOneResult,
                              fMeasure, f1Measure, f2Measure, precision, recall,
                              fMeasureOnCounts, f1MeasureOnCounts, f2MeasureOnCounts, countFolder,
-                             precisionAndRecall, precisionAndRecallFromCounts, maxMatch, maxMatchOnOrdered)
+                             precisionAndRecall, precisionAndRecallFromCounts,
+                             maxMatch, maxMatchOnOrdered, getCounts)
        where
 
 import GEval.Common
@@ -30,8 +31,8 @@ f1Measure :: (a -> b -> Bool) -> [a] -> [b] -> Double
 f1Measure = fMeasure 1.0
 
 -- | Calculates both generalized) F-measure
-fMeasure :: Double
-         -> (a -> b -> Bool)  -- ^ beta parameter
+fMeasure :: Double          -- ^ beta parameter
+         -> (a -> b -> Bool)  -- ^ function to check whether there is a match
          -> [a]             -- ^ the ground truth
          -> [b]             -- ^ what we got
          -> Double          -- ^ f-Measure
@@ -54,6 +55,11 @@ fMeasureOnCounts beta (tp, nbExpected, nbGot) =
 
 countFolder :: (Int, Int, Int) -> (Int, Int, Int) -> (Int, Int, Int)
 countFolder (a1, a2, a3) (b1, b2, b3) = (a1+b1, a2+b2, a3+b3)
+
+getCounts :: (a -> b -> Bool) -> ([a], [b]) -> (Int, Int, Int)
+getCounts matchingFun (expected, got) = (maxMatch matchingFun expected got,
+                                      length expected,
+                                      length got)
 
 -- | Calculates both precision and recall.
 --
