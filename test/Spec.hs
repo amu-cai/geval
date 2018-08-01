@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE FlexibleContexts #-}
 
 import Test.Hspec
 
@@ -23,10 +24,12 @@ import Data.Conduit.List (consume)
 import qualified Test.HUnit as HU
 
 import Data.Conduit.SmartSource
+import Data.Conduit.Rank
 import qualified Data.Conduit.Text as CT
 import Data.Conduit
 import Control.Monad.Trans.Resource
 import qualified Data.Conduit.List as CL
+import qualified Data.Conduit.Combinators as CC
 
 informationRetrievalBookExample :: [(String, Int)]
 informationRetrievalBookExample = [("o", 2), ("o", 2), ("d", 2), ("x", 3), ("d", 3),
@@ -343,9 +346,27 @@ main = hspec $ do
         OutputFileParsed "out" (Data.Map.Strict.fromList [("nb_epochs", "1"),
                                                           ("foo", ""),
                                                           ("bar-baz", "8")])
+  describe "ranking" $ do
+    it "simple case" $ do
+      checkConduitPure (rank (\(a,_) (b,_) -> a < b)) [(3.0::Double, "foo"::String),
+                                   (10.0, "bar"),
+                                   (12.0, "baz")]
+                                  [(1.0, (3.0::Double, "foo"::String)),
+                                   (2.0, (10.0, "bar")),
+                                   (3.0, (12.0, "baz"))]
+    it "one item" $ do
+      checkConduitPure (rank (\(a,_) (b,_) -> a < b)) [(5.0::Double, "foo"::String)]
+                                  [(1.0, (5.0::Double, "foo"::String))]
+    it "take between" $ do
+      checkConduitPure (rank (<)) [3.0::Double, 5.0, 5.0, 10.0]
+                                [(1.0::Double, 3.0),
+                                 (2.5, 5.0),
+                                 (2.5, 5.0),
+                                 (4.0, 10.0)]
 
-
-
+checkConduitPure conduit inList expList = do
+  let outList = runConduitPure $ CC.yieldMany inList .| conduit .| CC.sinkList
+  mapM_ (\(o,e) -> (fst o) `shouldBeAlmost` (fst e)) $ Prelude.zip outList expList
 
 readFromSmartSource :: FilePath -> FilePath -> String -> IO [String]
 readFromSmartSource defaultDir defaultFile specS = do

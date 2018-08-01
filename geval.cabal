@@ -30,6 +30,7 @@ library
                      , GEval.ParseParams
                      , Data.Conduit.AutoDecompress
                      , Data.Conduit.SmartSource
+                     , Data.Conduit.Rank
                      , Paths_geval
   build-depends:       base >= 4.7 && < 5
                      , cond
