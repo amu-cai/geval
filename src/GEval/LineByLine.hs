@@ -71,7 +71,7 @@ runWorstFeatures ordering spec = runLineByLineGeneralized ordering spec consum
          consum = (rank (lessByMetric $ gesMainMetric spec)
                    .| featureExtractor
                    .| uScoresCounter
-                   .| CL.map (encodeUtf8 . formatFeatureWithZScore)
+                   .| CL.map (encodeUtf8 . formatFeatureWithPValue)
                    .| CC.unlinesAscii
                    .| CC.stdout)
          formatOutput (LineRecord inp exp out _ score) = Data.Text.intercalate "\t" [
@@ -85,12 +85,12 @@ runWorstFeatures ordering spec = runLineByLineGeneralized ordering spec consum
 data RankedFeature = RankedFeature Text Double
                      deriving (Show)
 
-data FeatureWithZScore = FeatureWithZScore Text Double Int
+data FeatureWithPValue = FeatureWithPValue Text Double Int
                      deriving (Show)
 
-formatFeatureWithZScore :: FeatureWithZScore -> Text
-formatFeatureWithZScore (FeatureWithZScore f z c) =
-  f <> " " <> (pack $ show c)  <>  " " <> (pack $ printf "%0.20f" z)
+formatFeatureWithPValue :: FeatureWithPValue -> Text
+formatFeatureWithPValue (FeatureWithPValue f p c) =
+  f <> " " <> (pack $ show c)  <>  " " <> (pack $ printf "%0.20f" p)
 
 featureExtractor :: Monad m => ConduitT (Double, LineRecord) RankedFeature m ()
 featureExtractor = CC.map extract .| CC.concat
@@ -101,16 +101,19 @@ featureExtractor = CC.map extract .| CC.concat
               extractUnigramFeaturesFromTabbed "in" inLine,
               extractUnigramFeatures "out" outLine]
 
-uScoresCounter :: Monad m => ConduitT RankedFeature FeatureWithZScore m ()
+uScoresCounter :: Monad m => ConduitT RankedFeature FeatureWithPValue m ()
 uScoresCounter = CC.map (\(RankedFeature feature r) -> (feature, (r, 1)))
-               .| gobbleAndDo countUScores
-               .| CC.map (\(f, (r, c)) -> FeatureWithZScore f (zscore (r - minusR c) c (2942 - c)) c)
+               .| gobbleDoAndContinueWithCount
+                    countUScores
+                    (\total -> CC.map (\(f, (r, c)) -> FeatureWithPValue f (pvalue (r - minusR c) c (total - c)) c))
   where countUScores l =
            M.toList
            $ M.fromListWith (\(r1, c1) (r2, c2) -> ((r1 + r2), (c1 + c2))) l
         minusR c = (c' * (c' + 1)) / 2.0
               where c' = fromIntegral c
-        zscore u n1 n2 = let n1' = fromIntegral n1
+        -- calulating p-value from Mann–Whitney U test
+        -- (normal approximation is used)
+        pvalue u n1 n2 = let n1' = fromIntegral n1
                              n2' = fromIntegral n2
                              mean = n1' * n2' / 2
                              sigma = sqrt $ n1' * n2' * (n1' + n2' + 1) / 12
@@ -140,6 +143,13 @@ gobbleAndDo :: Monad m => ([a] -> [b]) -> ConduitT a b m ()
 gobbleAndDo fun = do
   l <- CC.sinkList
   CC.yieldMany $ fun l
+
+gobbleDoAndContinueWithCount :: Monad m => ([a] -> [b]) -> (Int -> ConduitT b c m ()) -> ConduitT a c m ()
+gobbleDoAndContinueWithCount fun continuation = do
+  l <- CC.sinkList
+  let lc = Prelude.length l
+  (CC.yieldMany $ fun l) .| (continuation lc)
+
 
 runDiff :: ResultOrdering -> FilePath -> GEvalSpecification -> IO ()
 runDiff ordering otherOut spec = runDiffGeneralized ordering otherOut spec consum
