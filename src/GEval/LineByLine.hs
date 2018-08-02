@@ -9,6 +9,7 @@
 
 module GEval.LineByLine
        (runLineByLine,
+        runWorstFeatures,
         runLineByLineGeneralized,
         runDiff,
         runDiffGeneralized,
@@ -25,11 +26,16 @@ import qualified Data.Conduit.List as CL
 import qualified Data.Conduit.Combinators as CC
 import Data.Text
 import Data.Text.Encoding
+import Data.Conduit.Rank
 
-import Data.List (sortBy, sort)
+import Data.List (sortBy, sort, concat)
 
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Resource
+
+import Data.Monoid ((<>))
+
+import GEval.FeatureExtractor
 
 import Data.Word
 
@@ -38,6 +44,11 @@ import Text.Printf
 import Data.Conduit.SmartSource
 
 import System.FilePath
+
+import Statistics.Distribution (cumulative)
+import Statistics.Distribution.Normal (normalDistr)
+
+import qualified Data.Map.Strict as M
 
 data LineRecord = LineRecord Text Text Text Word32 MetricValue
                   deriving (Eq, Show)
@@ -53,6 +64,65 @@ runLineByLine ordering spec = runLineByLineGeneralized ordering spec consum
            escapeTabs out]
          formatScore :: MetricValue -> Text
          formatScore = Data.Text.pack . printf "%f"
+
+runWorstFeatures :: ResultOrdering -> GEvalSpecification -> IO ()
+runWorstFeatures ordering spec = runLineByLineGeneralized ordering spec consum
+   where consum :: ConduitT LineRecord Void (ResourceT IO) ()
+         consum = (rank (lessByMetric $ gesMainMetric spec)
+                   .| featureExtractor
+                   .| uScoresCounter
+                   .| CL.map (encodeUtf8 . formatFeatureWithZScore)
+                   .| CC.unlinesAscii
+                   .| CC.stdout)
+         formatOutput (LineRecord inp exp out _ score) = Data.Text.intercalate "\t" [
+           formatScore score,
+           escapeTabs inp,
+           escapeTabs exp,
+           escapeTabs out]
+         formatScore :: MetricValue -> Text
+         formatScore = Data.Text.pack . printf "%f"
+
+data RankedFeature = RankedFeature Text Double
+                     deriving (Show)
+
+data FeatureWithZScore = FeatureWithZScore Text Double Int
+                     deriving (Show)
+
+formatFeatureWithZScore :: FeatureWithZScore -> Text
+formatFeatureWithZScore (FeatureWithZScore f z c) =
+  f <> " " <> (pack $ show c)  <>  " " <> (pack $ printf "%0.20f" z)
+
+featureExtractor :: Monad m => ConduitT (Double, LineRecord) RankedFeature m ()
+featureExtractor = CC.map extract .| CC.concat
+  where extract (rank, LineRecord inLine expLine outLine _ _) =
+          Prelude.map (\f -> RankedFeature f rank)
+          $ Data.List.concat [
+              extractUnigramFeatures "exp" expLine,
+              extractUnigramFeaturesFromTabbed "in" inLine,
+              extractUnigramFeatures "out" outLine]
+
+uScoresCounter :: Monad m => ConduitT RankedFeature FeatureWithZScore m ()
+uScoresCounter = CC.map (\(RankedFeature feature r) -> (feature, (r, 1)))
+               .| gobbleAndDo countUScores
+               .| CC.map (\(f, (r, c)) -> FeatureWithZScore f (zscore (r - minusR c) c (2942 - c)) c)
+  where countUScores l =
+           M.toList
+           $ M.fromListWith (\(r1, c1) (r2, c2) -> ((r1 + r2), (c1 + c2))) l
+        minusR c = (c' * (c' + 1)) / 2.0
+              where c' = fromIntegral c
+        zscore u n1 n2 = let n1' = fromIntegral n1
+                             n2' = fromIntegral n2
+                             mean = n1' * n2' / 2
+                             sigma = sqrt $ n1' * n2' * (n1' + n2' + 1) / 12
+                             z = (u - mean) / sigma
+                         in cumulative (normalDistr 0.0 1.0) z
+
+lessByMetric :: Metric -> (LineRecord -> LineRecord -> Bool)
+lessByMetric metric = lessByMetric' (getMetricOrdering metric)
+  where lessByMetric' TheHigherTheBetter = (\(LineRecord _ _ _ _ scoreA) (LineRecord _ _ _ _ scoreB) ->
+                                             scoreA < scoreB)
+        lessByMetric' TheLowerTheBetter = (\(LineRecord _ _ _ _ scoreA) (LineRecord _ _ _ _ scoreB) ->
+                                             scoreA > scoreB)
 
 runLineByLineGeneralized :: ResultOrdering -> GEvalSpecification -> ConduitT LineRecord Void (ResourceT IO) a -> IO a
 runLineByLineGeneralized ordering spec consum = do

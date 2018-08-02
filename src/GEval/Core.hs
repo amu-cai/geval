@@ -213,7 +213,7 @@ getExpectedDirectory :: GEvalSpecification -> FilePath
 getExpectedDirectory spec = fromMaybe outDirectory $ gesExpectedDirectory spec
                             where outDirectory = gesOutDirectory spec
 
-data GEvalSpecialCommand = Init | LineByLine | Diff FilePath | PrintVersion
+data GEvalSpecialCommand = Init | LineByLine | WorstFeatures | Diff FilePath | PrintVersion
 
 data ResultOrdering = KeepTheOriginalOrder | FirstTheWorst | FirstTheBest
 

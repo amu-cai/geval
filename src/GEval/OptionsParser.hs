@@ -46,6 +46,11 @@ optionsParser = GEvalOptions
                    <> short 'l'
                    <> help "Give scores for each line rather than the whole test set" ))
                  <|>
+                 (flag' WorstFeatures
+                 ( long "worst-features"
+                   <> short 'w'
+                   <> help "Print a ranking of worst features, i.e. features that worsen the score significantly" ))
+                 <|>
                  (Diff <$> strOption
                     ( long "diff"
                       <> short 'd'
@@ -193,6 +198,9 @@ runGEval''' (Just PrintVersion) _ _ = do
   return Nothing
 runGEval''' (Just LineByLine) ordering spec = do
   runLineByLine ordering spec
+  return Nothing
+runGEval''' (Just WorstFeatures) ordering spec = do
+  runWorstFeatures ordering spec
   return Nothing
 runGEval''' (Just (Diff otherOut)) ordering spec = do
   runDiff ordering otherOut spec
