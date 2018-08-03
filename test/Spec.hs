@@ -363,6 +363,26 @@ main = hspec $ do
                                  (2.5, 5.0),
                                  (2.5, 5.0),
                                  (4.0, 10.0)]
+    it "two sequences" $ do
+      checkConduitPure (rank (<)) [4.5::Double, 4.5, 4.5, 6.1, 6.1]
+                                [(2.0::Double, 4.4),
+                                 (2.0, 4.5),
+                                 (2.0, 4.5),
+                                 (4.5, 6.1),
+                                 (4.5, 6.1)]
+    it "series at the beginning" $ do
+      checkConduitPure (rank (<)) [10.0::Double, 10.0, 13.0, 14.0]
+                                [(1.5::Double, 10.0),
+                                 (1.5, 10.0),
+                                 (3.0, 13.0),
+                                 (4.0, 14.0)]
+    it "inverted" $ do
+      checkConduitPure (rank (>)) [3.0::Double, 3.0, 2.0, 1.0]
+                                [(1.5::Double, 3.0),
+                                 (1.5, 3.0),
+                                 (3.0, 2.0),
+                                 (4.0, 1.0)]
+
 
 checkConduitPure conduit inList expList = do
   let outList = runConduitPure $ CC.yieldMany inList .| conduit .| CC.sinkList
