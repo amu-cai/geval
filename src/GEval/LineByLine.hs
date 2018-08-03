@@ -32,6 +32,8 @@ import Data.List (sortBy, sort, concat)
 
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Resource
+import Data.Conduit.Lift
+import Control.Monad.State.Strict
 
 import Data.Monoid ((<>))
 
@@ -69,8 +71,7 @@ runWorstFeatures :: ResultOrdering -> GEvalSpecification -> IO ()
 runWorstFeatures ordering spec = runLineByLineGeneralized ordering spec consum
    where consum :: ConduitT LineRecord Void (ResourceT IO) ()
          consum = (rank (lessByMetric $ gesMainMetric spec)
-                   .| featureExtractor
-                   .| uScoresCounter
+                   .| evalStateC 0 extractFeaturesAndPValues
                    .| CL.map (encodeUtf8 . formatFeatureWithPValue)
                    .| CC.unlinesAscii
                    .| CC.stdout)
@@ -82,10 +83,17 @@ runWorstFeatures ordering spec = runLineByLineGeneralized ordering spec consum
          formatScore :: MetricValue -> Text
          formatScore = Data.Text.pack . printf "%f"
 
+extractFeaturesAndPValues :: Monad m => ConduitT (Double, LineRecord) FeatureWithPValue (StateT Integer m) ()
+extractFeaturesAndPValues =
+  totalCounter
+  .| featureExtractor
+  .| uScoresCounter
+
+
 data RankedFeature = RankedFeature Text Double
                      deriving (Show)
 
-data FeatureWithPValue = FeatureWithPValue Text Double Int
+data FeatureWithPValue = FeatureWithPValue Text Double Integer
                      deriving (Show)
 
 formatFeatureWithPValue :: FeatureWithPValue -> Text
@@ -101,15 +109,27 @@ featureExtractor = CC.map extract .| CC.concat
               extractUnigramFeaturesFromTabbed "in" inLine,
               extractUnigramFeatures "out" outLine]
 
-uScoresCounter :: Monad m => ConduitT RankedFeature FeatureWithPValue m ()
+uScoresCounter :: Monad m => ConduitT RankedFeature FeatureWithPValue (StateT Integer m) ()
 uScoresCounter = CC.map (\(RankedFeature feature r) -> (feature, (r, 1)))
-               .| gobbleDoAndContinueWithCount
-                    countUScores
-                    (\total -> CC.map (\(f, (r, c)) -> FeatureWithPValue f (pvalue (r - minusR c) c (total - c)) c))
+                 .| gobbleAndDo countUScores
+                 .| pValueCalculator
   where countUScores l =
            M.toList
            $ M.fromListWith (\(r1, c1) (r2, c2) -> ((r1 + r2), (c1 + c2))) l
-        minusR c = (c' * (c' + 1)) / 2.0
+
+pValueCalculator :: Monad m => ConduitT (Text, (Double, Integer)) FeatureWithPValue (StateT Integer m) ()
+pValueCalculator = do
+  firstVal <- await
+  case firstVal of
+    Just i -> do
+      total <- lift get
+      yield $ calculatePValue total i
+      CC.map $ calculatePValue total
+    Nothing -> return ()
+
+calculatePValue :: Integer -> (Text, (Double, Integer)) -> FeatureWithPValue
+calculatePValue total (f, (r, c)) = FeatureWithPValue f (pvalue (r - minusR c) c (total - c)) c
+  where minusR c = (c' * (c' + 1)) / 2.0
               where c' = fromIntegral c
         -- calulating p-value from Mann–Whitney U test
         -- (normal approximation is used)
@@ -119,6 +139,18 @@ uScoresCounter = CC.map (\(RankedFeature feature r) -> (feature, (r, 1)))
                              sigma = sqrt $ n1' * n2' * (n1' + n2' + 1) / 12
                              z = (u - mean) / sigma
                          in cumulative (normalDistr 0.0 1.0) z
+
+
+totalCounter :: Monad m => ConduitT a a (StateT Integer m) ()
+totalCounter = do
+  m <- await
+  case m of
+    Just x -> do
+      i <- lift get
+      lift $ put $ i + 1
+      yield x
+      totalCounter
+    Nothing -> return ()
 
 lessByMetric :: Metric -> (LineRecord -> LineRecord -> Bool)
 lessByMetric metric = lessByMetric' (getMetricOrdering metric)
@@ -143,13 +175,6 @@ gobbleAndDo :: Monad m => ([a] -> [b]) -> ConduitT a b m ()
 gobbleAndDo fun = do
   l <- CC.sinkList
   CC.yieldMany $ fun l
-
-gobbleDoAndContinueWithCount :: Monad m => ([a] -> [b]) -> (Int -> ConduitT b c m ()) -> ConduitT a c m ()
-gobbleDoAndContinueWithCount fun continuation = do
-  l <- CC.sinkList
-  let lc = Prelude.length l
-  (CC.yieldMany $ fun l) .| (continuation lc)
-
 
 runDiff :: ResultOrdering -> FilePath -> GEvalSpecification -> IO ()
 runDiff ordering otherOut spec = runDiffGeneralized ordering otherOut spec consum
