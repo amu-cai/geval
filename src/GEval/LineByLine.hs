@@ -68,7 +68,7 @@ runLineByLine ordering spec = runLineByLineGeneralized ordering spec consum
          formatScore = Data.Text.pack . printf "%f"
 
 runWorstFeatures :: ResultOrdering -> GEvalSpecification -> IO ()
-runWorstFeatures ordering spec = runLineByLineGeneralized ordering spec consum
+runWorstFeatures ordering spec = runLineByLineGeneralized ordering' spec consum
    where consum :: ConduitT LineRecord Void (ResourceT IO) ()
          consum = (rank (lessByMetric $ gesMainMetric spec)
                    .| evalStateC 0 extractFeaturesAndPValues
@@ -82,6 +82,13 @@ runWorstFeatures ordering spec = runLineByLineGeneralized ordering spec consum
            escapeTabs out]
          formatScore :: MetricValue -> Text
          formatScore = Data.Text.pack . printf "%f"
+         ordering' = forceSomeOrdering ordering
+
+-- for commands like --worst-features we need some ordering (KeepTheOriginalOrder
+-- does not make sense at all)
+forceSomeOrdering :: ResultOrdering -> ResultOrdering
+forceSomeOrdering FirstTheBest = FirstTheBest
+forceSomeOrdering KeepTheOriginalOrder = FirstTheWorst
 
 extractFeaturesAndPValues :: Monad m => ConduitT (Double, LineRecord) FeatureWithPValue (StateT Integer m) ()
 extractFeaturesAndPValues =
@@ -90,34 +97,40 @@ extractFeaturesAndPValues =
   .| uScoresCounter
 
 
-data RankedFeature = RankedFeature Text Double
+data RankedFeature = RankedFeature Text Double MetricValue
                      deriving (Show)
 
-data FeatureWithPValue = FeatureWithPValue Text Double Integer
+data FeatureWithPValue = FeatureWithPValue Text        -- ^ feature itself
+                                           Double      -- ^ p-value
+                                           MetricValue -- ^ average metric value
+                                           Integer     -- ^ count
                      deriving (Show)
 
 formatFeatureWithPValue :: FeatureWithPValue -> Text
-formatFeatureWithPValue (FeatureWithPValue f p c) =
-  f <> " " <> (pack $ show c)  <>  " " <> (pack $ printf "%0.20f" p)
+formatFeatureWithPValue (FeatureWithPValue f p avg c) =
+  Data.Text.intercalate "\t" [f,
+                              (pack $ show c),
+                              (pack $ printf "%0.8f" avg),
+                              (pack $ printf "%0.20f" p)]
 
 featureExtractor :: Monad m => ConduitT (Double, LineRecord) RankedFeature m ()
 featureExtractor = CC.map extract .| CC.concat
-  where extract (rank, LineRecord inLine expLine outLine _ _) =
-          Prelude.map (\f -> RankedFeature f rank)
+  where extract (rank, LineRecord inLine expLine outLine _ score) =
+          Prelude.map (\f -> RankedFeature f rank score)
           $ Data.List.concat [
               extractUnigramFeatures "exp" expLine,
               extractUnigramFeaturesFromTabbed "in" inLine,
               extractUnigramFeatures "out" outLine]
 
 uScoresCounter :: Monad m => ConduitT RankedFeature FeatureWithPValue (StateT Integer m) ()
-uScoresCounter = CC.map (\(RankedFeature feature r) -> (feature, (r, 1)))
+uScoresCounter = CC.map (\(RankedFeature feature r score) -> (feature, (r, score, 1)))
                  .| gobbleAndDo countUScores
                  .| pValueCalculator
   where countUScores l =
            M.toList
-           $ M.fromListWith (\(r1, c1) (r2, c2) -> ((r1 + r2), (c1 + c2))) l
+           $ M.fromListWith (\(r1, s1, c1) (r2, s2, c2) -> ((r1 + r2), (s1 + s2), (c1 + c2))) l
 
-pValueCalculator :: Monad m => ConduitT (Text, (Double, Integer)) FeatureWithPValue (StateT Integer m) ()
+pValueCalculator :: Monad m => ConduitT (Text, (Double, MetricValue, Integer)) FeatureWithPValue (StateT Integer m) ()
 pValueCalculator = do
   firstVal <- await
   case firstVal of
@@ -127,8 +140,11 @@ pValueCalculator = do
       CC.map $ calculatePValue total
     Nothing -> return ()
 
-calculatePValue :: Integer -> (Text, (Double, Integer)) -> FeatureWithPValue
-calculatePValue total (f, (r, c)) = FeatureWithPValue f (pvalue (r - minusR c) c (total - c)) c
+calculatePValue :: Integer -> (Text, (Double, MetricValue, Integer)) -> FeatureWithPValue
+calculatePValue total (f, (r, s, c)) = FeatureWithPValue f
+                                                         (pvalue (r - minusR c) c (total - c))
+                                                         (s / (fromIntegral c))
+                                                         c
   where minusR c = (c' * (c' + 1)) / 2.0
               where c' = fromIntegral c
         -- calulating p-value from Mann–Whitney U test
