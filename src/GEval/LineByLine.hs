@@ -12,6 +12,7 @@ module GEval.LineByLine
         runWorstFeatures,
         runLineByLineGeneralized,
         runDiff,
+        runMostWorseningFeatures,
         runDiffGeneralized,
         LineRecord(..),
         ResultOrdering(..)
@@ -211,6 +212,17 @@ runDiff ordering otherOut spec = runDiffGeneralized ordering otherOut spec consu
           escapeTabs outB]
         formatScoreDiff :: Double -> Text
         formatScoreDiff = Data.Text.pack . printf "%f"
+
+runMostWorseningFeatures :: ResultOrdering -> FilePath -> GEvalSpecification -> IO ()
+runMostWorseningFeatures ordering otherOut spec = runDiffGeneralized ordering' otherOut spec consum
+  where ordering' = forceSomeOrdering ordering
+        consum :: ConduitT (LineRecord, LineRecord) Void (ResourceT IO) ()
+        consum = CC.map prepareFakeLineRecord
+                 .| (worstFeaturesPipeline spec)
+        prepareFakeLineRecord :: (LineRecord, LineRecord) -> LineRecord
+        prepareFakeLineRecord (LineRecord _ _ _ _ scorePrev, LineRecord inp exp out c score) =
+          LineRecord inp exp out c (score - scorePrev)
+
 
 runDiffGeneralized :: ResultOrdering -> FilePath -> GEvalSpecification -> ConduitT (LineRecord, LineRecord) Void (ResourceT IO) a -> IO a
 runDiffGeneralized ordering otherOut spec consum = do

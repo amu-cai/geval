@@ -55,7 +55,13 @@ optionsParser = GEvalOptions
                     ( long "diff"
                       <> short 'd'
                       <> metavar "OTHER-OUT"
-                      <> help "compare results")))
+                      <> help "compare results"))
+                <|>
+                (MostWorseningFeatures <$> strOption
+                    ( long "most-worsening-features"
+                      <> short 'm'
+                      <> help "Print a ranking of the \"most worsening\" features, i.e. features that worsen the score the most when comparing outputs from two systems.")))
+
    <*> ((flag' FirstTheWorst
          (long "sort"
           <> short 's'
@@ -204,6 +210,9 @@ runGEval''' (Just WorstFeatures) ordering spec = do
   return Nothing
 runGEval''' (Just (Diff otherOut)) ordering spec = do
   runDiff ordering otherOut spec
+  return Nothing
+runGEval''' (Just (MostWorseningFeatures otherOut)) ordering spec = do
+  runMostWorseningFeatures ordering otherOut spec
   return Nothing
 
 initChallenge :: GEvalSpecification -> IO ()
