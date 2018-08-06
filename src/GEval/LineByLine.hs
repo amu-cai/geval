@@ -68,22 +68,24 @@ runLineByLine ordering spec = runLineByLineGeneralized ordering spec consum
          formatScore = Data.Text.pack . printf "%f"
 
 runWorstFeatures :: ResultOrdering -> GEvalSpecification -> IO ()
-runWorstFeatures ordering spec = runLineByLineGeneralized ordering' spec consum
-   where consum :: ConduitT LineRecord Void (ResourceT IO) ()
-         consum = (rank (lessByMetric $ gesMainMetric spec)
-                   .| evalStateC 0 extractFeaturesAndPValues
-                   .| gobbleAndDo (sortBy featureOrder)
-                   .| CL.map (encodeUtf8 . formatFeatureWithPValue)
-                   .| CC.unlinesAscii
-                   .| CC.stdout)
-         formatOutput (LineRecord inp exp out _ score) = Data.Text.intercalate "\t" [
+runWorstFeatures ordering spec = runLineByLineGeneralized ordering' spec (worstFeaturesPipeline spec)
+  where ordering' = forceSomeOrdering ordering
+
+
+worstFeaturesPipeline :: GEvalSpecification -> ConduitT LineRecord Void (ResourceT IO) ()
+worstFeaturesPipeline spec = rank (lessByMetric $ gesMainMetric spec)
+                             .| evalStateC 0 extractFeaturesAndPValues
+                             .| gobbleAndDo (sortBy featureOrder)
+                             .| CL.map (encodeUtf8 . formatFeatureWithPValue)
+                             .| CC.unlinesAscii
+                             .| CC.stdout
+  where  formatOutput (LineRecord inp exp out _ score) = Data.Text.intercalate "\t" [
            formatScore score,
            escapeTabs inp,
            escapeTabs exp,
            escapeTabs out]
          formatScore :: MetricValue -> Text
          formatScore = Data.Text.pack . printf "%f"
-         ordering' = forceSomeOrdering ordering
          featureOrder (FeatureWithPValue _ p1 _ _) (FeatureWithPValue _ p2 _ _) =
            p1 `compare` p2
 
