@@ -49,7 +49,7 @@ optionsParser = GEvalOptions
                  (flag' WorstFeatures
                  ( long "worst-features"
                    <> short 'w'
-                   <> help "Print a ranking of worst features, i.e. features that worsen the score significantly" ))
+                   <> help "Print a ranking of worst features, i.e. features that worsen the score significantly. Features are sorted using p-value for Mann-Whitney U test comparing the items with a given feature and without it. For each feature the number of occurrences, average score and p-value is given." ))
                  <|>
                  (Diff <$> strOption
                     ( long "diff"

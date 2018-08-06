@@ -72,6 +72,7 @@ runWorstFeatures ordering spec = runLineByLineGeneralized ordering' spec consum
    where consum :: ConduitT LineRecord Void (ResourceT IO) ()
          consum = (rank (lessByMetric $ gesMainMetric spec)
                    .| evalStateC 0 extractFeaturesAndPValues
+                   .| gobbleAndDo (sortBy featureOrder)
                    .| CL.map (encodeUtf8 . formatFeatureWithPValue)
                    .| CC.unlinesAscii
                    .| CC.stdout)
@@ -83,6 +84,8 @@ runWorstFeatures ordering spec = runLineByLineGeneralized ordering' spec consum
          formatScore :: MetricValue -> Text
          formatScore = Data.Text.pack . printf "%f"
          ordering' = forceSomeOrdering ordering
+         featureOrder (FeatureWithPValue _ p1 _ _) (FeatureWithPValue _ p2 _ _) =
+           p1 `compare` p2
 
 -- for commands like --worst-features we need some ordering (KeepTheOriginalOrder
 -- does not make sense at all)
