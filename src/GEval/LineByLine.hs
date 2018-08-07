@@ -245,8 +245,8 @@ runDiffGeneralized ordering otherOut spec consum = do
     Left (NoFile fp) -> throwM $ NoOutFile fp
     Left (NoDirectory d) -> throwM $ NoOutFile otherOut
     Right otherOutSource -> do
-      let sourceA = gevalLineByLineSource metric inputSource expectedSource outSource
-      let sourceB = gevalLineByLineSource metric inputSource expectedSource otherOutSource
+      let sourceA = gevalLineByLineSource metric inputSource expectedSource otherOutSource
+      let sourceB = gevalLineByLineSource metric inputSource expectedSource outSource
       runResourceT $ runConduit $
         ((getZipSource $ (,)
           <$> ZipSource sourceA
