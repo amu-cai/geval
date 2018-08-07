@@ -69,17 +69,17 @@ runLineByLine ordering spec = runLineByLineGeneralized ordering spec consum
          formatScore = Data.Text.pack . printf "%f"
 
 runWorstFeatures :: ResultOrdering -> GEvalSpecification -> IO ()
-runWorstFeatures ordering spec = runLineByLineGeneralized ordering' spec (worstFeaturesPipeline spec)
+runWorstFeatures ordering spec = runLineByLineGeneralized ordering' spec (worstFeaturesPipeline False spec)
   where ordering' = forceSomeOrdering ordering
 
 
-worstFeaturesPipeline :: GEvalSpecification -> ConduitT LineRecord Void (ResourceT IO) ()
-worstFeaturesPipeline spec = rank (lessByMetric $ gesMainMetric spec)
-                             .| evalStateC 0 extractFeaturesAndPValues
-                             .| gobbleAndDo (sortBy featureOrder)
-                             .| CL.map (encodeUtf8 . formatFeatureWithPValue)
-                             .| CC.unlinesAscii
-                             .| CC.stdout
+worstFeaturesPipeline :: Bool -> GEvalSpecification -> ConduitT LineRecord Void (ResourceT IO) ()
+worstFeaturesPipeline reversed spec = rank (lessByMetric reversed $ gesMainMetric spec)
+                                      .| evalStateC 0 extractFeaturesAndPValues
+                                      .| gobbleAndDo (sortBy featureOrder)
+                                      .| CL.map (encodeUtf8 . formatFeatureWithPValue)
+                                      .| CC.unlinesAscii
+                                      .| CC.stdout
   where  formatOutput (LineRecord inp exp out _ score) = Data.Text.intercalate "\t" [
            formatScore score,
            escapeTabs inp,
@@ -174,12 +174,20 @@ totalCounter = do
       totalCounter
     Nothing -> return ()
 
-lessByMetric :: Metric -> (LineRecord -> LineRecord -> Bool)
-lessByMetric metric = lessByMetric' (getMetricOrdering metric)
-  where lessByMetric' TheHigherTheBetter = (\(LineRecord _ _ _ _ scoreA) (LineRecord _ _ _ _ scoreB) ->
-                                             scoreA < scoreB)
-        lessByMetric' TheLowerTheBetter = (\(LineRecord _ _ _ _ scoreA) (LineRecord _ _ _ _ scoreB) ->
-                                             scoreA > scoreB)
+lessByMetric :: Bool -> Metric -> (LineRecord -> LineRecord -> Bool)
+lessByMetric reversed metric = lessByMetric' reversed (getMetricOrdering metric)
+  where lessByMetric' False TheHigherTheBetter =
+          (\(LineRecord _ _ _ _ scoreA) (LineRecord _ _ _ _ scoreB) ->
+              scoreA < scoreB)
+        lessByMetric' False TheLowerTheBetter =
+          (\(LineRecord _ _ _ _ scoreA) (LineRecord _ _ _ _ scoreB) ->
+              scoreA > scoreB)
+        lessByMetric' True TheHigherTheBetter =
+          (\(LineRecord _ _ _ _ scoreA) (LineRecord _ _ _ _ scoreB) ->
+              scoreA > scoreB)
+        lessByMetric' True TheLowerTheBetter =
+          (\(LineRecord _ _ _ _ scoreA) (LineRecord _ _ _ _ scoreB) ->
+              scoreA < scoreB)
 
 runLineByLineGeneralized :: ResultOrdering -> GEvalSpecification -> ConduitT LineRecord Void (ResourceT IO) a -> IO a
 runLineByLineGeneralized ordering spec consum = do
@@ -216,9 +224,13 @@ runDiff ordering otherOut spec = runDiffGeneralized ordering otherOut spec consu
 runMostWorseningFeatures :: ResultOrdering -> FilePath -> GEvalSpecification -> IO ()
 runMostWorseningFeatures ordering otherOut spec = runDiffGeneralized ordering' otherOut spec consum
   where ordering' = forceSomeOrdering ordering
+        reversed = case ordering of
+          KeepTheOriginalOrder -> False
+          FirstTheWorst -> False
+          FirstTheBest -> True
         consum :: ConduitT (LineRecord, LineRecord) Void (ResourceT IO) ()
         consum = CC.map prepareFakeLineRecord
-                 .| (worstFeaturesPipeline spec)
+                 .| (worstFeaturesPipeline reversed spec)
         prepareFakeLineRecord :: (LineRecord, LineRecord) -> LineRecord
         prepareFakeLineRecord (LineRecord _ _ _ _ scorePrev, LineRecord inp exp out c score) =
           LineRecord inp exp out c (score - scorePrev)
