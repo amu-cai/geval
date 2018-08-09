@@ -98,6 +98,7 @@ defaultLogLossHashedSize = 10
 data Metric = RMSE | MSE | BLEU | Accuracy | ClippEU | FMeasure Double | NMI
               | LogLossHashed Word32 | CharMatch | MAP | LogLoss | Likelihood
               | BIOF1 | BIOF1Labels | LikelihoodHashed Word32 | MAE | MultiLabelFMeasure Double
+              | MultiLabelLogLoss | MultiLabelLikelihood
               deriving (Eq)
 
 instance Show Metric where
@@ -128,6 +129,8 @@ instance Show Metric where
   show BIOF1Labels = "BIO-F1-Labels"
   show MAE = "MAE"
   show (MultiLabelFMeasure beta) = "MultiLabel-F" ++ (show beta)
+  show MultiLabelLogLoss = "MultiLabel-Logloss"
+  show MultiLabelLikelihood = "MultiLabel-Likelihood"
 
 instance Read Metric where
   readsPrec _ ('R':'M':'S':'E':theRest) = [(RMSE, theRest)]
@@ -155,6 +158,10 @@ instance Read Metric where
   readsPrec _ ('B':'I':'O':'-':'F':'1':'-':'L':'a':'b':'e':'l':'s':theRest) = [(BIOF1Labels, theRest)]
   readsPrec _ ('B':'I':'O':'-':'F':'1':theRest) = [(BIOF1, theRest)]
   readsPrec _ ('M':'A':'E':theRest) = [(MAE, theRest)]
+  readsPrec _ ('M':'u':'l':'t':'i':'L':'a':'b':'e':'l':'-':'L':'o':'g':'L':'o':'s':'s':theRest) = [(MultiLabelLogLoss, theRest)]
+  readsPrec _ ('M':'u':'l':'t':'i':'L':'a':'b':'e':'l':'-':'L':'i':'k':'e':'l':'i':'h':'o':'o':'d':theRest) = [(MultiLabelLikelihood, theRest)]
+
+
 
 data MetricOrdering = TheLowerTheBetter | TheHigherTheBetter
 
@@ -177,6 +184,9 @@ getMetricOrdering BIOF1 = TheHigherTheBetter
 getMetricOrdering BIOF1Labels = TheHigherTheBetter
 getMetricOrdering MAE = TheLowerTheBetter
 getMetricOrdering (MultiLabelFMeasure _) = TheHigherTheBetter
+getMetricOrdering MultiLabelLogLoss = TheLowerTheBetter
+getMetricOrdering MultiLabelLikelihood = TheHigherTheBetter
+
 
 isInputNeeded :: Metric -> Bool
 isInputNeeded CharMatch = True
@@ -448,6 +458,10 @@ gevalCoreOnSources (LikelihoodHashed b) inputLineSource expectedLineSource outLi
   logLoss <- gevalCoreOnSources (LogLossHashed b) inputLineSource expectedLineSource outLineSource
   return $ logLossToLikehood logLoss
 
+gevalCoreOnSources MultiLabelLikelihood inputLineSource expectedLineSource outLineSource = do
+  logLoss <- gevalCoreOnSources MultiLabelLogLoss inputLineSource expectedLineSource outLineSource
+  return $ logLossToLikehood logLoss
+
 gevalCoreOnSources metric inputLineSource expectedLineSource outLineSource = do
   gevalCore' metric inputLineSource expectedLineSource outLineSource
 
@@ -581,6 +595,13 @@ gevalCore' (MultiLabelFMeasure beta) _ = gevalCoreWithoutInput intoWords
       getWords = Right . (Prelude.map unpack) . selectByStandardThreshold . parseIntoProbList
       intoWords = Right . (Prelude.map unpack) . Data.Text.words
 
+gevalCore' MultiLabelLogLoss _ = gevalCoreWithoutInput intoWords
+                                                       (Right . parseIntoProbList)
+                                                       (uncurry countLogLossOnProbList)
+                                                       averageC
+                                                       id
+    where
+      intoWords = Right . Data.Text.words
 
 countAgg :: Monad m => ConduitM (Int, Int, Int) o m (Int, Int, Int)
 countAgg = CC.foldl countFolder (0, 0, 0)

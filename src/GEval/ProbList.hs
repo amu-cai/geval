@@ -1,7 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 module GEval.ProbList
-       (parseIntoProbList, selectByStandardThreshold)
+       (parseIntoProbList, selectByStandardThreshold, countLogLossOnProbList)
        where
 
 import qualified Data.Text as T
@@ -22,6 +22,9 @@ mkProbability p
 
 probabilityOne :: Probability
 probabilityOne = mkProbability 1.0
+
+probabilityZero :: Probability
+probabilityZero = mkProbability 0.0
 
 data ProbList = ProbList [WordWithProb]
   deriving (Show)
@@ -63,3 +66,19 @@ standardThreshold = 0.5
 
 selectByStandardThreshold :: ProbList -> [T.Text]
 selectByStandardThreshold = selectByThreshold (mkProbability standardThreshold)
+
+findProb :: ProbList -> T.Text -> Probability
+findProb (ProbList probList) target =
+  case filter (\(WordWithProb w _) -> w == target) probList of
+    ((WordWithProb _ p):_) -> p
+    [] -> probabilityZero
+
+countLogLossOnProbList :: [T.Text] -> ProbList -> Double
+countLogLossOnProbList expected probList@(ProbList l)  =
+  - (logLossForCorrectOnes + logLossForIncorrectOnes)
+  where logLossForCorrectOnes =
+          sum  $ map (\ew -> log ( getP (findProb probList ew))) expected
+        logLossForIncorrectOnes =
+          sum
+          $ map (\(WordWithProb _ p) -> log (1.0 - getP p))
+          $ filter (\(WordWithProb w p) -> w `notElem` expected) l
