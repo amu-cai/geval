@@ -245,6 +245,25 @@ For each tag a sequence of token IDs separated with commas should be given (afte
 The metric is F1 on labels.
 |] ++ (commonReadmeMDContents testName)
 
+readmeMDContents MultiLabelLikelihood testName = readmeMDContents MultiLabelLogLoss testName
+readmeMDContents MultiLabelLogLoss testName = [i|
+Multi-label classification for sentiment
+========================================
+
+Guess sentiments for a given text. More than one sentiment (or none) should be given.
+
+The output format is:
+
+    L1:p1 L2:p2 ... Ln:pn
+
+where is L1, L2, ..., Ln are labels and p1, p2, ..., pn -
+probabilities for each label (Li:pi are separated with spaces).
+Probabilities can be omitted, 1.0 is assumed then. If a label is not
+given at all, probability 0.0 is assumed. (But note that returning
+0.0/1.0 probabilities is risky, as if you fail, you will be punished
+in an infinite manner).
+|] ++ (commonReadmeMDContents testName)
+
 readmeMDContents _ testName = [i|
 GEval sample challenge
 ======================
@@ -344,6 +363,11 @@ trainContents (MultiLabelFMeasure _) = [hereLit|I know Mr John Smith	person:3,4,
 Steven bloody Brown	person:1,3 first-name:1 surname:3
 James and James	first-name:1 firstname:3
 |]
+trainContents MultiLabelLikelihood = [hereLit|I hate you!	HATE
+Love and hate	LOVE HATE
+I am sad	SADNESS
+I am so sad and hateful	SADNESS HATE
+|]
 trainContents _ = [hereLit|0.06	0.39	0	0.206
 1.00	1.00	1	0.017
 317.8	5.20	67	0.048
@@ -389,6 +413,10 @@ devInContents (MultiLabelFMeasure _) = [hereLit|Jan Kowalski is here
 I see him
 Barbara
 |]
+devInContents MultiLabelLikelihood = devInContents MultiLabelLogLoss
+devInContents MultiLabelLogLoss = [hereLit|I am in love
+I am a sad hater
+|]
 devInContents _ = [hereLit|0.72	0	0.007
 9.54	62	0.054
 |]
@@ -431,6 +459,10 @@ O B-firstname/JAN B-surname/KOWALSKI
 devExpectedContents (MultiLabelFMeasure _) = [hereLit|person:1,2 first-name:1 surname:2
 
 first-name:1
+|]
+devExpectedContents MultiLabelLikelihood = devExpectedContents MultiLabelLogLoss
+devExpectedContents MultiLabelLogLoss = [hereLit|LOVE
+SADNESS LOVE
 |]
 devExpectedContents _ = [hereLit|0.82
 95.2
@@ -477,8 +509,9 @@ testInContents (MultiLabelFMeasure _) = [hereLit|John bloody Smith
 Nobody is there
 I saw Marketa
 |]
-testInContents _ = [hereLit|1.52	2	0.093
-30.06	14	0.009
+testInContents MultiLabelLikelihood = testInContents MultiLabelLogLoss
+testInContents MultiLabelLogLoss = [hereLit|I am very sad
+I hate
 |]
 
 testExpectedContents :: Metric -> String
@@ -521,6 +554,10 @@ O O O
 testExpectedContents (MultiLabelFMeasure _) = [hereLit|person:1,3 first-name:1 surname:3
 
 first-name:3
+|]
+testExpectedContents MultiLabelLikelihood = testExpectedContents MultiLabelLogLoss
+testExpectedContents MultiLabelLogLoss = [hereLit|SADNESS
+HATE
 |]
 testExpectedContents _ = [hereLit|0.11
 17.2
