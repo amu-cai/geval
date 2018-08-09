@@ -78,6 +78,7 @@ import GEval.ClusteringMetrics
 import GEval.LogLossHashed
 import GEval.CharMatch
 import GEval.BIO
+import GEval.ProbList
 import Data.Conduit.AutoDecompress
 
 import qualified Data.HashMap.Strict as M
@@ -572,11 +573,14 @@ gevalCore' BIOF1Labels _ = gevalCoreWithoutInput parseBioSequenceIntoEntitiesWit
            return $ Prelude.map eraseNormalisation entities
 
 gevalCore' (MultiLabelFMeasure beta) _ = gevalCoreWithoutInput intoWords
-                                                               intoWords
+                                                               getWords
                                                                (getCounts (==))
                                                                countAgg
                                                                (fMeasureOnCounts beta)
-    where intoWords = Right . (Prelude.map unpack) . Data.Text.words
+    where
+      getWords = Right . (Prelude.map unpack) . selectByStandardThreshold . parseIntoProbList
+      intoWords = Right . (Prelude.map unpack) . Data.Text.words
+
 
 countAgg :: Monad m => ConduitM (Int, Int, Int) o m (Int, Int, Int)
 countAgg = CC.foldl countFolder (0, 0, 0)

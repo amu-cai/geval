@@ -28,6 +28,7 @@ library
                      , GEval.LineByLine
                      , GEval.BIO
                      , GEval.ParseParams
+                     , GEval.ProbList
                      , Data.Conduit.AutoDecompress
                      , Data.Conduit.SmartSource
                      , Data.Conduit.Rank

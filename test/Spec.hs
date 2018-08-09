@@ -220,6 +220,10 @@ main = hspec $ do
       runGEvalTest "multilabel-f1-simple" `shouldReturnAlmost` 0.66666666666
     it "simple F2" $ do
       runGEvalTest "multilabel-f2-simple" `shouldReturnAlmost` 0.441176470588235
+    it "labels given with probs" $ do
+      runGEvalTest "multilabel-f1-with-probs" `shouldReturnAlmost` 0.615384615384615
+    it "labels given with probs and numbers" $ do
+      runGEvalTest "multilabel-f1-with-probs-and-numbers" `shouldReturnAlmost` 0.6666666666666
   describe "evaluating single lines" $ do
     it "RMSE" $ do
       gevalCoreOnSingleLines RMSE (LineInFile (FilePathSpec "stub1") 1 "blabla")
