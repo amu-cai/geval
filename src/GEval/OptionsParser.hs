@@ -137,7 +137,7 @@ metricReader = many $ option auto         -- actually `some` should be used inst
                ( long "metric"            -- --metric might be in the config.txt file...
                  <> short 'm'
                  <> metavar "METRIC"
-                 <> help "Metric to be used - RMSE, MSE, Accuracy, LogLoss, Likelihood, F-measure (specify as F1, F2, F0.25, etc.), MAP, BLEU, NMI, ClippEU, LogLossHashed, LikelihoodHashed, BIO-F1, BIO-F1-Labels or CharMatch" )
+                 <> help "Metric to be used - RMSE, MSE, Accuracy, LogLoss, Likelihood, F-measure (specify as F1, F2, F0.25, etc.), multi-label F-measure (specify as MultiLabel-F1, MultiLabel-F2, MultiLabel-F0.25, etc.), MAP, BLEU, NMI, ClippEU, LogLossHashed, LikelihoodHashed, BIO-F1, BIO-F1-Labels or CharMatch" )
 
 altMetricReader :: Parser (Maybe Metric)
 altMetricReader = optional $ option auto
