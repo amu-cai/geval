@@ -4,7 +4,9 @@ module GEval.OptionsParser
        (fullOptionsParser,
         runGEval,
         runGEvalGetOptions,
-        getOptions) where
+        getOptions,
+        metricReader
+        ) where
 
 import Paths_geval (version)
 import Data.Version (showVersion)
@@ -218,7 +220,7 @@ runGEval''' (Just (MostWorseningFeatures otherOut)) ordering spec = do
 initChallenge :: GEvalSpecification -> IO ()
 initChallenge spec = case gesExpectedDirectory spec of
   Nothing -> showInitInstructions
-  Just expectedDirectory -> createChallenge expectedDirectory spec
+  Just expectedDirectory -> createChallenge True expectedDirectory spec
 
 showInitInstructions = do
   putStrLn [here|

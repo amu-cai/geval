@@ -14,20 +14,28 @@ import Control.Exception
 import Control.Monad.Trans.Resource
 import Data.String.Here
 
-createChallenge :: FilePath -> GEvalSpecification -> IO ()
-createChallenge expectedDirectory spec = do
+createChallenge :: Bool -> FilePath -> GEvalSpecification -> IO ()
+createChallenge withDataFiles expectedDirectory spec = do
   D.createDirectoryIfMissing False expectedDirectory
+  D.createDirectoryIfMissing False trainDirectory
+  D.createDirectoryIfMissing False devDirectory
+  D.createDirectoryIfMissing False testDirectory
+  createFile (expectedDirectory </> ".gitignore") $ gitignoreContents
   createFile (expectedDirectory </> "README.md") $ readmeMDContents metric testName
   createFile (expectedDirectory </> configFileName) $ configContents metrics precision testName
-  D.createDirectoryIfMissing False trainDirectory
-  createFile (trainDirectory </> "train.tsv") $ trainContents metric
-  D.createDirectoryIfMissing False devDirectory
-  createFile (devDirectory </> "in.tsv") $ devInContents metric
-  createFile (devDirectory </> "expected.tsv") $ devExpectedContents metric
-  D.createDirectoryIfMissing False testDirectory
-  createFile (testDirectory </> "in.tsv") $ testInContents metric
-  createFile (testDirectory </> expectedFile) $ testExpectedContents metric
-  createFile (expectedDirectory </> ".gitignore") $ gitignoreContents
+  if withDataFiles
+    then
+     do
+      createFile (trainDirectory </> "train.tsv") $ trainContents metric
+
+      createFile (devDirectory </> "in.tsv") $ devInContents metric
+      createFile (devDirectory </> expectedFile) $ devExpectedContents metric
+
+      createFile (testDirectory </> "in.tsv") $ testInContents metric
+      createFile (testDirectory </> expectedFile) $ testExpectedContents metric
+
+    else
+      return ()
   where metric = gesMainMetric spec
         metrics = gesMetrics spec
         precision = gesPrecision spec
@@ -564,4 +572,11 @@ testExpectedContents _ = [hereLit|0.11
 |]
 
 gitignoreContents :: String
-gitignoreContents = "*~\n"
+gitignoreContents = [hereLit|
+*~
+*.swp
+*.bak
+*.pyc
+*.o
+.DS_Store
+|]
