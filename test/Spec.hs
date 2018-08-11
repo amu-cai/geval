@@ -12,6 +12,7 @@ import GEval.ClusteringMetrics
 import GEval.BIO
 import GEval.LineByLine
 import GEval.ParseParams
+import Text.Tokenizer
 import Data.Attoparsec.Text
 import Options.Applicative
 import Data.Text
@@ -389,7 +390,11 @@ main = hspec $ do
                                  (1.5, 3.0),
                                  (3.0, 2.0),
                                  (4.0, 1.0)]
-
+  describe "tokenizer" $ do
+    it "simple utterance with '13a' tokenizer" $ do
+      tokenize (Just V13a) "To be or not to be, that's the question." `shouldBe`
+        ["To", "be", "or", "not", "to", "be",
+         ",", "that's", "the", "question", "."]
 
 checkConduitPure conduit inList expList = do
   let outList = runConduitPure $ CC.yieldMany inList .| conduit .| CC.sinkList
