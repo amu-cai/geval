@@ -232,9 +232,9 @@ main = hspec $ do
       runGEvalTest "multilabel-likelihood-simple" `shouldReturnAlmost` 0.115829218528827
   describe "evaluating single lines" $ do
     it "RMSE" $ do
-      gevalCoreOnSingleLines RMSE (LineInFile (FilePathSpec "stub1") 1 "blabla")
-                                  (LineInFile (FilePathSpec "stub2") 1 "3.4")
-                                  (LineInFile (FilePathSpec "stub3") 1 "2.6") `shouldReturnAlmost` 0.8
+      gevalCoreOnSingleLines RMSE id (LineInFile (FilePathSpec "stub1") 1 "blabla")
+                                     (LineInFile (FilePathSpec "stub2") 1 "3.4")
+                                     (LineInFile (FilePathSpec "stub3") 1 "2.6") `shouldReturnAlmost` 0.8
   describe "BIO format" $ do
     it "just parse" $ do
       let (Right r) = parseOnly (bioSequenceParser <* endOfInput) "O B-city/NEW_YORK I-city B-city/KALISZ I-city O B-name"
@@ -311,7 +311,8 @@ main = hspec $ do
             gesExpectedFile = "expected.tsv",
             gesInputFile = "in.tsv",
             gesMetrics = [Likelihood],
-            gesPrecision = Nothing }
+            gesPrecision = Nothing,
+            gesTokenizer = Nothing }
     it "simple test" $ do
       results <- runLineByLineGeneralized KeepTheOriginalOrder sampleChallenge Data.Conduit.List.consume
       Prelude.map (\(LineRecord inp _ _ _ _) -> inp) results `shouldBe` ["foo",

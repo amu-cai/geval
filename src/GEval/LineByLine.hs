@@ -192,8 +192,9 @@ lessByMetric reversed metric = lessByMetric' reversed (getMetricOrdering metric)
 runLineByLineGeneralized :: ResultOrdering -> GEvalSpecification -> ConduitT LineRecord Void (ResourceT IO) a -> IO a
 runLineByLineGeneralized ordering spec consum = do
   (inputFilePath, expectedFilePath, outFilePath) <- checkAndGetFilesSingleOut True spec
-  gevalLineByLineCore metric inputFilePath expectedFilePath outFilePath (sorter ordering .| consum)
+  gevalLineByLineCore metric preprocess inputFilePath expectedFilePath outFilePath (sorter ordering .| consum)
   where metric = gesMainMetric spec
+        preprocess = gesPreprocess spec
         sorter KeepTheOriginalOrder = doNothing
         sorter ordering = gobbleAndDo $ sortBy (sortOrder ordering (getMetricOrdering metric))
         sortOrder FirstTheWorst TheHigherTheBetter = compareScores
@@ -245,13 +246,14 @@ runDiffGeneralized ordering otherOut spec consum = do
     Left (NoFile fp) -> throwM $ NoOutFile fp
     Left (NoDirectory d) -> throwM $ NoOutFile otherOut
     Right otherOutSource -> do
-      let sourceA = gevalLineByLineSource metric inputSource expectedSource otherOutSource
-      let sourceB = gevalLineByLineSource metric inputSource expectedSource outSource
+      let sourceA = gevalLineByLineSource metric preprocess inputSource expectedSource otherOutSource
+      let sourceB = gevalLineByLineSource metric preprocess inputSource expectedSource outSource
       runResourceT $ runConduit $
         ((getZipSource $ (,)
           <$> ZipSource sourceA
           <*> ZipSource sourceB) .| sorter ordering .| consum)
   where metric = gesMainMetric spec
+        preprocess = gesPreprocess spec
         sorter KeepTheOriginalOrder = doNothing
         sorter ordering = gobbleAndDo $ sortBy (sortOrder ordering (getMetricOrdering metric))
         sortOrder FirstTheWorst TheHigherTheBetter = compareScores
@@ -265,24 +267,24 @@ runDiffGeneralized ordering otherOut spec consum = do
 escapeTabs :: Text -> Text
 escapeTabs = Data.Text.replace "\t" "<tab>"
 
-gevalLineByLineCore :: Metric -> SourceSpec -> SourceSpec -> SourceSpec -> ConduitT LineRecord Void (ResourceT IO) a -> IO a
-gevalLineByLineCore metric inputSource expectedSource outSource consum =
+gevalLineByLineCore :: Metric -> (Text -> Text) -> SourceSpec -> SourceSpec -> SourceSpec -> ConduitT LineRecord Void (ResourceT IO) a -> IO a
+gevalLineByLineCore metric preprocess inputSource expectedSource outSource consum =
   runResourceT $ runConduit $
-     ((gevalLineByLineSource metric inputSource expectedSource outSource) .| consum)
+     ((gevalLineByLineSource metric preprocess inputSource expectedSource outSource) .| consum)
 
-gevalLineByLineSource :: Metric -> SourceSpec -> SourceSpec -> SourceSpec -> ConduitT () LineRecord (ResourceT IO) ()
-gevalLineByLineSource metric inputSource expectedSource outSource =
+gevalLineByLineSource :: Metric -> (Text -> Text) -> SourceSpec -> SourceSpec -> SourceSpec -> ConduitT () LineRecord (ResourceT IO) ()
+gevalLineByLineSource metric preprocess inputSource expectedSource outSource =
   (getZipSource $ (,)
        <$> ZipSource (CL.sourceList [1..])
        <*> (ZipSource $ recordSource context parserSpec)) .| CL.mapM (checkStepM evaluateLine) .| CL.catMaybes
   where parserSpec = (ParserSpecWithInput (Right . id) (Right . id) (Right . id))
         context = (WithInput inputLineSource expectedLineSource outputLineSource)
-        inputLineSource = fileAsLineSource inputSource
-        expectedLineSource = fileAsLineSource expectedSource
-        outputLineSource = fileAsLineSource outSource
+        inputLineSource = fileAsLineSource inputSource id
+        expectedLineSource = fileAsLineSource expectedSource id
+        outputLineSource = fileAsLineSource outSource id
         justLine (LineInFile _ _ l) = l
         evaluateLine (lineNo, ParsedRecordWithInput inp exp out) = do
-          s <- liftIO $ gevalCoreOnSingleLines metric (LineInFile inputSource lineNo inp)
-                                                     (LineInFile expectedSource lineNo exp)
-                                                     (LineInFile outSource lineNo out)
+          s <- liftIO $ gevalCoreOnSingleLines metric preprocess (LineInFile inputSource lineNo inp)
+                                                                (LineInFile expectedSource lineNo exp)
+                                                                (LineInFile outSource lineNo out)
           return $ LineRecord inp exp out lineNo s

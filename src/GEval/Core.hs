@@ -39,7 +39,8 @@ module GEval.Core
       checkAndGetFilesSingleOut,
       checkMultipleOuts,
       checkMultipleOutsCore,
-      gesMainMetric
+      gesMainMetric,
+      gesPreprocess
     ) where
 
 import Data.Conduit
@@ -222,6 +223,9 @@ gesMainMetric spec = case gesMetrics spec of
   (metric:_) -> metric
   otherwise -> error "no metric given"
 
+gesPreprocess :: GEvalSpecification -> (Text -> Text)
+gesPreprocess spec = tokenizeTabSeparatedWithSpaces (gesTokenizer spec)
+
 getExpectedDirectory :: GEvalSpecification -> FilePath
 getExpectedDirectory spec = fromMaybe outDirectory $ gesExpectedDirectory spec
                             where outDirectory = gesOutDirectory spec
@@ -295,7 +299,7 @@ isEmptyFile path = do
     return ((fileSize stat) == 0)
 
 
-data LineSource m = LineSource (ConduitT () Text m ()) SourceSpec Word32
+data LineSource m = LineSource (ConduitT () Text m ()) (Text -> Text) SourceSpec Word32
 
 geval :: GEvalSpecification -> IO [(SourceSpec, [MetricValue])]
 geval gevalSpec = do
@@ -305,9 +309,10 @@ geval gevalSpec = do
 
 gevalOnSingleOut :: GEvalSpecification -> SourceSpec -> SourceSpec -> SourceSpec -> IO (SourceSpec, [MetricValue])
 gevalOnSingleOut gevalSpec inputSource expectedSource outSource = do
-  vals <- Prelude.mapM (\metric -> gevalCore metric inputSource expectedSource outSource) metrics
+  vals <- Prelude.mapM (\metric -> gevalCore metric preprocess inputSource expectedSource outSource) metrics
   return (outSource, vals)
   where metrics = gesMetrics gevalSpec
+        preprocess = gesPreprocess gevalSpec
 
 checkAndGetFilesSingleOut :: Bool -> GEvalSpecification -> IO (SourceSpec, SourceSpec, SourceSpec)
 checkAndGetFilesSingleOut forceInput gevalSpec = do
@@ -394,35 +399,36 @@ getInputSourceIfNeeded forced metrics directory inputFilePath
          Right sourceSpec -> return sourceSpec
    | otherwise = return NoSource
 
-fileAsLineSource :: SourceSpec -> LineSource (ResourceT IO)
-fileAsLineSource spec =
-  LineSource ((smartSource spec) $= autoDecompress $= CT.decodeUtf8Lenient =$= CT.lines) spec 1
+fileAsLineSource :: SourceSpec -> (Text -> Text) -> LineSource (ResourceT IO)
+fileAsLineSource spec preprocess =
+  LineSource ((smartSource spec) $= autoDecompress $= CT.decodeUtf8Lenient =$= CT.lines) preprocess spec 1
 
-gevalCoreOnSingleLines :: Metric -> LineInFile -> LineInFile -> LineInFile -> IO (MetricValue)
-gevalCoreOnSingleLines metric inpLine expLine outLine =
-  gevalCoreOnSources metric (singleLineAsLineSource inpLine)
-                            (singleLineAsLineSource expLine)
-                            (singleLineAsLineSource outLine)
+gevalCoreOnSingleLines :: Metric -> (Text -> Text) -> LineInFile -> LineInFile -> LineInFile -> IO (MetricValue)
+gevalCoreOnSingleLines metric preprocess inpLine expLine outLine =
+  gevalCoreOnSources metric (singleLineAsLineSource inpLine preprocess)
+                            (singleLineAsLineSource expLine preprocess)
+                            (singleLineAsLineSource outLine preprocess)
 
-singleLineAsLineSource :: LineInFile -> LineSource (ResourceT IO)
-singleLineAsLineSource (LineInFile sourceSpec lineNo line) =
-  LineSource (CL.sourceList [line]) sourceSpec lineNo
+singleLineAsLineSource :: LineInFile -> (Text -> Text) -> LineSource (ResourceT IO)
+singleLineAsLineSource (LineInFile sourceSpec lineNo line) preprocess =
+  LineSource (CL.sourceList [line]) preprocess sourceSpec lineNo
 
 -- | Runs evaluation for a given metric using the sources specified
 -- for input, expected output and output. Returns the metric value.
 -- Throws @GEvalException@ if something was wrong in the data (e.g.
 -- inconsistent number of lines in the sources).
 gevalCore :: Metric           -- ^ evaluation metric
+          -> (Text -> Text)    -- ^ preprocessing function (e.g. tokenization)
           -> SourceSpec       -- ^ source specification for the input values
           -> SourceSpec       -- ^ source specification for the expected output
           -> SourceSpec       -- ^ source specification for the output
           -> IO (MetricValue) -- ^ metric value for the output against the expected output
-gevalCore metric inputSource expectedSource outSource = do
+gevalCore metric preprocess inputSource expectedSource outSource = do
   whenM (isEmptyFileSource outSource) $ throwM $ EmptyOutput
   gevalCoreOnSources metric
-                     (fileAsLineSource inputSource)
-                     (fileAsLineSource expectedSource)
-                     (fileAsLineSource outSource)
+                     (fileAsLineSource inputSource preprocess)
+                     (fileAsLineSource expectedSource preprocess)
+                     (fileAsLineSource outSource preprocess)
 
 isEmptyFileSource :: SourceSpec -> IO Bool
 isEmptyFileSource (FilePathSpec filePath) = isEmptyFile filePath
@@ -690,9 +696,9 @@ instance (MonadUnliftIO m, MonadIO m, MonadThrow m) => EvaluationContext (Withou
   data ParserSpec (WithoutInput m e o) = ParserSpecWithoutInput (Text -> Either String e) (Text -> Either String o)
   data WrappedParsedRecord (WithoutInput m e o) = WrappedParsedRecordWithoutInput (SourceItem e) (SourceItem o)
   data ParsedRecord (WithoutInput m e o) = ParsedRecordWithoutInput e o
-  getFirstLineNo _ (WithoutInput _ (LineSource _ _ lineNo)) = lineNo
-  getExpectedSource (WithoutInput (LineSource _ expectedSource _) _) = expectedSource
-  getOutSource (WithoutInput _ (LineSource _ outSource _)) = outSource
+  getFirstLineNo _ (WithoutInput _ (LineSource _ _ _ lineNo)) = lineNo
+  getExpectedSource (WithoutInput (LineSource _ _ expectedSource _) _) = expectedSource
+  getOutSource (WithoutInput _ (LineSource _ _ outSource _)) = outSource
   recordSource (WithoutInput expectedLineSource outLineSource) (ParserSpecWithoutInput expParser outParser) = getZipSource $ WrappedParsedRecordWithoutInput
                         <$> ZipSource (items expectedLineSource expParser)
                         <*> ZipSource (items outLineSource outParser)
@@ -713,15 +719,15 @@ instance (MonadUnliftIO m, MonadIO m, MonadThrow m) => EvaluationContext (Withou
 
 data WithInput m i e o = WithInput (LineSource (ResourceT m)) (LineSource (ResourceT m)) (LineSource (ResourceT m))
 
-getInputFilePath (WithInput (LineSource _ inputFilePath _) _ _) = inputFilePath
+getInputFilePath (WithInput (LineSource _ _ inputFilePath _) _ _) = inputFilePath
 
 instance (MonadUnliftIO m, MonadIO m, MonadThrow m) => EvaluationContext (WithInput m i e o) m where
   data ParserSpec (WithInput m i e o) = ParserSpecWithInput (Text -> Either String i) (Text -> Either String e) (Text -> Either String o)
   data WrappedParsedRecord (WithInput m i e o) = WrappedParsedRecordWithInput (SourceItem i) (SourceItem e) (SourceItem o)
   data ParsedRecord (WithInput m i e o) = ParsedRecordWithInput i e o
-  getFirstLineNo _ (WithInput _ _ (LineSource _ _ lineNo)) = lineNo
-  getExpectedSource (WithInput _ (LineSource _ expectedSource _) _) = expectedSource
-  getOutSource (WithInput _ _ (LineSource _ outSource _)) = outSource
+  getFirstLineNo _ (WithInput _ _ (LineSource _ _ _ lineNo)) = lineNo
+  getExpectedSource (WithInput _ (LineSource _ _ expectedSource _) _) = expectedSource
+  getOutSource (WithInput _ _ (LineSource _ _ outSource _)) = outSource
   recordSource (WithInput inputLineSource expectedLineSource outLineSource) (ParserSpecWithInput inpParser expParser outParser) = getZipSource $ (\x (y,z) -> WrappedParsedRecordWithInput x y z)
          <$> ZipSource (items inputLineSource inpParser)                                                                         <*> (ZipSource $ getZipSource $ (,)
                         <$> ZipSource (items expectedLineSource expParser)
@@ -756,8 +762,8 @@ averageC = getZipSink
   <*> ZipSink CC.length
 
 items :: MonadResource m => LineSource m -> (Text -> Either String a) -> ConduitT () (SourceItem a) m ()
-items (LineSource lineSource _ _) parser =
-  (lineSource =$= CL.map (toItem . parser)) >> yield Done
+items (LineSource lineSource preprocess _ _) parser =
+  (lineSource =$= CL.map (toItem . parser . preprocess)) >> yield Done
   where toItem (Right x) = Got x
         toItem (Left m) = Wrong m
 

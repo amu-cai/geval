@@ -21,6 +21,13 @@ instance Read Tokenizer where
 tokenize :: Maybe Tokenizer -> T.Text -> [T.Text]
 tokenize mTokenizer = T.words . (tokenizeWithSpaces mTokenizer)
 
+tokenizeTabSeparatedWithSpaces :: Maybe Tokenizer -> T.Text -> T.Text
+tokenizeTabSeparatedWithSpaces Nothing t = t -- special case for efficiency
+tokenizeTabSeparatedWithSpaces tokenizer@(Just _) t =
+  T.intercalate "\t"
+  $ map (tokenizeWithSpaces tokenizer)
+  $ T.splitOn "\t" t
+
 tokenizeWithSpaces :: Maybe Tokenizer -> T.Text -> T.Text
 tokenizeWithSpaces Nothing t = t
 tokenizeWithSpaces (Just V13a) t = T.strip tTokenized
