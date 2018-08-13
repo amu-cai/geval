@@ -80,6 +80,7 @@ import GEval.CharMatch
 import GEval.BIO
 import GEval.ProbList
 import Data.Conduit.AutoDecompress
+import Text.Tokenizer
 
 import qualified Data.HashMap.Strict as M
 
@@ -213,7 +214,8 @@ data GEvalSpecification = GEvalSpecification
                             gesExpectedFile :: String,
                             gesInputFile :: String,
                             gesMetrics :: [Metric],
-                            gesPrecision :: Maybe Int}
+                            gesPrecision :: Maybe Int,
+                            gesTokenizer :: Maybe Tokenizer }
 
 gesMainMetric :: GEvalSpecification -> Metric
 gesMainMetric spec = case gesMetrics spec of
@@ -284,7 +286,8 @@ defaultGEvalSpecification = GEvalSpecification {
   gesExpectedFile = defaultExpectedFile,
   gesInputFile = defaultInputFile,
   gesMetrics = [defaultMetric],
-  gesPrecision = Nothing}
+  gesPrecision = Nothing,
+  gesTokenizer = Nothing}
 
 isEmptyFile :: FilePath -> IO (Bool)
 isEmptyFile path = do

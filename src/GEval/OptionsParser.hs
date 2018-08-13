@@ -126,6 +126,11 @@ specParser = GEvalSpecification
     <> help "The name of the file with the input (applicable only for some metrics)" )
   <*> ((flip fromMaybe) <$> (singletonMaybe <$> altMetricReader) <*> metricReader)
   <*> optional precisionArgParser
+  <*> (optional $ option auto
+       ( long "tokenize"
+         <> short 'T'
+         <> metavar "TOKENIZER"
+         <> help "Tokenizer on expected and actual output before running evaluation (makes sense mostly for metrics such BLEU), only 13a tokenizer is implemented so far" ))
 
 singletonMaybe :: Maybe a -> Maybe [a]
 singletonMaybe (Just x) = Just [x]

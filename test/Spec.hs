@@ -71,6 +71,8 @@ main = hspec $ do
       runGEvalTest "bleu-perfect" `shouldReturnAlmost` 1.0000
     it "empty translation" $
       runGEvalTest "bleu-empty" `shouldReturnAlmost` 0.0000
+    it "with tokenization" $
+      runGEvalTest "bleu-with-tokenization" `shouldReturnAlmost` 0.6501914150070065
   describe "Accuracy" $ do
     it "simple example" $
       runGEvalTest "accuracy-simple" `shouldReturnAlmost` 0.6
