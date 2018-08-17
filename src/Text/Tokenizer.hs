@@ -9,14 +9,17 @@ import Data.Monoid ((<>))
 
 import Text.Regex.PCRE.Heavy
 
-data Tokenizer = V13a | V14International
+data Tokenizer = Minimalistic | V13a | V14International
   deriving (Eq)
 
 instance Show Tokenizer where
+  show Minimalistic = "minimalistic"
   show V13a = "13a"
   show V14International = "v14"
 
 instance Read Tokenizer where
+  readsPrec _ ('m':'i':'n':'i':'m':'a':'l':'i':'s':'t':'i':'c':theRest) =
+            [(Minimalistic, theRest)]
   readsPrec _ ('1':'3':'a':theRest) = [(V13a, theRest)]
   readsPrec _ ('v':'1':'4':theRest) = [(V14International, theRest)]
 
@@ -35,6 +38,15 @@ space = " "
 
 tokenizeWithSpaces :: Maybe Tokenizer -> T.Text -> T.Text
 tokenizeWithSpaces Nothing t = t
+-- very simple tokenization, punctuation marks are separated
+-- only at the beginning and end of a word
+tokenizeWithSpaces (Just Minimalistic) t = T.strip tTokenized
+  where tTokenized =
+          gsub [re|\s{2,}|] ((const space) :: T.Text -> T.Text)
+          $ gsub [re|[\w\d]+\S*[\w\d]+|[\w\d]|[^\w\s]+|]
+                 (\tok -> space <> tok <> space)
+                 t
+
 -- tokenization following the official BLEU implementation
 -- https://github.com/moses-smt/mosesdecoder/blob/master/scripts/generic/mteval-v14.pl#L954-L983
 -- cf. tokenize_v14_international function in sacrebleu evaluator
