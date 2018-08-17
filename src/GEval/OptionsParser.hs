@@ -58,12 +58,17 @@ optionsParser = GEvalOptions
                     ( long "diff"
                       <> short 'd'
                       <> metavar "OTHER-OUT"
-                      <> help "compare results"))
+                      <> help "Compare results of evaluations (line by line) for two outputs."))
                 <|>
                 (MostWorseningFeatures <$> strOption
                     ( long "most-worsening-features"
                       <> short 'm'
-                      <> help "Print a ranking of the \"most worsening\" features, i.e. features that worsen the score the most when comparing outputs from two systems.")))
+                      <> help "Print a ranking of the \"most worsening\" features, i.e. features that worsen the score the most when comparing outputs from two systems."))
+                <|>
+                (flag' JustTokenize
+                    ( long "just-tokenize"
+                      <> short 'j'
+                      <> help "Just tokenise standard input and print out the tokens (separated by spaces) on the standard output. rather than do any evaluation. The --tokenizer option must be given.")))
 
    <*> ((flag' FirstTheWorst
          (long "sort"
@@ -127,7 +132,7 @@ specParser = GEvalSpecification
   <*> ((flip fromMaybe) <$> (singletonMaybe <$> altMetricReader) <*> metricReader)
   <*> optional precisionArgParser
   <*> (optional $ option auto
-       ( long "tokenize"
+       ( long "tokenizer"
          <> short 'T'
          <> metavar "TOKENIZER"
          <> help "Tokenizer on expected and actual output before running evaluation (makes sense mostly for metrics such BLEU), only 13a tokenizer is implemented so far" ))
@@ -221,6 +226,9 @@ runGEval''' (Just (Diff otherOut)) ordering spec = do
   return Nothing
 runGEval''' (Just (MostWorseningFeatures otherOut)) ordering spec = do
   runMostWorseningFeatures ordering otherOut spec
+  return Nothing
+runGEval''' (Just JustTokenize) _ spec = do
+  justTokenize (gesTokenizer spec)
   return Nothing
 
 initChallenge :: GEvalSpecification -> IO ()

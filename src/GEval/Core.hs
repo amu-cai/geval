@@ -230,10 +230,12 @@ getExpectedDirectory :: GEvalSpecification -> FilePath
 getExpectedDirectory spec = fromMaybe outDirectory $ gesExpectedDirectory spec
                             where outDirectory = gesOutDirectory spec
 
+-- | Special command, not just running the regular evaluation.
+-- See OptionsParser.hs for more information.
 data GEvalSpecialCommand = Init
                            | LineByLine | WorstFeatures
                            | Diff FilePath | MostWorseningFeatures FilePath
-                           | PrintVersion
+                           | PrintVersion | JustTokenize
 
 data ResultOrdering = KeepTheOriginalOrder | FirstTheWorst | FirstTheBest
 

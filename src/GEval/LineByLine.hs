@@ -15,16 +15,19 @@ module GEval.LineByLine
         runMostWorseningFeatures,
         runDiffGeneralized,
         LineRecord(..),
-        ResultOrdering(..)
+        ResultOrdering(..),
+        justTokenize
        ) where
 
 import GEval.Core
+import Text.Tokenizer
 
 import Data.Conduit.AutoDecompress (doNothing)
 
 import Data.Conduit
 import qualified Data.Conduit.List as CL
 import qualified Data.Conduit.Combinators as CC
+import qualified Data.Conduit.Text as CT
 import Data.Text
 import Data.Text.Encoding
 import Data.Conduit.Rank
@@ -288,3 +291,16 @@ gevalLineByLineSource metric preprocess inputSource expectedSource outSource =
                                                                 (LineInFile expectedSource lineNo exp)
                                                                 (LineInFile outSource lineNo out)
           return $ LineRecord inp exp out lineNo s
+
+justTokenize :: Maybe Tokenizer -> IO ()
+justTokenize Nothing = error "a tokenizer must be specified with --tokenizer option"
+justTokenize (Just tokenizer) =
+             runResourceT
+             $ runConduit
+             $ CC.stdin
+               .| CC.decodeUtf8Lenient
+               .| CT.lines
+               .| CC.map (tokenizeWithSpaces (Just tokenizer))
+               .| CC.unlines
+               .| CC.encodeUtf8
+               .| CC.stdout

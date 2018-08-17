@@ -1,1 +1,1 @@
---metric BLEU --tokenize 13a
+--metric BLEU --tokenizer 13a
