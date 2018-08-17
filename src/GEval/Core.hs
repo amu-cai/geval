@@ -403,7 +403,7 @@ getInputSourceIfNeeded forced metrics directory inputFilePath
 
 fileAsLineSource :: SourceSpec -> (Text -> Text) -> LineSource (ResourceT IO)
 fileAsLineSource spec preprocess =
-  LineSource ((smartSource spec) $= autoDecompress $= CT.decodeUtf8Lenient =$= CT.lines) preprocess spec 1
+  LineSource ((smartSource spec) .| autoDecompress $= CT.decodeUtf8Lenient =$= CT.lines) preprocess spec 1
 
 gevalCoreOnSingleLines :: Metric -> (Text -> Text) -> LineInFile -> LineInFile -> LineInFile -> IO (MetricValue)
 gevalCoreOnSingleLines metric preprocess inpLine expLine outLine =
@@ -673,7 +673,7 @@ gevalCoreGeneralized' parserSpec itemStep aggregator finalStep context = do
    v <- runResourceT $
      (((getZipSource $ (,)
        <$> ZipSource (CL.sourceList [(getFirstLineNo (Proxy :: Proxy m) context)..])
-       <*> (ZipSource $ recordSource context parserSpec)) .| CL.map (checkStep (Proxy :: Proxy m) itemStep)) $$ CL.catMaybes =$ aggregator)
+       <*> (ZipSource $ recordSource context parserSpec)) .| CL.map (checkStep (Proxy :: Proxy m) itemStep)) $$ CL.catMaybes .| aggregator)
    return $ finalStep v
 
 -- | A type family to handle all the evaluation "context".
@@ -765,7 +765,7 @@ averageC = getZipSink
 
 items :: MonadResource m => LineSource m -> (Text -> Either String a) -> ConduitT () (SourceItem a) m ()
 items (LineSource lineSource preprocess _ _) parser =
-  (lineSource =$= CL.map (toItem . parser . preprocess)) >> yield Done
+  (lineSource .| CL.map (toItem . parser . preprocess)) >> yield Done
   where toItem (Right x) = Got x
         toItem (Left m) = Wrong m
 
