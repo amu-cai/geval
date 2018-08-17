@@ -9,17 +9,19 @@ module GEval.FeatureExtractor
 import Data.Text
 import Data.List
 import Data.Monoid ((<>))
+import Text.Tokenizer
 
-extractUnigramFeatures :: Text -> Text -> [Text]
-extractUnigramFeatures namespace record = Prelude.map (prefix <>) $ nub $ tokenize record
+extractUnigramFeatures :: (Maybe Tokenizer) -> Text -> Text -> [Text]
+extractUnigramFeatures mTokenizer namespace record = Prelude.map (prefix <>) $ nub $ (tokenizeForFeatures mTokenizer) record
   where prefix = namespace <> ":"
 
-tokenize :: Text -> [Text]
-tokenize t = Data.List.filter (not . Data.Text.null) $ split splitPred t
+tokenizeForFeatures :: (Maybe Tokenizer) -> Text -> [Text]
+tokenizeForFeatures Nothing t = Data.List.filter (not . Data.Text.null) $ split splitPred t
    where splitPred c = c == ' ' || c == '\t' || c == ':'
+tokenizeForFeatures mTokenizer t = tokenize mTokenizer t
 
-extractUnigramFeaturesFromTabbed :: Text -> Text -> [Text]
-extractUnigramFeaturesFromTabbed namespace record =
+extractUnigramFeaturesFromTabbed :: (Maybe Tokenizer) -> Text -> Text -> [Text]
+extractUnigramFeaturesFromTabbed mTokenizer namespace record =
   Data.List.concat
-  $ Prelude.map (\(n, t) -> extractUnigramFeatures (namespace <> "<" <> (pack $ show n) <> ">") t)
+  $ Prelude.map (\(n, t) -> extractUnigramFeatures mTokenizer (namespace <> "<" <> (pack $ show n) <> ">") t)
   $ Prelude.zip [1..] (splitOn "\t" record)

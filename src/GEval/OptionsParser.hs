@@ -135,7 +135,7 @@ specParser = GEvalSpecification
        ( long "tokenizer"
          <> short 'T'
          <> metavar "TOKENIZER"
-         <> help "Tokenizer on expected and actual output before running evaluation (makes sense mostly for metrics such BLEU), only 13a tokenizer is implemented so far" ))
+         <> help "Tokenizer on expected and actual output before running evaluation (makes sense mostly for metrics such BLEU), only 13a tokenizer is implemented so far. Will be also used for tokenizing text into features when in --worst-features and --most-worsening-features modes." ))
 
 singletonMaybe :: Maybe a -> Maybe [a]
 singletonMaybe (Just x) = Just [x]

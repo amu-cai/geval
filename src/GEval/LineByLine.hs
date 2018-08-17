@@ -78,7 +78,7 @@ runWorstFeatures ordering spec = runLineByLineGeneralized ordering' spec (worstF
 
 worstFeaturesPipeline :: Bool -> GEvalSpecification -> ConduitT LineRecord Void (ResourceT IO) ()
 worstFeaturesPipeline reversed spec = rank (lessByMetric reversed $ gesMainMetric spec)
-                                      .| evalStateC 0 extractFeaturesAndPValues
+                                      .| evalStateC 0 (extractFeaturesAndPValues spec)
                                       .| gobbleAndDo (sortBy featureOrder)
                                       .| CL.map (encodeUtf8 . formatFeatureWithPValue)
                                       .| CC.unlinesAscii
@@ -99,10 +99,10 @@ forceSomeOrdering :: ResultOrdering -> ResultOrdering
 forceSomeOrdering FirstTheBest = FirstTheBest
 forceSomeOrdering KeepTheOriginalOrder = FirstTheWorst
 
-extractFeaturesAndPValues :: Monad m => ConduitT (Double, LineRecord) FeatureWithPValue (StateT Integer m) ()
-extractFeaturesAndPValues =
+extractFeaturesAndPValues :: Monad m => GEvalSpecification -> ConduitT (Double, LineRecord) FeatureWithPValue (StateT Integer m) ()
+extractFeaturesAndPValues spec =
   totalCounter
-  .| featureExtractor
+  .| featureExtractor spec
   .| uScoresCounter
 
 
@@ -122,15 +122,15 @@ formatFeatureWithPValue (FeatureWithPValue f p avg c) =
                               (pack $ printf "%0.8f" avg),
                               (pack $ printf "%0.20f" p)]
 
-featureExtractor :: Monad m => ConduitT (Double, LineRecord) RankedFeature m ()
-featureExtractor = CC.map extract .| CC.concat
+featureExtractor :: Monad m => GEvalSpecification -> ConduitT (Double, LineRecord) RankedFeature m ()
+featureExtractor spec = CC.map extract .| CC.concat
   where extract (rank, LineRecord inLine expLine outLine _ score) =
           Prelude.map (\f -> RankedFeature f rank score)
           $ Data.List.concat [
-              extractUnigramFeatures "exp" expLine,
-              extractUnigramFeaturesFromTabbed "in" inLine,
-              extractUnigramFeatures "out" outLine]
-
+              extractUnigramFeatures mTokenizer "exp" expLine,
+              extractUnigramFeaturesFromTabbed mTokenizer "in" inLine,
+              extractUnigramFeatures mTokenizer "out" outLine]
+        mTokenizer = gesTokenizer spec
 uScoresCounter :: Monad m => ConduitT RankedFeature FeatureWithPValue (StateT Integer m) ()
 uScoresCounter = CC.map (\(RankedFeature feature r score) -> (feature, (r, score, 1)))
                  .| gobbleAndDo countUScores
