@@ -9,14 +9,16 @@ import Data.Monoid ((<>))
 
 import Text.Regex.PCRE.Heavy
 
-data Tokenizer = V13a
+data Tokenizer = V13a | V14International
   deriving (Eq)
 
 instance Show Tokenizer where
   show V13a = "13a"
+  show V14International = "v14"
 
 instance Read Tokenizer where
   readsPrec _ ('1':'3':'a':theRest) = [(V13a, theRest)]
+  readsPrec _ ('v':'1':'4':theRest) = [(V14International, theRest)]
 
 tokenize :: Maybe Tokenizer -> T.Text -> [T.Text]
 tokenize mTokenizer = T.words . (tokenizeWithSpaces mTokenizer)
@@ -28,8 +30,22 @@ tokenizeTabSeparatedWithSpaces tokenizer@(Just _) t =
   $ map (tokenizeWithSpaces tokenizer)
   $ T.splitOn "\t" t
 
+space :: T.Text
+space = " "
+
 tokenizeWithSpaces :: Maybe Tokenizer -> T.Text -> T.Text
 tokenizeWithSpaces Nothing t = t
+-- tokenization following the official BLEU implementation
+-- https://github.com/moses-smt/mosesdecoder/blob/master/scripts/generic/mteval-v14.pl#L954-L983
+-- cf. tokenize_v14_international function in sacrebleu evaluator
+tokenizeWithSpaces (Just V14International) t =
+  T.strip tTokenized
+  where tTokenized =
+          gsub [re|\p{S}|] (\s -> space <> s <> space)
+          $ gsub [re|(\p{P})([^\d])|] (\(p:n:_) -> p <> space <> n)
+          $ gsub [re|([^\d])(\p{P})|] (\(n:p:_) -> n <> space <> p) t
+-- tokenization equivalent to mteval-v13a
+-- cf. tokenize_13a function in sacrebleu evaluator
 tokenizeWithSpaces (Just V13a) t = T.strip tTokenized
   where tTokenized =
           gsub [re|([0-9])(-)|] (\(c:p:_) -> c <> space <> p)
@@ -45,4 +61,3 @@ tokenizeWithSpaces (Just V13a) t = T.strip tTokenized
           $ T.replace "\n" " "
           $ T.replace "-\n" ""
           $ T.replace "<skipped>" "" t
-        space = " " :: T.Text
