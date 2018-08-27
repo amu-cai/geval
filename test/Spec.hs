@@ -12,6 +12,7 @@ import GEval.ClusteringMetrics
 import GEval.BIO
 import GEval.LineByLine
 import GEval.ParseParams
+import GEval.Submit
 import Text.Tokenizer
 import Data.Attoparsec.Text
 import Options.Applicative
@@ -21,6 +22,13 @@ import Text.EditDistance
 import Data.Map.Strict
 
 import Data.Conduit.List (consume)
+
+import System.Directory
+import System.Process
+import System.Exit
+import System.IO
+import System.IO.Temp
+import System.IO.Silently
 
 import qualified Test.HUnit as HU
 
@@ -398,6 +406,44 @@ main = hspec $ do
       tokenize (Just V13a) "To be or not to be, that's the question." `shouldBe`
         ["To", "be", "or", "not", "to", "be",
          ",", "that's", "the", "question", "."]
+  describe "submit" $ do
+    it "current branch" $ do
+      runGitTest "branch-test" (\_ -> getCurrentBranch) `shouldReturn` "develop"
+    it "challengeId" $ do
+      runGitTest "challengeId-test" (
+        \_ -> do
+          path <- makeAbsolute "challenge01"
+          setCurrentDirectory path
+          getChallengeId) `shouldReturn` "challenge01"
+    it "everything committed - positive" $ do
+      runGitTest "everythingCommitted-test-pos" (\_ -> checkEverythingCommitted) `shouldReturn` ()
+    it "everything committed - negative" $ do
+      hSilence [stderr] $ runGitTest "everythingCommitted-test-neg" (\_ -> checkEverythingCommitted) `shouldThrow` (== ExitFailure 1)
+    it "remote synced - positive" $ do
+      runGitTest "remoteSynced-test-pos" (\_ -> checkRemoteSynced) `shouldReturn` ()
+    it "remote synced - negative" $ do
+      hSilence [stderr] $ runGitTest "remoteSynced-test-neg" (\_ -> checkRemoteSynced) `shouldThrow` (== ExitFailure 1)
+    it "remote url" $ do
+      runGitTest "remoteUrl-test" (\_ -> getRemoteUrl "origin") `shouldReturn` "git@git.example.com:example/example.git"
+    it "repo root" $ do
+      runGitTest "repoRoot-test" (
+        \path -> do
+          subpath <- makeAbsolute "A/B"
+          setCurrentDirectory subpath
+          root <- getRepoRoot
+          return $ root == path
+        ) `shouldReturn` True
+    it "no token" $ do
+      runGitTest "token-test-no" (\_ -> readToken) `shouldReturn` Nothing
+    it "read token" $ do
+      runGitTest "token-test-yes" (\_ -> readToken) `shouldReturn` (Just "AAAA")
+    it "write-read token" $ do
+      runGitTest "token-test-no" (
+        \_ -> do
+          writeToken "BBBB"
+          token <- readToken
+          return $ token == (Just "BBBB")
+       ) `shouldReturn` True
 
 checkConduitPure conduit inList expList = do
   let outList = runConduitPure $ CC.yieldMany inList .| conduit .| CC.sinkList
@@ -458,3 +504,13 @@ shouldBeAlmost got expected = got @=~? expected
 
 shouldReturnAlmost :: (AEq a, Show a, Eq a) => IO a -> a -> Expectation
 shouldReturnAlmost action expected = action >>= (@=~? expected)
+
+runGitTest :: String -> (FilePath -> IO a) -> IO a
+runGitTest name callback = do
+  withTempDirectory "/tmp" "geval-submit-test" $ \temp -> do
+    copyFile ("test/_submit-tests/" ++ name ++ ".tar") (temp ++ "/" ++ name ++ ".tar")
+    withCurrentDirectory temp $ do
+      callCommand $ "tar xf " ++ name ++ ".tar"
+    let testRoot = temp ++ "/" ++ name
+    withCurrentDirectory testRoot $ do
+      callback testRoot

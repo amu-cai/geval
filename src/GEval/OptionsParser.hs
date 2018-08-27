@@ -25,6 +25,7 @@ import Data.Monoid ((<>))
 import GEval.Core
 import GEval.CreateChallenge
 import GEval.LineByLine
+import GEval.Submit (submit)
 
 import Data.Conduit.SmartSource
 
@@ -68,7 +69,13 @@ optionsParser = GEvalOptions
                 (flag' JustTokenize
                     ( long "just-tokenize"
                       <> short 'j'
-                      <> help "Just tokenise standard input and print out the tokens (separated by spaces) on the standard output. rather than do any evaluation. The --tokenizer option must be given.")))
+                      <> help "Just tokenise standard input and print out the tokens (separated by spaces) on the standard output. rather than do any evaluation. The --tokenizer option must be given."))
+                <|>
+                (flag' Submit
+                    ( long "submit"
+                      <> short 'S'
+                      <> help "Submit current solution for evalution to an external Gonito instance specified with --gonito-host option. Optionally, specify --token."))
+                )
 
    <*> ((flag' FirstTheWorst
          (long "sort"
@@ -136,6 +143,18 @@ specParser = GEvalSpecification
          <> short 'T'
          <> metavar "TOKENIZER"
          <> help "Tokenizer on expected and actual output before running evaluation (makes sense mostly for metrics such BLEU), minimalistic, 13a and v14 tokenizers are implemented so far. Will be also used for tokenizing text into features when in --worst-features and --most-worsening-features modes." ))
+  <*> ( optional . strOption $
+        ( long "gonito-host"
+          <> metavar "GONITO_HOST"
+          <> help "Submit ONLY: Gonito instance location."
+        )
+      )
+  <*> ( optional . strOption $
+        ( long "token"
+          <> metavar "TOKEN"
+          <> help "Submit ONLY: Token for authorization with Gonito instance."
+        )
+      )
 
 singletonMaybe :: Maybe a -> Maybe [a]
 singletonMaybe (Just x) = Just [x]
@@ -229,6 +248,9 @@ runGEval''' (Just (MostWorseningFeatures otherOut)) ordering spec = do
   return Nothing
 runGEval''' (Just JustTokenize) _ spec = do
   justTokenize (gesTokenizer spec)
+  return Nothing
+runGEval''' (Just Submit) _ spec = do
+  submit (gesGonitoHost spec) (gesToken spec)
   return Nothing
 
 initChallenge :: GEvalSpecification -> IO ()

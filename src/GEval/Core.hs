@@ -216,7 +216,9 @@ data GEvalSpecification = GEvalSpecification
                             gesInputFile :: String,
                             gesMetrics :: [Metric],
                             gesPrecision :: Maybe Int,
-                            gesTokenizer :: Maybe Tokenizer }
+                            gesTokenizer :: Maybe Tokenizer,
+                            gesGonitoHost :: Maybe String,
+                            gesToken :: Maybe String }
 
 gesMainMetric :: GEvalSpecification -> Metric
 gesMainMetric spec = case gesMetrics spec of
@@ -235,7 +237,7 @@ getExpectedDirectory spec = fromMaybe outDirectory $ gesExpectedDirectory spec
 data GEvalSpecialCommand = Init
                            | LineByLine | WorstFeatures
                            | Diff FilePath | MostWorseningFeatures FilePath
-                           | PrintVersion | JustTokenize
+                           | PrintVersion | JustTokenize | Submit
 
 data ResultOrdering = KeepTheOriginalOrder | FirstTheWorst | FirstTheBest
 
