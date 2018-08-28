@@ -295,7 +295,9 @@ defaultGEvalSpecification = GEvalSpecification {
   gesInputFile = defaultInputFile,
   gesMetrics = [defaultMetric],
   gesPrecision = Nothing,
-  gesTokenizer = Nothing}
+  gesTokenizer = Nothing,
+  gesGonitoHost = Nothing,
+  gesToken = Nothing }
 
 isEmptyFile :: FilePath -> IO (Bool)
 isEmptyFile path = do

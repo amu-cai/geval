@@ -1,6 +1,7 @@
 module GEval.Submit (
   submit,
 
+  tokenFileName,
   getToken,
   readToken,
   writeToken,
@@ -24,29 +25,44 @@ import System.Exit
 import System.Directory
 import System.FilePath
 
+import Data.List (isPrefixOf)
+
 import Network.HTTP.Simple
 import Network.URI.Encode (encode)
 import qualified Data.ByteString.Char8 as BS
 
+tokenFileName :: String
+tokenFileName = ".token"
+
 submit :: Maybe String -> Maybe String -> IO ()
-submit Nothing _ = failWith "ERROR: Please provide --gonito-host"
+submit Nothing _ = failWith "Please provide a Gonito host with --gonito-host option"
 submit (Just host) tok = do
-  token <- getToken tok
   branch <- getCurrentBranch
   challengeId <- getChallengeId
   repoUrl <- getRemoteUrl "origin"
   if branch == "master" || branch == "dont-peek" then
-    failWith $  "ERROR: Run on prohibited branch " ++ branch
+    failWith $  "Run on prohibited branch " ++ branch
   else do
     checkEverythingCommitted
     checkRemoteSynced
+    token <- getToken tok
     trigger host token branch challengeId repoUrl
 
 trigger :: String -> String -> String -> String -> String -> IO ()
 trigger host token branch challengeId repoUrl = do
+    putStrLn $ "triggering: " ++ url
     req <- parseRequest url
-    httpBS req >>= BS.putStrLn . getResponseBody
-  where url = "POST http://" ++ host ++ "/trigger-remotely?token=" ++ (encode token) ++ "&branch=" ++ (encode branch) ++ "&challenge=" ++ (encode challengeId) ++ "&url=" ++ (encode repoUrl)
+    let params = map (\(pname, pval) -> (BS.pack $ pname, BS.pack $ pval)) [
+          ("challenge", challengeId),
+          ("branch", branch),
+          ("token", token),
+          ("url", repoUrl)]
+    let req' = setRequestBodyURLEncoded params req
+    httpBS req' >>= BS.putStrLn . getResponseBody
+  where url = "POST " ++ hostWithProtocol ++ "/trigger-remotely"
+        hostWithProtocol = if ("http://" `isPrefixOf` host) || ("https://" `isPrefixOf` host)
+                           then host
+                           else ("http://" ++ host)
 
 getToken :: Maybe String -> IO String
 getToken (Just token) = do
@@ -54,7 +70,7 @@ getToken (Just token) = do
   case dotToken of
     Just token' -> do
       if token /= token' then do
-        putStrLn "WARNING: Token found in .token file is different then one specified through commandline. Overwrite? [Y/N]:"
+        putStrLn ("WARNING: Token found in " ++ tokenFileName ++ " file is different then one specified through commandline. Overwrite? [Y/N]:")
         answer <- getChar
         case toLower answer of
           'y' -> writeToken token
@@ -78,7 +94,7 @@ checkEverythingCommitted = do
   (code, _, _) <- readCreateProcessWithExitCode (shell "git diff-index --quiet HEAD --") ""
   case code of
     ExitSuccess -> return ()
-    ExitFailure _ -> failWith "ERROR: Uncommitted changes."
+    ExitFailure _ -> failWith "Uncommitted changes. Please commit, push and re-run submitting."
 
 checkRemoteSynced :: IO ()
 checkRemoteSynced = do
@@ -90,7 +106,7 @@ checkRemoteSynced = do
   if localHash == remoteHash then
     return ()
   else
-    failWith "ERROR: Changes are not merged with remote branch."
+    failWith "Changes are not merged with remote branch."
 
 getCurrentBranch :: IO String
 getCurrentBranch = runCommand "git rev-parse --abbrev-ref HEAD"
@@ -105,7 +121,7 @@ getRepoRoot :: IO String
 getRepoRoot = runCommand "git rev-parse --show-toplevel"
 
 tokenFilePath :: IO String
-tokenFilePath = (++ "/.token" ) <$> getRepoRoot
+tokenFilePath = (++ "/" ++ tokenFileName ) <$> getRepoRoot
 
 readToken :: IO (Maybe String)
 readToken = do
@@ -114,13 +130,13 @@ readToken = do
     (Just . takeWhile (/= '\n') <$> readFile file)
     (\e -> if isDoesNotExistError e
            then return Nothing
-           else failWith "ERROR: Unable to read .token file" >> return Nothing
+           else failWith ("Unable to read " ++ tokenFileName ++ " file") >> return Nothing
     )
 
 writeToken :: String -> IO ()
 writeToken token = do
   file <- tokenFilePath
-  catchIOError (writeFile file token) (\_ -> failWith "ERROR: Unable to write .token file")
+  catchIOError (writeFile file token) (\_ -> failWith $ "Unable to write " ++ tokenFileName ++ " file")
 
 runCommand :: String -> IO String
 runCommand cmd = do
@@ -128,4 +144,4 @@ runCommand cmd = do
   return $ takeWhile (/= '\n') content
 
 failWith :: String -> IO ()
-failWith msg = hPutStrLn stderr msg >> exitFailure
+failWith msg = hPutStrLn stderr ("ERROR: " ++ msg) >> exitFailure

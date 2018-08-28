@@ -320,7 +320,9 @@ main = hspec $ do
             gesInputFile = "in.tsv",
             gesMetrics = [Likelihood],
             gesPrecision = Nothing,
-            gesTokenizer = Nothing }
+            gesTokenizer = Nothing,
+            gesGonitoHost = Nothing,
+            gesToken = Nothing }
     it "simple test" $ do
       results <- runLineByLineGeneralized KeepTheOriginalOrder sampleChallenge Data.Conduit.List.consume
       Prelude.map (\(LineRecord inp _ _ _ _) -> inp) results `shouldBe` ["foo",

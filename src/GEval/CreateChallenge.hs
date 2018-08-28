@@ -5,6 +5,7 @@ module GEval.CreateChallenge
        where
 
 import GEval.Core
+import GEval.Submit (tokenFileName)
 import qualified System.Directory as D
 import Control.Conditional (whenM)
 
@@ -579,4 +580,4 @@ gitignoreContents = [hereLit|
 *.pyc
 *.o
 .DS_Store
-|]
+|] ++ tokenFileName ++ "\n"
