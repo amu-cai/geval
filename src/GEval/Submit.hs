@@ -50,7 +50,8 @@ submit (Just host) tok = do
 
 trigger :: String -> String -> String -> String -> String -> IO ()
 trigger host token branch challengeId repoUrl = do
-    putStrLn $ "triggering: " ++ url
+    putStrLn $ "Triggering: " ++ url
+    putStrLn "Please wait, it may take some time"
     req <- parseRequest url
     let params = map (\(pname, pval) -> (BS.pack $ pname, BS.pack $ pval)) [
           ("challenge", challengeId),

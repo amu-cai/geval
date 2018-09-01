@@ -74,7 +74,7 @@ optionsParser = GEvalOptions
                 (flag' Submit
                     ( long "submit"
                       <> short 'S'
-                      <> help "Submit current solution for evalution to an external Gonito instance specified with --gonito-host option. Optionally, specify --token."))
+                      <> help "Submit current solution for evaluation to an external Gonito instance specified with --gonito-host option. Optionally, specify --token."))
                 )
 
    <*> ((flag' FirstTheWorst

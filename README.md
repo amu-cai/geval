@@ -61,7 +61,7 @@ have a look at the first 5 items:
 Now let's try to evaluate some solution to this challenge. Let's fetch it:
 
     git fetch git://gonito.net/sentiment-by-emoticons submission-01865
-    git reset --hard FECH_HEAD
+    git reset --hard FETCH_HEAD
 
 and now run geval:
 
@@ -203,7 +203,38 @@ be nice and commit also your source codes.
     git commit -m 'my solution to the challenge'
     git push mine master
 
-Then let Gonito pull them and evaluate your results.
+Then let Gonito pull them and evaluate your results, either manually clicking
+"submit" at the Gonito web site or using `--submit` option (see below).
+
+### Submitting a solution to a Gonito platform with GEval
+
+A solution to a machine learning challenge can be submitted with the
+special `--submit` option:
+
+    geval --submit --host HOST --token TOKEN
+
+where:
+
+* _HOST_ is the name of the host with a Gonito platform
+* _TOKEN_ is a special per-user authorisation token (can be copied
+  from "your account" page)
+
+_HOST_ must be given when `--submit` is used (unless the creator of the challenge
+put `--host` option in the `config.txt` file, note that in such a case using
+`--host` option will result in an error).
+
+If _TOKEN_ was not given, GEval attempts to read it from the `.token`
+file, and if the `.token` file does not exist, the user is asked to
+type it (and then the token is cached in `.token` file).
+
+GEval with `--submit` does not commit or push changes, this needs to
+be done before running `geval --submit`. On the other hand, GEval will
+check whether the changes were committed and pushed.
+
+Note that using `--submit` option for the main instance at
+<https://gonito.net> is usually **NOT** needed, as the git
+repositories are configured there in such a way that an evaluation is
+triggered with each push anyway.
 
 ## `geval` options
 
@@ -246,7 +277,7 @@ Available options:
                            (separated by spaces) on the standard output. rather
                            than do any evaluation. The --tokenizer option must
                            be given.
-  -S,--submit              Submit current solution for evalution to an external
+  -S,--submit              Submit current solution for evaluation to an external
                            Gonito instance specified with --gonito-host option.
                            Optionally, specify --token.
   -s,--sort                When in line-by-line or diff mode, sort the results
