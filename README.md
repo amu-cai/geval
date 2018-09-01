@@ -211,7 +211,7 @@ Then let Gonito pull them and evaluate your results, either manually clicking
 A solution to a machine learning challenge can be submitted with the
 special `--submit` option:
 
-    geval --submit --host HOST --token TOKEN
+    geval --submit --gonito-host HOST --token TOKEN
 
 where:
 
@@ -220,8 +220,8 @@ where:
   from "your account" page)
 
 _HOST_ must be given when `--submit` is used (unless the creator of the challenge
-put `--host` option in the `config.txt` file, note that in such a case using
-`--host` option will result in an error).
+put `--gonito-host` option in the `config.txt` file, note that in such a case using
+`--gonito-host` option will result in an error).
 
 If _TOKEN_ was not given, GEval attempts to read it from the `.token`
 file, and if the `.token` file does not exist, the user is asked to
