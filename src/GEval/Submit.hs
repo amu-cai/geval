@@ -101,15 +101,25 @@ checkRemoteSynced = do
   (_, _, _, pr) <- createProcess (shell "git fetch")
   waitForProcess pr
   localHash <- runCommand "git rev-parse HEAD"
-  remoteTrackingBranch <- runCommand "git rev-parse --abbrev-ref --symbolic-full-name @{u}"
-  remoteHash <- runCommand $ "git rev-parse " ++ remoteTrackingBranch
-  if localHash == remoteHash then
-    return ()
-  else
-    failWith "Changes are not merged with remote branch."
+  mRemoteTrackingBranch <- getRemoteTrackingBranch
+  case mRemoteTrackingBranch of
+    Just remoteTrackingBranch -> do
+      remoteHash <- runCommand $ "git rev-parse " ++ remoteTrackingBranch
+      if localHash == remoteHash then
+        return ()
+      else
+        failWith "Changes are not merged with remote branch."
+    Nothing -> failWith "No tracking branch found, use `git push -u origin BRANCH_NAME`"
 
 getCurrentBranch :: IO String
 getCurrentBranch = runCommand "git rev-parse --abbrev-ref HEAD"
+
+getRemoteTrackingBranch :: IO (Maybe String)
+getRemoteTrackingBranch = do
+  (code, content, _) <- readCreateProcessWithExitCode (shell "git rev-parse --abbrev-ref --symbolic-full-name @{u}") ""
+  case code of
+    ExitSuccess -> return $ Just $ takeWhile (/= '\n') content
+    ExitFailure _ -> return Nothing
 
 getRemoteUrl :: String -> IO String
 getRemoteUrl remote = runCommand $ "git config --get remote." ++ remote ++ ".url"
