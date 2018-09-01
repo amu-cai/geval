@@ -208,21 +208,47 @@ Then let Gonito pull them and evaluate your results.
 ## `geval` options
 
 ```
-Usage: geval ([--init] | [-l|--line-by-line] | [-d|--diff OTHER-OUT])
-             ([-s|--sort] | [-r|--reverse-sort]) [--out-directory OUT-DIRECTORY]
+geval - stand-alone evaluation tool for tests in Gonito platform
+
+Usage: geval ([--init] | [-v|--version] | [-l|--line-by-line] |
+             [-w|--worst-features] | [-d|--diff OTHER-OUT] |
+             [-m|--most-worsening-features ARG] | [-j|--just-tokenize] |
+             [-S|--submit]) ([-s|--sort] | [-r|--reverse-sort])
+             [--out-directory OUT-DIRECTORY]
              [--expected-directory EXPECTED-DIRECTORY] [-t|--test-name NAME]
              [-o|--out-file OUT] [-e|--expected-file EXPECTED]
              [-i|--input-file INPUT] [-a|--alt-metric METRIC]
              [-m|--metric METRIC] [-p|--precision NUMBER-OF-FRACTIONAL-DIGITS]
+             [-T|--tokenizer TOKENIZER] [--gonito-host GONITO_HOST]
+             [--token TOKEN]
   Run evaluation for tests in Gonito platform
 
 Available options:
   -h,--help                Show this help text
   --init                   Init a sample Gonito challenge rather than run an
                            evaluation
+  -v,--version             Print GEval version
   -l,--line-by-line        Give scores for each line rather than the whole test
                            set
-  -d,--diff OTHER-OUT      compare results
+  -w,--worst-features      Print a ranking of worst features, i.e. features that
+                           worsen the score significantly. Features are sorted
+                           using p-value for Mann-Whitney U test comparing the
+                           items with a given feature and without it. For each
+                           feature the number of occurrences, average score and
+                           p-value is given.
+  -d,--diff OTHER-OUT      Compare results of evaluations (line by line) for two
+                           outputs.
+  -m,--most-worsening-features ARG
+                           Print a ranking of the "most worsening" features,
+                           i.e. features that worsen the score the most when
+                           comparing outputs from two systems.
+  -j,--just-tokenize       Just tokenise standard input and print out the tokens
+                           (separated by spaces) on the standard output. rather
+                           than do any evaluation. The --tokenizer option must
+                           be given.
+  -S,--submit              Submit current solution for evalution to an external
+                           Gonito instance specified with --gonito-host option.
+                           Optionally, specify --token.
   -s,--sort                When in line-by-line or diff mode, sort the results
                            from the worst to the best
   -r,--reverse-sort        When in line-by-line or diff mode, sort the results
@@ -245,11 +271,23 @@ Available options:
   -a,--alt-metric METRIC   Alternative metric (overrides --metric option)
   -m,--metric METRIC       Metric to be used - RMSE, MSE, Accuracy, LogLoss,
                            Likelihood, F-measure (specify as F1, F2, F0.25,
+                           etc.), multi-label F-measure (specify as
+                           MultiLabel-F1, MultiLabel-F2, MultiLabel-F0.25,
                            etc.), MAP, BLEU, NMI, ClippEU, LogLossHashed,
                            LikelihoodHashed, BIO-F1, BIO-F1-Labels or CharMatch
   -p,--precision NUMBER-OF-FRACTIONAL-DIGITS
                            Arithmetic precision, i.e. the number of fractional
                            digits to be shown
+  -T,--tokenizer TOKENIZER Tokenizer on expected and actual output before
+                           running evaluation (makes sense mostly for metrics
+                           such BLEU), minimalistic, 13a and v14 tokenizers are
+                           implemented so far. Will be also used for tokenizing
+                           text into features when in --worst-features and
+                           --most-worsening-features modes.
+  --gonito-host GONITO_HOST
+                           Submit ONLY: Gonito instance location.
+  --token TOKEN            Submit ONLY: Token for authorization with Gonito
+                           instance.
 ```
 
 If you need another metric, let me know, or do it yourself!
@@ -261,3 +299,7 @@ Apache License 2.0
 ## Authors
 
 Filip Graliński
+
+## Contributors
+
+Piotr Halama
