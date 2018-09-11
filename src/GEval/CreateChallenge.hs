@@ -52,6 +52,7 @@ createFile filePath contents = do
   writeFile filePath contents
 
 readmeMDContents :: Metric -> String -> String
+readmeMDContents GLEU testName = readmeMDContents BLEU testName
 readmeMDContents BLEU testName = [i|
 GEval sample machine translation challenge
 ==========================================
@@ -313,6 +314,7 @@ configContents metrics precision testName = unwords (Prelude.map (\metric -> ("-
           precisionOpt (Just p) = " --precision " ++ (show p)
 
 trainContents :: Metric -> String
+trainContents GLEU = trainContents BLEU
 trainContents BLEU = [hereLit|alussa loi jumala taivaan ja maan	he mea hanga na te atua i te timatanga te rangi me te whenua
 ja maa oli autio ja tyhjä , ja pimeys oli syvyyden päällä	a kahore he ahua o te whenua , i takoto kau ; he pouri ano a runga i te mata o te hohonu
 ja jumalan henki liikkui vetten päällä	na ka whakapaho te wairua o te atua i runga i te kare o nga wai
@@ -384,6 +386,7 @@ trainContents _ = [hereLit|0.06	0.39	0	0.206
 |]
 
 devInContents :: Metric -> String
+devInContents GLEU = devInContents BLEU
 devInContents BLEU = [hereLit|ja jumala sanoi : " tulkoon valkeus " , ja valkeus tuli
 ja jumala näki , että valkeus oli hyvä ; ja jumala erotti valkeuden pimeydestä
 |]
@@ -431,6 +434,7 @@ devInContents _ = [hereLit|0.72	0	0.007
 |]
 
 devExpectedContents :: Metric -> String
+devExpectedContents GLEU = devExpectedContents BLEU
 devExpectedContents BLEU = [hereLit|a ka ki te atua , kia marama : na ka marama
 a ka kite te atua i te marama , he pai : a ka wehea e te atua te marama i te pouri
 |]
@@ -478,6 +482,7 @@ devExpectedContents _ = [hereLit|0.82
 |]
 
 testInContents :: Metric -> String
+testInContents GLEU = testInContents BLEU
 testInContents BLEU = [hereLit|ja jumala kutsui valkeuden päiväksi , ja pimeyden hän kutsui yöksi
 ja tuli ehtoo , ja tuli aamu , ensimmäinen päivä
 |]
@@ -524,6 +529,7 @@ I hate
 |]
 
 testExpectedContents :: Metric -> String
+testExpectedContents GLEU = testExpectedContents BLEU
 testExpectedContents BLEU = [hereLit|na ka huaina e te atua te marama ko te awatea , a ko te pouri i huaina e ia ko te po
 a ko te ahiahi , ko te ata , he ra kotahi
 |]

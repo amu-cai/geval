@@ -97,7 +97,7 @@ defaultLogLossHashedSize :: Word32
 defaultLogLossHashedSize = 10
 
 -- | evaluation metric
-data Metric = RMSE | MSE | BLEU | Accuracy | ClippEU | FMeasure Double | NMI
+data Metric = RMSE | MSE | BLEU | GLEU | Accuracy | ClippEU | FMeasure Double | NMI
               | LogLossHashed Word32 | CharMatch | MAP | LogLoss | Likelihood
               | BIOF1 | BIOF1Labels | LikelihoodHashed Word32 | MAE | MultiLabelFMeasure Double
               | MultiLabelLogLoss | MultiLabelLikelihood
@@ -107,6 +107,7 @@ instance Show Metric where
   show RMSE = "RMSE"
   show MSE  = "MSE"
   show BLEU = "BLEU"
+  show GLEU = "GLEU"
   show Accuracy = "Accuracy"
   show ClippEU = "ClippEU"
   show (FMeasure beta) = "F" ++ (show beta)
@@ -138,6 +139,7 @@ instance Read Metric where
   readsPrec _ ('R':'M':'S':'E':theRest) = [(RMSE, theRest)]
   readsPrec _ ('M':'S':'E':theRest) = [(MSE, theRest)]
   readsPrec _ ('B':'L':'E':'U':theRest) = [(BLEU, theRest)]
+  readsPrec _ ('G':'L':'E':'U':theRest) = [(GLEU, theRest)]
   readsPrec _ ('A':'c':'c':'u':'r':'a':'c':'y':theRest) = [(Accuracy, theRest)]
   readsPrec _ ('C':'l':'i':'p':'p':'E':'U':theRest) = [(ClippEU, theRest)]
   readsPrec _ ('N':'M':'I':theRest) = [(NMI, theRest)]
@@ -172,6 +174,7 @@ getMetricOrdering :: Metric -> MetricOrdering
 getMetricOrdering RMSE     = TheLowerTheBetter
 getMetricOrdering MSE      = TheLowerTheBetter
 getMetricOrdering BLEU     = TheHigherTheBetter
+getMetricOrdering GLEU     = TheHigherTheBetter
 getMetricOrdering Accuracy = TheHigherTheBetter
 getMetricOrdering ClippEU  = TheHigherTheBetter
 getMetricOrdering (FMeasure _) = TheHigherTheBetter
@@ -515,6 +518,12 @@ gevalCore' BLEU _ = gevalCoreWithoutInput (Right . Prelude.map Prelude.words . D
           | c >= r = 1.0
           | c == 0 && r > 0 = 0.0
           | otherwise = exp (1.0 - (r /. c))
+
+gevalCore' GLEU _ = gevalCoreWithoutInput (Right . Prelude.map Prelude.words . DLS.splitOn "\t" . unpack) (Right . Prelude.words . unpack) gleuCombine gleuAgg gleuFinal
+  where gleuFinal (m, t) = m /. t
+        gleuCombine (refs, sen) = gleuStep refs sen
+        gleuAgg = CC.foldl gleuFuse (0, 0)
+        gleuFuse (a1, a2) (b1, b2) = (a1+b1, a2+b2)
 
 gevalCore' Accuracy _ = gevalCoreWithoutInput (Right . strip) (Right . strip) hitOrMiss averageC id
                       where hitOrMiss (exp, got) =
