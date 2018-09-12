@@ -84,6 +84,10 @@ main = hspec $ do
   describe "GLEU" $ do
     it "simple example" $
       runGEvalTest "gleu-simple" `shouldReturnAlmost` 0.462962962962963
+    it "empty translation" $
+      runGEvalTest "gleu-empty" `shouldReturnAlmost` 0.0
+    it "perfect translation" $
+      runGEvalTest "gleu-perfect" `shouldReturnAlmost` 1.0
   describe "Accuracy" $ do
     it "simple example" $
       runGEvalTest "accuracy-simple" `shouldReturnAlmost` 0.6
@@ -477,6 +481,11 @@ testMatchFun _ _ = False
 
 extractVal :: (Either (ParserResult GEvalOptions) (Maybe [(SourceSpec, [MetricValue])])) -> IO MetricValue
 extractVal (Right (Just ([(_, val:_)]))) = return val
+extractVal (Right Nothing) = return $ error "no metrics???"
+extractVal (Right (Just [])) = return $ error "emtpy metric list???"
+extractVal (Left result) = do
+  handleParseResult result
+  return $ error "something wrong"
 
 runGEvalTest = runGEvalTestExtraOptions []
 
