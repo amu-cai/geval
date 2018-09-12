@@ -73,6 +73,7 @@ library
                      , pcre-heavy
                      , process
                      , uri-encode
+                     , MissingH
   default-language:    Haskell2010
 
 executable geval

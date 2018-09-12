@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE QuasiQuotes #-}
 
 module GEval.ParseParams(parseParamsFromFilePath,
                          parseParamsFromSourceSpec,
@@ -8,6 +9,12 @@ module GEval.ParseParams(parseParamsFromFilePath,
 import Data.Map.Strict as M
 import Data.Text
 import Data.Attoparsec.Text
+
+import Text.Regex.PCRE.Heavy
+
+import Data.Monoid ((<>))
+
+import qualified Data.String.Utils as DSU
 
 import System.FilePath
 
@@ -22,7 +29,17 @@ parseParamsFromSourceSpec spec = OutputFileParsed (recoverPath spec) M.empty
 
 parseParamsFromFilePath :: FilePath -> OutputFileParsed
 parseParamsFromFilePath filePath = parseParamsFromBaseName fileBaseName
-  where fileBaseName = dropExtensions $ takeBaseName filePath
+  where fileBaseName = backDecimalSeparator $ dropExtensions $ hideDecimalSeparator $ takeBaseName filePath
+
+dotReplacement :: Char
+dotReplacement = '•'
+
+hideDecimalSeparator :: String -> String
+hideDecimalSeparator = gsub [re|([0-9])\.([0-9])|] (\(a:b:_) -> a <> [dotReplacement] <> b)
+
+backDecimalSeparator :: String -> String
+backDecimalSeparator = DSU.replace [dotReplacement] "."
+
 
 parseParamsFromBaseName :: FilePath -> OutputFileParsed
 parseParamsFromBaseName baseName = case parseOnly (parser <* endOfInput) (pack baseName) of
