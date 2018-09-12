@@ -131,7 +131,11 @@ Format of the output files
 --------------------------
 
 For each input line, a probability distribution for words in a gap
-must be given:
+must be given with either logprobs or probs.
+
+### Logprobs
+
+The distribution could be given with logprobs:
 
     word1:logprob1 word2:logprob2 ... wordN:logprobN :logprob0
 
@@ -142,8 +146,7 @@ respective probabilities do not sum up to 1:
 
   * if the sum is larger than 0.0 and smaller than 1.0, and no logprob0
     is given, log of the remaining probablity mass will be assigned to logprob0,
-  * otherwise they will be normalised with.
-softmax
+  * otherwise they will be normalised with softmax.
 
 Note: the separator here is space, not TAB!
 

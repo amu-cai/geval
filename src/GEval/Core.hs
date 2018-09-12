@@ -283,7 +283,7 @@ instance Show GEvalException where
   show TooManyLinesInInput = "Too many lines in the input file"
   show EmptyOutput = "The output file is empty"
   show (UnexpectedData lineNo message) = "Line " ++ (show lineNo) ++ ": Unexpected data [" ++ message ++ "]"
-  show UnexpectedMultipleOutputs = "Multiple outputs are not possible in this mode"
+  show UnexpectedMultipleOutputs = "Multiple outputs are not possible in this mode, use -o option to select an output file"
 
 somethingWrongWithFilesMessage :: String -> FilePath -> String
 somethingWrongWithFilesMessage msg filePath = Prelude.concat
