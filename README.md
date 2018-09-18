@@ -44,7 +44,111 @@ order to run `geval` you need to either add `$HOME/.local/bin` to
     chmod u+x geval
     ./geval --help
 
-## Examples
+## Quick tour
+
+Let's use GEval to evaluate machine translation (MT) systems (but keep in
+mind than GEval could be used for many other machine learning task
+types).
+
+First, we will run GEval on WMT-2017, a German-to-English machine
+translation challenge repackaged for [Gonito.net](https://gonito.net)
+platform and available there (though, in a moment you'll see it can be
+run on other test sets, not just the ones conforming to specific
+Gonito.net standards). Let's download one of the solutions, it's just
+available via git, so you don't have to click anywhere, just type:
+
+    git clone git://gonito.net/wmt-2017 -b submission-01229
+
+Let's step into the repo and run GEval (I assume you added `geval`
+path to `$PATH`, so that you could just use `geval` instead of
+`/full/path/to/geval`):
+
+    cd submission-01229
+    geval
+
+Well, something went wrong:
+
+    geval: No file with the expected results: `./test-A/expected.tsv`
+
+The problem is that the official test set is hidden from you (although
+you can find it if you are determined...) You should try running GEval
+on the dev set instead:
+
+    geval -t dev-0
+
+and you'll see the result — 0.27358 in [BLEU
+metric](https://en.wikipedia.org/wiki/BLEU), which is the default
+metric for the WMT-2017 challenge. GEval could do the evaluation using
+other metrics, in case of machine translation, (Google) GLEU (alternative to
+BLEU) or simple accuracy might make sense:
+
+    geval -t dev-0 --metric GLEU --metric Accuracy
+
+If you wait a moment, you'll see the results:
+
+    BLEU	0.27358
+    GLEU	0.31404
+    Accuracy	0.01660
+
+Ah, we forgot about the tokenization, in order to properly calculate
+BLEU (or GLEU) the way it was done within the official WMT-2017
+challenge, you need to tokenize the output of your system and the
+expected system using the right tokenizer:
+
+    geval -t dev-0 --metric GLEU --metric Accuracy --tokenizer 13a
+
+    BLEU	0.26901
+    GLEU	0.30514
+    Accuracy	0.01660
+
+The results do not look good anyway and I'm not talking about
+Accuracy, which even for a good MT (or even a human) will be low (as
+it measures how many translations are exactly the same as the golden
+standard), but rather about BLEU which is not impressive for this
+particular task. Actually, it's no wonder as the system we're
+evaluating now is a very simple neural machine translation baseline.
+Out of curiosity, let's have a look at the worst items, i.e. sentences
+for which the GLEU metric is the lowest (GLEU is better than BLEU for
+item-per-item evaluation); it's easy with GEval:
+
+    geval -t dev-0 --alt-metric GLEU --line-by-line --sort | head -n 10
+
+    0.0	Tanzfreudiger Nachwuchs gesucht	Dance-crazy youths wanted	Dance joyous offspring sought
+    0.0	Bulgarische Gefängnisaufseher protestieren landesweit	Bulgaria 's Prison Officers Stage National Protest	Bulgarian prison guards protest nationwide
+    0.0	Schiffe der Küstenwache versenkt	Coastguard ships sunk	Coast Guard vessels sinking
+    0.0	Gebraucht kaufen	Buying used	Needed buy
+    0.0	Mieten	Renting	Rentals
+    0.0	E-Books	E-books	E-Books
+    0.021739130434782608	Auch Reservierungen in Hotels gehen deutlich zurück.	There is even a marked decline in the number of hotel reservations .	Reservations also go back to hotels significantly .
+    0.023809523809523808	Steuerbelastung von Geschäftsleuten im Raum Washington steigt mit der wirtschaftlichen Erholung	Washington-area business owners " tax burden mounts as economy rebounds	Tax burden of businessmen in the Washington area rises with economic recovery
+    0.03333333333333333	Verwunderte Ärzte machten Röntgenaufnahmen seiner Brust und setzen Pleurakathether an, um Flüssigkeit aus den Lungen zu entnehmen und im Labor zu testen.	Puzzled doctors gave him chest X-rays , and administered pleural catheters to draw off fluid from the lungs and send it for assessment .	At the end of his life , she studied medicine at the time .
+    0.03333333333333333	Die Tradition der Schulabschlussbälle in den USA wird nun auf die Universitäten übertragen, wo Freshmen Auftritte mit dem Privatflugzeug angeboten werden.	US prom culture hits university life with freshers offered private jet entrances	The tradition of school leavers in the U.S. is now transferred to universities , where freshmen are offered appearances with the private plane .
+
+Well, this way we found some funny utterances for which even a single
+word was recovered, but could we get more insight?
+
+The good news is that you could use GEval to debug the MT system in a
+black-box manner to find its weak points -- --worst-features is the
+option to do this:
+
+    geval -t dev-0 --alt-metric GLEU --worst-features | head -n 10
+
+This command will find the top 10 "worst" features (in either input,
+expected output or actual output), i.e. the features which correlate
+with low GLEU values in the most significant way.
+
+    exp:"	346	0.27823151	0.00000909178949766883
+    out:&apos;&apos;	348	0.28014113	0.00002265047322460752
+    exp:castle	23	0.20197660	0.00006393156973075869
+    exp:be	191	0.27880383	0.00016009575605100586
+    exp:road	9	0.16307514	0.00025767878872874620
+    exp:out	78	0.26033671	0.00031551452260174863
+    exp:(	52	0.25348798	0.00068739029500072100
+    exp:)	52	0.25386216	0.00071404713888387060
+    exp:club	28	0.22958093	0.00078051481428704770
+    out:`	9	0.17131601	0.00079873676961809170
+
+## Another example
 
 Let us download a Gonito.net challenge:
 
