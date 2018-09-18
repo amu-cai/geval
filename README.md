@@ -52,7 +52,7 @@ types).
 
 First, we will run GEval on WMT-2017, a German-to-English machine
 translation challenge repackaged for [Gonito.net](https://gonito.net)
-platform and available there (though, in a moment you'll see it can be
+platform and [available there](https://gonito.net/challenge-readme/wmt-2017) (though, in a moment you'll see it can be
 run on other test sets, not just the ones conforming to specific
 Gonito.net standards). Let's download one of the solutions, it's just
 available via git, so you don't have to click anywhere, just type:
@@ -66,7 +66,7 @@ path to `$PATH`, so that you could just use `geval` instead of
     cd submission-01229
     geval
 
-Well, something went wrong:
+Well, something apparently went wrong:
 
     geval: No file with the expected results: `./test-A/expected.tsv`
 
@@ -92,8 +92,8 @@ If you wait a moment, you'll see the results:
 
 Ah, we forgot about the tokenization, in order to properly calculate
 BLEU (or GLEU) the way it was done within the official WMT-2017
-challenge, you need to tokenize the output of your system and the
-expected system using the right tokenizer:
+challenge, you need to tokenize the expected output and the actual
+output of your system using the right tokenizer:
 
     geval -t dev-0 --metric GLEU --metric Accuracy --tokenizer 13a
 
@@ -102,7 +102,7 @@ expected system using the right tokenizer:
     Accuracy	0.01660
 
 The results do not look good anyway and I'm not talking about
-Accuracy, which even for a good MT (or even a human) will be low (as
+Accuracy, which, even for a good MT (or even a human), will be low (as
 it measures how many translations are exactly the same as the golden
 standard), but rather about BLEU which is not impressive for this
 particular task. Actually, it's no wonder as the system we're
@@ -124,11 +124,11 @@ item-per-item evaluation); it's easy with GEval:
     0.03333333333333333	Verwunderte Ärzte machten Röntgenaufnahmen seiner Brust und setzen Pleurakathether an, um Flüssigkeit aus den Lungen zu entnehmen und im Labor zu testen.	Puzzled doctors gave him chest X-rays , and administered pleural catheters to draw off fluid from the lungs and send it for assessment .	At the end of his life , she studied medicine at the time .
     0.03333333333333333	Die Tradition der Schulabschlussbälle in den USA wird nun auf die Universitäten übertragen, wo Freshmen Auftritte mit dem Privatflugzeug angeboten werden.	US prom culture hits university life with freshers offered private jet entrances	The tradition of school leavers in the U.S. is now transferred to universities , where freshmen are offered appearances with the private plane .
 
-Well, this way we found some funny utterances for which even a single
+Well, this way, we found some funny utterances for which even a single
 word was recovered, but could we get more insight?
 
 The good news is that you could use GEval to debug the MT system in a
-black-box manner to find its weak points -- --worst-features is the
+black-box manner to order to find its weak points -- --worst-features is the
 option to do this:
 
     geval -t dev-0 --alt-metric GLEU --worst-features | head -n 10
@@ -147,6 +147,49 @@ with low GLEU values in the most significant way.
     exp:)	52	0.25386216	0.00071404713888387060
     exp:club	28	0.22958093	0.00078051481428704770
     out:`	9	0.17131601	0.00079873676961809170
+
+How to read the output like this?
+
+1. The feature (i.e. a word or token) found, prepended with a
+qualifier: `exp` for the expected output, `out` — the actul output,
+`in` — input.
+2. Number of occurrences.
+3. The mean score for all items (in our examples: sentences) with a given feature.
+For instance, the average GLEU score for sentences for which a double quote is expected
+is 0.27823151. At first glance, it does not seem much worse than the general score
+(0.30514), but actually…
+4. … it's highly significant. The probability to get it by chance
+(according to [Mann-Whitney _U_ test](https://en.wikipedia.org/wiki/Mann%E2%80%93Whitney_U_test))
+is extremely low (_p_ = 0.000009).
+
+But why were double quotes so problematic in German-English
+translation?! Well, look at the second worst feature — `&apos;&apos;`
+in the _output_! Oops, it seems like a very stupid mistake with
+post-processing was done and no double quote was correctly generated,
+which decreased the score a little bit for each sentence in which the
+quote was expected.
+
+When I fixed this simple bug, the BLUE metric increased from 0.27358
+to [0.27932](https://gonito.net/q/433e8cfdc4b5e20e276f4ddef5885c5ed5947ae5)!
+
+What about the third item — the word _castle_ in the expected output? Let's
+have a look at the examples with this word using `--line-by-line` option combined with grep:
+
+    geval -t dev-0 --alt-metric GLEU --line-by-line --sort | grep 'castle' | head -n 5
+
+    0.0660377358490566	Eine Wasserburg, die bei unserer nächsten Aufgabe gesucht wird, ist allerdings in der Höhe eher selten zu finden.	A moated castle , which we looked for as part of our next challenge , is , of course , rather hard to find way up high .	However , a watershed that is being sought in our next assignment is rather rare .
+    0.07142857142857142	Ziehen die Burgvereine bald wieder an einem Strang?	Will the Burgvereine ( castle clubs ) get back together again ?	Do the Burgundy clubs join forces soon ?
+    0.11290322580645161	Zuletzt gab es immer wieder Zwist zwischen den beiden Wolfratshauser Burgvereinen.	Recently there have been a lot of disputes between both of the castle groups in Wolfratshausen .	Last but not least , there has been a B.A. between the two Wolfratshauser Burgundy .
+    0.11650485436893204	Während die Burgfreunde um den plötzlich verstorbenen Richard Dimbath bis zuletzt einen Wiederaufbau der Burg am Bergwald im Auge hatten, steht für den Burgverein um Sjöberg die "Erschließung und Erlebbarmachung" des Geländes an vorderster Stelle.	Whereas the castle friends , and the recently deceased Richard Dimbath right up until the bitter end , had their eyes on reconstructing the castle in the mountain forest , the castle club , with Sjöberg , want to " develop and bring the premises to life " in its original place .	While the castle fans were aware of the sudden death of Richard Dimbath until the end of a reconstruction of the castle at Bergwald , the Burgverein around Sjöberg is in the vanguard of the `` development and adventure &apos;&apos; of the area .
+    0.1206896551724138	Auf der Hüpfburg beim Burggartenfest war am Sonnabend einiges los.	Something is happening on the bouncy castle at the Burggartenfest ( castle garden festival ) .On the edge of the castle there was a lot left at the castle castle .
+
+Well, know it is not as simple as the problem with double quotes. It
+seems that "castle" German is full of compounds which are hard for the
+MT system analysed, in particular the word _Burgverein_ makes the
+system trip up. You might try to generalise this insight and improve
+your system or you might not. It might be considered an issue in the
+test set rather than in the system being evaluated. (Is it OK that we
+have so many sentences with _Burgverein_ in the test set?)
 
 ## Another example
 
