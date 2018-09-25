@@ -88,6 +88,9 @@ main = hspec $ do
       runGEvalTest "gleu-empty" `shouldReturnAlmost` 0.0
     it "perfect translation" $
       runGEvalTest "gleu-perfect" `shouldReturnAlmost` 1.0
+  describe "WER" $ do
+    it "simple example" $
+      runGEvalTest "wer-simple" `shouldReturnAlmost` 0.5555555555
   describe "Accuracy" $ do
     it "simple example" $
       runGEvalTest "accuracy-simple" `shouldReturnAlmost` 0.6

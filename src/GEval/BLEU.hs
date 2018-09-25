@@ -1,5 +1,3 @@
-{-# LANGUAGE BangPatterns #-}
-
 module GEval.BLEU
        (precisionCount, bleuStep, gleuStep)
        where
