@@ -76,18 +76,21 @@ on the dev set instead:
 
     geval -t dev-0
 
-and you'll see the result — 0.27358 in [BLEU
-metric](https://en.wikipedia.org/wiki/BLEU), which is the default
-metric for the WMT-2017 challenge. GEval could do the evaluation using
-other metrics, in case of machine translation, (Google) GLEU (alternative to
-BLEU) or simple accuracy might make sense:
+and you'll see the result — 0.27358 in
+[BLEU metric](https://en.wikipedia.org/wiki/BLEU), which is the
+default metric for the WMT-2017 challenge. GEval could do the
+evaluation using other metrics, in case of machine translation,
+(Google) GLEU (alternative to BLEU), WER (word-error rate) or simple
+accuracy (which could be interpreted as sentence-recognition rate
+here) might make sense:
 
-    geval -t dev-0 --metric GLEU --metric Accuracy
+    geval -t dev-0 --metric GLEU --metric WER --metric Accuracy
 
 If you wait a moment, you'll see the results:
 
     BLEU	0.27358
     GLEU	0.31404
+    WER	0.55201
     Accuracy	0.01660
 
 Ah, we forgot about the tokenization, in order to properly calculate
@@ -95,9 +98,10 @@ BLEU (or GLEU) the way it was done within the official WMT-2017
 challenge, you need to tokenize the expected output and the actual
 output of your system using the right tokenizer:
 
-    geval -t dev-0 --metric GLEU --metric Accuracy --tokenizer 13a
+    geval -t dev-0 --metric GLEU --metric WER --metric Accuracy --tokenizer 13a
 
     BLEU	0.26901
+    WER 0.58858
     GLEU	0.30514
     Accuracy	0.01660
 
@@ -183,13 +187,84 @@ have a look at the examples with this word using `--line-by-line` option combine
     0.11650485436893204	Während die Burgfreunde um den plötzlich verstorbenen Richard Dimbath bis zuletzt einen Wiederaufbau der Burg am Bergwald im Auge hatten, steht für den Burgverein um Sjöberg die "Erschließung und Erlebbarmachung" des Geländes an vorderster Stelle.	Whereas the castle friends , and the recently deceased Richard Dimbath right up until the bitter end , had their eyes on reconstructing the castle in the mountain forest , the castle club , with Sjöberg , want to " develop and bring the premises to life " in its original place .	While the castle fans were aware of the sudden death of Richard Dimbath until the end of a reconstruction of the castle at Bergwald , the Burgverein around Sjöberg is in the vanguard of the `` development and adventure &apos;&apos; of the area .
     0.1206896551724138	Auf der Hüpfburg beim Burggartenfest war am Sonnabend einiges los.	Something is happening on the bouncy castle at the Burggartenfest ( castle garden festival ) .On the edge of the castle there was a lot left at the castle castle .
 
-Well, know it is not as simple as the problem with double quotes. It
+Well, now it is not as simple as the problem with double quotes. It
 seems that "castle" German is full of compounds which are hard for the
 MT system analysed, in particular the word _Burgverein_ makes the
 system trip up. You might try to generalise this insight and improve
 your system or you might not. It might be considered an issue in the
 test set rather than in the system being evaluated. (Is it OK that we
 have so many sentences with _Burgverein_ in the test set?)
+
+But do you need to represent your test set a Gonito challenge to run GEval? Actually no,
+I'll show this by running GEval directly on WMT-2018. First, let's download the files:
+
+    wget http://data.statmt.org/wmt17/translation-task/wmt17-submitted-data-v1.0.tgz
+    tar vxf wmt17-submitted-data-v1.0.tgz
+
+and run GEval for on of the submissions (UEdin-NMT):
+
+    geval --metric BLEU --precision 4 --tokenizer 13a \
+        -i wmt17-submitted-data/txt/sources/newstest2017-deen-src.de \
+        -o wmt17-submitted-data/txt/system-outputs/newstest2017/de-en/newstest2017.uedin-nmt.4723.de-en \
+        -e wmt17-submitted-data/txt/references/newstest2017-deen-ref.en
+
+    0.3430
+
+where `-i` stands for the input file, `-o` — output file, `-e` — file with expected (reference) data.
+
+Let's evaluate another system:
+
+    geval --metric BLEU --precision 4 --tokenizer 13a \
+        -i wmt17-submitted-data/txt/sources/newstest2017-deen-src.de \
+        -o wmt17-submitted-data/txt/system-outputs/newstest2017/de-en/newstest2017.LIUM-NMT.4733.de-en \
+        -e wmt17-submitted-data/txt/references/newstest2017-deen-ref.en
+
+    0.2939
+
+In general, LIUM is worse than UEdin, but were there any utterance for which UEdin is worse than LIUM?
+You could use `--diff` option to find this:
+
+    geval --metric GLEU --precision 4 --tokenizer 13a \
+        -i wmt17-submitted-data/txt/sources/newstest2017-deen-src.de \
+        -o wmt17-submitted-data/txt/system-outputs/newstest2017/de-en/newstest2017.uedin-nmt.4723.de-en \
+        --diff wmt17-submitted-data/txt/system-outputs/newstest2017/de-en/newstest2017.LIUM-NMT.4733.de-en \
+        -e wmt17-submitted-data/txt/references/newstest2017-deen-ref.en -s | head -n 10
+
+The above command will print out the 10 sentences for which the difference between UEdin and LIUM is the largest:
+
+    -0.5714285714285714     Hier eine Übersicht:    Here is an overview:    Here is an overview:    Here's an overview:
+    -0.5714285714285714     Eine Generation protestiert.    A generation is protesting.     A generation is protesting.     A generation protesting.
+    -0.5102564102564102     Bald stehen neue Container in der Wasenstraße   New containers will soon be located in Wasenstraße      New containers will soon be available on Wasenstraße    Soon, new containers are in the water road
+    -0.5    "Die ersten 100.000 Euro sind frei."    "The first 100,000 euros are free."     "The first 100.000 euros are free."     'the first £100,000 is free. '
+    -0.4736842105263158     Als gefährdet gelten auch Arizona und Georgia.  Arizona and Georgia are also at risk.   Arizona and Georgia are also at risk.   Arizona and Georgia are also considered to be at risk.
+    -0.4444444444444445     Das ist alles andere als erholsam.      This is anything but relaxing.  That is anything but relaxing.  This is far from relaxing.
+    -0.4285714285714286     Ein Haus bietet Zuflucht.       One house offers refuge.        A house offers refuge.  A house offers sanctuary.
+    -0.42307692307692313    Weshalb wir Simone, Gabby und Laurie brauchen   Why we need Simone, Gabby and Laurie    Why we need Simone, Gabby and Laurie    Why We Need Simone, Gabby and Laurie
+    -0.4009009009009009     Die "Identitäre Bewegung" ist eine Gruppierung mit französischen Wurzeln, die seit 2012 auch in Deutschland aktiv ist.  The "Identitäre Bewegung" is a group with French roots that has been active in Germany since 2012.     The "identitarian movement" is a group with French roots that has been active in Germany since 2012.    The "Identitarian Movement" is a grouping with French roots, which has also been active in Germany since 2012.
+    -0.4004524886877827     Der Mann soll nicht direkt angesprochen werden. The man should not be approached.       The man should not be addressed directly.       The man is not expected to be addressed directly.
+
+Hmmm, turning 100.000 euros into £100,000 is no good…
+
+You could even get the list of the "most worsening" features between LIUM and UEdin:
+
+    geval --metric GLEU --precision 4 --tokenizer 13a \
+      -i wmt17-submitted-data/txt/sources/newstest2017-deen-src.de \
+      -o wmt17-submitted-data/txt/system-outputs/newstest2017/de-en/newstest2017.uedin-nmt.4723.de-en \
+      --most-worsening-features wmt17-submitted-data/txt/system-outputs/newstest2017/de-en/newstest2017.LIUM-NMT.4733.de-en \
+      -e wmt17-submitted-data/txt/references/newstest2017-deen-ref.en | head -n 10
+
+    exp:euros       31      -0.06888191     0.00000597009369023376
+    in<1>:Euro      31      -0.05745546     0.00001601359624974303
+    exp:be  295     0.01980564      0.00039919436507962510
+    exp:Federal     12      -0.05519148     0.00044208689767323860
+    exp:small       21      -0.02782365     0.00097178111718141370
+    exp:40  9       -0.05635973     0.00121990447157221800
+    in<1>:40        9       -0.05635973     0.00121990447157221800
+    out:interior    6       -0.07150121     0.00132944903870436640
+    exp:turnover    9       -0.09077533     0.00147928107739624940
+    exp:head        17      -0.03198173     0.00170431081987969600
+
+Hey, UEdin you have a problem with euros. Is it due to Brexit?
 
 ## Another example
 
