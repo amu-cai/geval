@@ -46,9 +46,10 @@ order to run `geval` you need to either add `$HOME/.local/bin` to
 
 ## Quick tour
 
-Let's use GEval to evaluate machine translation (MT) systems (but keep in
-mind than GEval could be used for many other machine learning task
-types).
+Let's use GEval to evaluate machine translation (MT) systems (but keep
+in mind than GEval could be used for many other machine learning task
+types). We start with simple evaluation, but then we switch to what
+might be called black-box debugging of ML models.
 
 First, we will run GEval on WMT-2017, a German-to-English machine
 translation challenge repackaged for [Gonito.net](https://gonito.net)
