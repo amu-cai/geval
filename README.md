@@ -86,7 +86,7 @@ here) might make sense:
 
     geval -t dev-0 --metric GLEU --metric WER --metric Accuracy
 
-If you wait a moment, you'll see the results:
+After a moment, you'll see the results:
 
     BLEU	0.27358
     GLEU	0.31404
@@ -221,7 +221,7 @@ Let's evaluate another system:
 
     0.2939
 
-In general, LIUM is worse than UEdin, but were there any utterance for which UEdin is worse than LIUM?
+In general, LIUM is much worse than UEdin, but were there any utterance for which UEdin is worse than LIUM?
 You could use `--diff` option to find this:
 
     geval --metric GLEU --precision 4 --tokenizer 13a \
@@ -243,9 +243,19 @@ The above command will print out the 10 sentences for which the difference betwe
     -0.4009009009009009     Die "Identitäre Bewegung" ist eine Gruppierung mit französischen Wurzeln, die seit 2012 auch in Deutschland aktiv ist.  The "Identitäre Bewegung" is a group with French roots that has been active in Germany since 2012.     The "identitarian movement" is a group with French roots that has been active in Germany since 2012.    The "Identitarian Movement" is a grouping with French roots, which has also been active in Germany since 2012.
     -0.4004524886877827     Der Mann soll nicht direkt angesprochen werden. The man should not be approached.       The man should not be addressed directly.       The man is not expected to be addressed directly.
 
+The columns goes as follows:
+
+1. the difference between the two systems (GLEU "delta")
+2. input
+3. expected output (reference translation)
+4. the output from LIUM
+5. the output from UEdint
+
 Hmmm, turning 100.000 euros into £100,000 is no good…
 
-You could even get the list of the "most worsening" features between LIUM and UEdin:
+You could even get the list of the "most worsening" features between
+LIUM and UEdin, the features which were "hard" for UEdin, even though they were
+easy for UEdin:
 
     geval --metric GLEU --precision 4 --tokenizer 13a \
       -i wmt17-submitted-data/txt/sources/newstest2017-deen-src.de \
@@ -264,7 +274,7 @@ You could even get the list of the "most worsening" features between LIUM and UE
     exp:turnover    9       -0.09077533     0.00147928107739624940
     exp:head        17      -0.03198173     0.00170431081987969600
 
-Hey, UEdin you have a problem with euros. Is it due to Brexit?
+Hey, UEdin, you have a problem with euros… is it due to Brexit?
 
 ## Another example
 
