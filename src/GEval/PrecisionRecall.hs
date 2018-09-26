@@ -58,8 +58,8 @@ countFolder (a1, a2, a3) (b1, b2, b3) = (a1+b1, a2+b2, a3+b3)
 
 getCounts :: (a -> b -> Bool) -> ([a], [b]) -> (Int, Int, Int)
 getCounts matchingFun (expected, got) = (maxMatch matchingFun expected got,
-                                      length expected,
-                                      length got)
+                                         length expected,
+                                         length got)
 
 -- | Calculates both precision and recall.
 --
