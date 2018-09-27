@@ -202,7 +202,7 @@ I'll show this by running GEval directly on WMT-2018. First, let's download the 
     wget http://data.statmt.org/wmt17/translation-task/wmt17-submitted-data-v1.0.tgz
     tar vxf wmt17-submitted-data-v1.0.tgz
 
-and run GEval for on of the submissions (UEdin-NMT):
+and run GEval for one of the submissions (UEdin-NMT):
 
     geval --metric BLEU --precision 4 --tokenizer 13a \
         -i wmt17-submitted-data/txt/sources/newstest2017-deen-src.de \
