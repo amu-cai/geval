@@ -98,7 +98,7 @@ defaultLogLossHashedSize :: Word32
 defaultLogLossHashedSize = 10
 
 -- | evaluation metric
-data Metric = RMSE | MSE | BLEU | GLEU | WER | Accuracy | ClippEU | FMeasure Double | NMI
+data Metric = RMSE | MSE | BLEU | GLEU | WER | Accuracy | ClippEU | FMeasure Double | MacroFMeasure Double | NMI
               | LogLossHashed Word32 | CharMatch | MAP | LogLoss | Likelihood
               | BIOF1 | BIOF1Labels | LikelihoodHashed Word32 | MAE | MultiLabelFMeasure Double
               | MultiLabelLogLoss | MultiLabelLikelihood
@@ -113,6 +113,7 @@ instance Show Metric where
   show Accuracy = "Accuracy"
   show ClippEU = "ClippEU"
   show (FMeasure beta) = "F" ++ (show beta)
+  show (MacroFMeasure beta) = "Macro-F" ++ (show beta)
   show NMI = "NMI"
   show (LogLossHashed nbOfBits) = "LogLossHashed" ++ (if
                                                        nbOfBits == defaultLogLossHashedSize
@@ -149,6 +150,9 @@ instance Read Metric where
   readsPrec p ('F':theRest) = case readsPrec p theRest of
     [(beta, theRest)] -> [(FMeasure beta, theRest)]
     _ -> []
+  readsPrec p ('M':'a':'c':'r':'o':'-':'F':theRest) = case readsPrec p theRest of
+    [(beta, theRest)] -> [(MacroFMeasure beta, theRest)]
+    _ -> []
   readsPrec p ('M':'u':'l':'t':'i':'L':'a':'b':'e':'l':'-':'F':theRest) = case readsPrec p theRest of
     [(beta, theRest)] -> [(MultiLabelFMeasure beta, theRest)]
     _ -> []
@@ -182,6 +186,7 @@ getMetricOrdering WER      = TheLowerTheBetter
 getMetricOrdering Accuracy = TheHigherTheBetter
 getMetricOrdering ClippEU  = TheHigherTheBetter
 getMetricOrdering (FMeasure _) = TheHigherTheBetter
+getMetricOrdering (MacroFMeasure _) = TheHigherTheBetter
 getMetricOrdering NMI = TheHigherTheBetter
 getMetricOrdering (LogLossHashed _) = TheLowerTheBetter
 getMetricOrdering (LikelihoodHashed _) = TheHigherTheBetter
@@ -572,6 +577,35 @@ gevalCore' (FMeasure beta) _ = gevalCoreWithoutInput outParser outParser getCoun
         getCount (True, False)  = (0, 1, 0)
         getCount (False, True)  = (0, 0, 1)
         getCount (False, False) = (0, 0, 0)
+
+gevalCore' (MacroFMeasure beta) _ = gevalCoreWithoutInput (Right . Just . strip) (Right . predicted . strip) getClassesInvolved gatherClassC macroAverageOnCounts
+                      where predicted got =
+                              -- first try to parse what we got as a probability distribution
+                              -- (like the one used for Likelikehood/LogLossHashed metric)
+                              case parseWordSpecs got of
+                                Right wordSpecs -> if Prelude.null pairs
+                                                   then Nothing
+                                                   else Just $ snd $ Prelude.maximum pairs
+                                                 where pairs = catMaybes $ Prelude.map wordSpecToPair wordSpecs
+                                Left _ -> Just got
+                            getClassesInvolved (Just a, Nothing) = (Nothing, Just a, Nothing)
+                            getClassesInvolved (Nothing, Just b) = (Nothing, Nothing, Just b) -- should not occur, for completeness
+                            getClassesInvolved (Just a, Just b) = if a == b
+                                                                     then (Just a, Just a, Just a)
+                                                                     else (Nothing, Just a, Just b)
+                            gatherClassC = CC.foldl gatherClassCombiner (M.empty, M.empty, M.empty)
+                            gatherClassCombiner (tpMap, expectedMap, gotMap) (tp, expected, got) =
+                              (insertMaybeToMap tp tpMap,
+                               insertMaybeToMap expected expectedMap,
+                               insertMaybeToMap got gotMap)
+                            insertMaybeToMap Nothing m = m
+                            insertMaybeToMap (Just c) m = M.insertWith (+) c 1 m
+                            macroAverageOnCounts (tpMap, expectedMap, gotMap) =
+                              (Prelude.sum
+                               $ Prelude.map (\c -> fMeasureOnCounts beta (M.lookupDefault 0 c tpMap,
+                                                                         M.lookupDefault 0 c expectedMap,
+                                                                         M.lookupDefault 0 c gotMap))
+                               $ M.keys expectedMap) / (fromIntegral $ Prelude.length $ M.keys expectedMap)
 
 gevalCore' ClippEU _ = gevalCoreWithoutInput parseClippingSpecs parseClippings matchStep clippeuAgg finalStep
   where

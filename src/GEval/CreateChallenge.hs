@@ -103,6 +103,13 @@ The output value could a probability where value greater than or equal to 0.5 is
 as 1.
 |] ++ (commonReadmeMDContents testName)
 
+readmeMDContents (MacroFMeasure _) testName = [i|
+GEval sample challenge — guess the language of a first name
+===========================================================
+
+This is a sample/toy classification challenge for Gonito framework with Macro-F-measure as the metric.
+|] ++ (commonReadmeMDContents testName)
+
 readmeMDContents NMI testName = [i|
 Cluster proverbs
 ================
@@ -342,6 +349,16 @@ trainContents (FMeasure _) = [hereLit|0	b	b	W	289580	1986	-38	2	a	2	0	1	1	0	0	0	
 1	a	a	W	268170	1352	-41	-35	a	1	1	0	0	0	0	0	0	400	400
 |]
 
+trainContents (MacroFMeasure _) = [hereLit|pl	Stanisław
+en	John
+de	Hans
+pl	Wacław
+pl	Jan
+pl	Kazimierz
+en	Matthew
+en	Richard
+|]
+
 trainContents NMI = [hereLit|pl	Kto pod kim dołki kopie, ten sam w nie wpada.
 en	The pen is mightier than the sword.
 pl	Baba z wozu, koniom lżej.
@@ -403,6 +420,10 @@ When the going gets tough, the tough get going.
 devInContents (FMeasure _) = [hereLit|b	b	W	29520	779	-28	-32	a	0	0	0	0	0	0	0	0	0	0
 b	b	W	55200	1259	35	9	a	1	0	1	0	0	0	0	0	4000	4000
 |]
+devInContents (MacroFMeasure _) = [hereLit|Władysław
+Steven
+Helmut
+|]
 devInContents (LikelihoodHashed b) = devInContents (LogLossHashed b)
 devInContents (LogLossHashed _) = [hereLit|Nie kupuj	w worku
 Ona	psa
@@ -446,6 +467,10 @@ Y
 |]
 devExpectedContents (FMeasure _) = [hereLit|0
 1
+|]
+devExpectedContents (MacroFMeasure _) = [hereLit|pl
+en
+de
 |]
 devExpectedContents NMI = [hereLit|en
 pl
@@ -495,6 +520,10 @@ testInContents Accuracy = [hereLit|2	mild	yes
 testInContents (FMeasure _) = [hereLit|b	b	W	15210	527	-64	-56	a	0	0	0	0	0	0	0	0	0	0
 b	b	N	38060	486	357	189	b	0	0	0	0	0	0	0	0	0	0
 |]
+testInContents (MacroFMeasure _) = [hereLit|Arkadiusz
+Heinrich
+Henry
+|]
 testInContents NMI = [hereLit|Fortune favors the bold.
 People who live in glass houses should not throw stones.
 W marcu, jak w garncu.
@@ -541,6 +570,10 @@ Y
 |]
 testExpectedContents (FMeasure _) = [hereLit|0
 0
+|]
+testExpectedContents (MacroFMeasure _) = [hereLit|pl
+de
+en
 |]
 testExpectedContents NMI = [hereLit|en
 en

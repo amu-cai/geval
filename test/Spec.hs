@@ -107,6 +107,11 @@ main = hspec $ do
       runGEvalTest "f-measure-all-false" `shouldReturnAlmost` 1.0
     it "F2-measure" $
       runGEvalTest "f2-simple" `shouldReturnAlmost` 0.714285714
+  describe "Macro-F-measure" $ do
+    it "simple example" $
+      runGEvalTest "macro-f1-simple" `shouldReturnAlmost` 0.266666
+    it "perfect soltion" $
+      runGEvalTest "macro-f-measure-perfect" `shouldReturnAlmost` 1.00000
   describe "precision count" $ do
     it "simple test" $ do
       precisionCount [["Alice", "has", "a", "cat" ]] ["Ala", "has", "cat"] `shouldBe` 2
