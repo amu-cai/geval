@@ -70,6 +70,9 @@ main = hspec $ do
   describe "mean absolute error" $ do
     it "simple test with arguments" $
       runGEvalTest "mae-simple" `shouldReturnAlmost` 1.5
+  describe "Spearman's rank correlation coefficient" $ do
+    it "simple test" $ do
+      runGEvalTest "spearman-simple" `shouldReturnAlmost` (- 0.5735)
   describe "BLEU" $ do
     it "trivial example from Wikipedia" $
       runGEvalTest "bleu-trivial" `shouldReturnAlmost` 0.0

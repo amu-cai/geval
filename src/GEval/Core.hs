@@ -85,6 +85,10 @@ import Data.Conduit.AutoDecompress
 import Text.Tokenizer
 
 import qualified Data.HashMap.Strict as M
+import qualified Data.Vector as V
+import qualified Data.Vector.Generic as VG
+
+import Statistics.Correlation
 
 import Data.Proxy
 
@@ -98,7 +102,8 @@ defaultLogLossHashedSize :: Word32
 defaultLogLossHashedSize = 10
 
 -- | evaluation metric
-data Metric = RMSE | MSE | BLEU | GLEU | WER | Accuracy | ClippEU | FMeasure Double | MacroFMeasure Double | NMI
+data Metric = RMSE | MSE | Pearson | Spearman | BLEU | GLEU | WER | Accuracy | ClippEU
+              | FMeasure Double | MacroFMeasure Double | NMI
               | LogLossHashed Word32 | CharMatch | MAP | LogLoss | Likelihood
               | BIOF1 | BIOF1Labels | LikelihoodHashed Word32 | MAE | MultiLabelFMeasure Double
               | MultiLabelLogLoss | MultiLabelLikelihood
@@ -107,6 +112,8 @@ data Metric = RMSE | MSE | BLEU | GLEU | WER | Accuracy | ClippEU | FMeasure Dou
 instance Show Metric where
   show RMSE = "RMSE"
   show MSE  = "MSE"
+  show Pearson = "Pearson"
+  show Spearman = "Spearman"
   show BLEU = "BLEU"
   show GLEU = "GLEU"
   show WER = "WER"
@@ -141,6 +148,8 @@ instance Show Metric where
 instance Read Metric where
   readsPrec _ ('R':'M':'S':'E':theRest) = [(RMSE, theRest)]
   readsPrec _ ('M':'S':'E':theRest) = [(MSE, theRest)]
+  readsPrec _ ('P':'e':'a':'r':'s':'o':'n':theRest) = [(Pearson, theRest)]
+  readsPrec _ ('S':'p':'e':'a':'r':'m':'a':'n':theRest) = [(Spearman, theRest)]
   readsPrec _ ('B':'L':'E':'U':theRest) = [(BLEU, theRest)]
   readsPrec _ ('G':'L':'E':'U':theRest) = [(GLEU, theRest)]
   readsPrec _ ('W':'E':'R':theRest) = [(WER, theRest)]
@@ -180,6 +189,8 @@ data MetricOrdering = TheLowerTheBetter | TheHigherTheBetter
 getMetricOrdering :: Metric -> MetricOrdering
 getMetricOrdering RMSE     = TheLowerTheBetter
 getMetricOrdering MSE      = TheLowerTheBetter
+getMetricOrdering Pearson  = TheHigherTheBetter
+getMetricOrdering Spearman = TheHigherTheBetter
 getMetricOrdering BLEU     = TheHigherTheBetter
 getMetricOrdering GLEU     = TheHigherTheBetter
 getMetricOrdering WER      = TheLowerTheBetter
@@ -514,6 +525,8 @@ gevalCore' MSE _ = gevalCoreWithoutInput outParser outParser itemSquaredError av
 gevalCore' MAE _ = gevalCoreWithoutInput outParser outParser itemAbsoluteError averageC id
   where outParser = getValue . TR.double
 
+gevalCore' Pearson _ = gevalCoreByCorrelationMeasure pearson
+gevalCore' Spearman _ = gevalCoreByCorrelationMeasure spearman
 
 gevalCore' LogLoss _ = gevalCoreWithoutInput outParser outParser itemLogLossError averageC id
   where outParser = getValue . TR.double
@@ -669,6 +682,17 @@ gevalCore' MultiLabelLogLoss _ = gevalCoreWithoutInput intoWords
 
 countAgg :: Monad m => ConduitM (Int, Int, Int) o m (Int, Int, Int)
 countAgg = CC.foldl countFolder (0, 0, 0)
+
+gevalCoreByCorrelationMeasure :: (MonadUnliftIO m, MonadThrow m, MonadIO m) =>
+                                (V.Vector (Double, Double) -> Double) -> -- ^ correlation function
+                                LineSource (ResourceT m) ->  -- ^ source to read the expected output
+                                LineSource (ResourceT m) ->  -- ^ source to read the output
+                                m (MetricValue)             -- ^ metric values for the output against the expected output
+gevalCoreByCorrelationMeasure correlationFunction =
+  gevalCoreWithoutInput outParser outParser id correlationC finalStep
+  where outParser = getValue . TR.double
+        correlationC = CC.foldl (flip (:)) []
+        finalStep pairs = correlationFunction $ V.fromList pairs
 
 parseDistributionWrapper :: Word32 -> Word32 -> Text -> HashedDistribution
 parseDistributionWrapper nbOfBits seed distroSpec = case parseDistribution nbOfBits seed distroSpec of
