@@ -6,9 +6,20 @@ import Data.Text.Read as TR
 
 import Data.Attoparsec.Text
 
-(/.) :: (Eq a, Integral a) => a -> a -> Double
+-- some operations can be "hard" (on ints) or "soft" (on doubles),
+-- introduce a typeclass so that we could generalise easily
+class ConvertibleToDouble n where
+  toDouble :: n -> Double
+
+instance ConvertibleToDouble Double where
+  toDouble = id
+
+instance ConvertibleToDouble Int where
+  toDouble = fromIntegral
+
+(/.) :: (ConvertibleToDouble f, Integral a) => f -> a -> Double
 x /. 0 = 1.0
-x /. y = (fromIntegral x) / (fromIntegral y)
+x /. y = (toDouble x) / (fromIntegral y)
 
 safeDoubleDiv :: Double -> Double -> Double
 safeDoubleDiv _ 0.0 = 0.0

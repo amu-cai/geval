@@ -110,6 +110,13 @@ GEval sample challenge — guess the language of a first name
 This is a sample/toy classification challenge for Gonito framework with Macro-F-measure as the metric.
 |] ++ (commonReadmeMDContents testName)
 
+readmeMDContents (SoftFMeasure _) testName = [i|
+GEval sample challenge — mark numbers
+=====================================
+
+This is a sample/toy classification challenge for Gonito framework with Soft-F-measure as the metric.
+|] ++ (commonReadmeMDContents testName)
+
 readmeMDContents NMI testName = [i|
 Cluster proverbs
 ================
@@ -358,7 +365,10 @@ pl	Kazimierz
 en	Matthew
 en	Richard
 |]
-
+trainContents (SoftFMeasure _) = [hereLit|indigits:8	I have 3 daughters
+indigits:1-2 indigits:9-12	12 July 1812
+inwords:11-13	I can see two dogs
+|]
 trainContents NMI = [hereLit|pl	Kto pod kim dołki kopie, ten sam w nie wpada.
 en	The pen is mightier than the sword.
 pl	Baba z wozu, koniom lżej.
@@ -424,6 +434,9 @@ devInContents (MacroFMeasure _) = [hereLit|Władysław
 Steven
 Helmut
 |]
+devInContents (SoftFMeasure _) = [hereLit|I have two kids
+7 April 2003
+|]
 devInContents (LikelihoodHashed b) = devInContents (LogLossHashed b)
 devInContents (LogLossHashed _) = [hereLit|Nie kupuj	w worku
 Ona	psa
@@ -471,6 +484,9 @@ devExpectedContents (FMeasure _) = [hereLit|0
 devExpectedContents (MacroFMeasure _) = [hereLit|pl
 en
 de
+|]
+devExpectedContents (SoftFMeasure _) = [hereLit|inwords:8-10
+indigits:1 indigits:9-12
 |]
 devExpectedContents NMI = [hereLit|en
 pl
@@ -524,6 +540,9 @@ testInContents (MacroFMeasure _) = [hereLit|Arkadiusz
 Heinrich
 Henry
 |]
+testInContents (SoftFMeasure _) = [hereLit|Nothing
+Four sides
+|]
 testInContents NMI = [hereLit|Fortune favors the bold.
 People who live in glass houses should not throw stones.
 W marcu, jak w garncu.
@@ -574,6 +593,9 @@ testExpectedContents (FMeasure _) = [hereLit|0
 testExpectedContents (MacroFMeasure _) = [hereLit|pl
 de
 en
+|]
+testExpectedContents (SoftFMeasure _) = [hereLit|
+inwords:1-4
 |]
 testExpectedContents NMI = [hereLit|en
 en

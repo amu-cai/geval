@@ -18,6 +18,7 @@ import Data.Attoparsec.Text
 import Options.Applicative
 import Data.Text
 import Text.EditDistance
+import GEval.Annotation
 
 import Data.Map.Strict
 
@@ -31,6 +32,8 @@ import System.IO.Temp
 import System.IO.Silently
 
 import qualified Test.HUnit as HU
+
+import qualified Data.IntSet as IS
 
 import Data.Conduit.SmartSource
 import Data.Conduit.Rank
@@ -185,6 +188,10 @@ main = hspec $ do
       precision alwaysMatch ['a', 'b', 'c'] [0, 1, 2, 3, 4, 5] `shouldBeAlmost` 0.5
       recall alwaysMatch ['a', 'b', 'c'] [0, 1, 2, 3, 4, 5] `shouldBeAlmost` 1.0
       f1Measure alwaysMatch ['a', 'b', 'c'] [0, 1, 2, 3 , 4, 5] `shouldBeAlmost` 0.66666666666666
+  describe "max match" $ do
+    it "simple" $ do
+      maxMatch (==) [1,2,2] [3,2] `shouldBe` 1
+      maxMatch (==) [3,2] [1,2,2] `shouldBe` 1
   describe "ClippEU" $ do
     it "parsing rectangles" $ do
       let (Right r) = parseOnly (lineClippingsParser <* endOfInput) "2/0,0,2,3 10/20,30,40,50 18/0,1,500,3 "
@@ -214,6 +221,11 @@ main = hspec $ do
       read "F2" `shouldBe` (FMeasure 2.0)
       read "F1" `shouldBe` (FMeasure 1.0)
       read "F0.5" `shouldBe` (FMeasure 0.5)
+  describe "Soft-F1" $ do
+    it "simple test" $ do
+      runGEvalTest "soft-f1-simple" `shouldReturnAlmost` 0.33333333333333
+    it "perfect test" $ do
+      runGEvalTest "soft-f1-perfect" `shouldReturnAlmost` 1.0
   describe "test edit-distance library" $ do
     it "for handling UTF8" $ do
       levenshteinDistance defaultEditCosts "źdźbło" "źd好bło" `shouldBe` 1
@@ -261,6 +273,19 @@ main = hspec $ do
       gevalCoreOnSingleLines RMSE id (LineInFile (FilePathSpec "stub1") 1 "blabla")
                                      (LineInFile (FilePathSpec "stub2") 1 "3.4")
                                      (LineInFile (FilePathSpec "stub3") 1 "2.6") `shouldReturnAlmost` 0.8
+  describe "Annotation format" $ do
+    it "just parse" $ do
+      parseAnnotations "foo:3,7-10 baz:4-6" `shouldBe` Right [Annotation "foo" (IS.fromList [3,7,8,9,10]),
+                                                               Annotation "baz" (IS.fromList [4,5,6])]
+    it "empty" $ do
+      parseAnnotations "" `shouldBe` Right []
+    it "empty (just spaces)" $ do
+      parseAnnotations "   " `shouldBe` Right []
+    it "match score" $ do
+      matchScore (Annotation "x" (IS.fromList [3..6])) (Annotation "y" (IS.fromList [3..6])) `shouldBeAlmost` 0.0
+      matchScore (Annotation "x" (IS.fromList [3..6])) (Annotation "x" (IS.fromList [3..6])) `shouldBeAlmost` 1.0
+      matchScore (Annotation "x" (IS.fromList [123..140])) (Annotation "x" (IS.fromList [125..130])) `shouldBeAlmost` 0.33333
+      matchScore (Annotation "x" (IS.fromList [3..4])) (Annotation "x" (IS.fromList [2..13])) `shouldBeAlmost` 0.1666666
   describe "BIO format" $ do
     it "just parse" $ do
       let (Right r) = parseOnly (bioSequenceParser <* endOfInput) "O B-city/NEW_YORK I-city B-city/KALISZ I-city O B-name"

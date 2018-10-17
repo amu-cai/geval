@@ -1,10 +1,11 @@
 {-# LANGUAGE PartialTypeSignatures #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 module GEval.PrecisionRecall(calculateMAPForOneResult,
                              fMeasure, f1Measure, f2Measure, precision, recall,
                              fMeasureOnCounts, f1MeasureOnCounts, f2MeasureOnCounts, countFolder,
                              precisionAndRecall, precisionAndRecallFromCounts,
-                             maxMatch, maxMatchOnOrdered, getCounts)
+                             maxMatch, maxMatchOnOrdered, getCounts, weightedMaxMatch)
        where
 
 import GEval.Common
@@ -14,9 +15,13 @@ import Data.Graph.Inductive.Query.MaxFlow
 
 import Data.List (nub, foldl')
 
+import Data.Algorithm.Munkres
+import qualified Data.Array.IArray as DAI
+
+
 calculateMAPForOneResult :: (Eq a) => [a] -> [a] -> Double
 calculateMAPForOneResult expected got = precisionSum / fromIntegral (length expected)
-  where (_, _, precisionSum) = calculateMAPForOneResultCore expected (nub got)
+  where (_::Int, _, precisionSum) = calculateMAPForOneResultCore expected (nub got)
         calculateMAPForOneResultCore expected got = foldl' (oneMAPStep expected) (0, 0, 0.0) got
         oneMAPStep expected (gotCount, allCount, precisionSum) gotItem
           | gotItem `elem` expected = (newGotCount, newAllCount, precisionSum + (newGotCount /. newAllCount))
@@ -41,19 +46,19 @@ fMeasure beta matchingFun expected got =
   where betaSquared = beta ^ 2
         (p, r) = precisionAndRecall matchingFun expected got
 
-f2MeasureOnCounts :: (Int, Int, Int) -> Double
+f2MeasureOnCounts :: ConvertibleToDouble n => (n, Int, Int) -> Double
 f2MeasureOnCounts = fMeasureOnCounts 2.0
 
-f1MeasureOnCounts :: (Int, Int, Int) -> Double
+f1MeasureOnCounts :: ConvertibleToDouble n => (n, Int, Int) -> Double
 f1MeasureOnCounts = fMeasureOnCounts 1.0
 
-fMeasureOnCounts :: Double -> (Int, Int, Int) -> Double
+fMeasureOnCounts :: ConvertibleToDouble n => Double -> (n, Int, Int) -> Double
 fMeasureOnCounts beta (tp, nbExpected, nbGot) =
   (1 + betaSquared) * p * r `safeDoubleDiv` (betaSquared * p + r)
   where betaSquared = beta ^ 2
         (p, r) = precisionAndRecallFromCounts (tp, nbExpected, nbGot)
 
-countFolder :: (Int, Int, Int) -> (Int, Int, Int) -> (Int, Int, Int)
+countFolder :: Num n => (n, Int, Int) -> (n, Int, Int) -> (n, Int, Int)
 countFolder (a1, a2, a3) (b1, b2, b3) = (a1+b1, a2+b2, a3+b3)
 
 getCounts :: (a -> b -> Bool) -> ([a], [b]) -> (Int, Int, Int)
@@ -72,7 +77,7 @@ precisionAndRecall matchFun expected got
   = precisionAndRecallFromCounts (tp, length expected, length got)
     where tp = maxMatch matchFun expected got
 
-precisionAndRecallFromCounts :: (Int, Int, Int) -> (Double, Double)
+precisionAndRecallFromCounts :: ConvertibleToDouble n => (n, Int, Int) -> (Double, Double)
 precisionAndRecallFromCounts (tp, nbExpected, nbGot) =
   (tp /. nbGot, tp /. nbExpected)
 
@@ -116,3 +121,16 @@ buildGraph matchFun expected got = (b, e, g)
                 return (b,e)
                 where expectedIxs = [2..1+(length expected)]
                       gotIxs = [2+(length expected)..1+(length expected)+(length got)]
+
+-- the weight are assumed to be between 0.0 and 1.0
+weightedMaxMatch :: (a -> b -> Double) -> [a] -> [b] -> Double
+weightedMaxMatch matchFun expected got = (fromIntegral $ length matching) - score
+   where (matching, score) = hungarianMethodDouble complementWeightArray
+                             -- unfortunately `hungarianMethodDouble` looks
+                             -- for minimal bipartite matching
+                             -- rather than the maximal one
+         complementWeightArray = DAI.array ((1, 1), (m, n)) weightList
+         m = length expected
+         n = length got
+         weightList = [((i, j), 1.0 - (matchFun x y)) | (i, x) <- zip [1..m] expected,
+                                                        (j, y) <- zip [1..n] got]

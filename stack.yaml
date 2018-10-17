@@ -1,5 +1,5 @@
 flags: {}
 packages:
 - '.'
-extra-deps: [murmur3-1.0.3,naturalcomp-0.0.3]
+extra-deps: [murmur3-1.0.3,naturalcomp-0.0.3,Munkres-0.1]
 resolver: lts-11.9

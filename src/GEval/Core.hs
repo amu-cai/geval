@@ -71,6 +71,8 @@ import Data.Attoparsec.Text (parseOnly)
 
 import Data.Conduit.SmartSource
 
+import qualified Data.IntSet as IS
+
 import GEval.BLEU
 import GEval.Common
 import GEval.ClippEU
@@ -83,6 +85,7 @@ import GEval.ProbList
 import GEval.WER
 import Data.Conduit.AutoDecompress
 import Text.Tokenizer
+import GEval.Annotation
 
 import qualified Data.HashMap.Strict as M
 import qualified Data.Vector as V
@@ -107,6 +110,7 @@ data Metric = RMSE | MSE | Pearson | Spearman | BLEU | GLEU | WER | Accuracy | C
               | LogLossHashed Word32 | CharMatch | MAP | LogLoss | Likelihood
               | BIOF1 | BIOF1Labels | LikelihoodHashed Word32 | MAE | MultiLabelFMeasure Double
               | MultiLabelLogLoss | MultiLabelLikelihood
+              | SoftFMeasure Double
               deriving (Eq)
 
 instance Show Metric where
@@ -121,6 +125,7 @@ instance Show Metric where
   show ClippEU = "ClippEU"
   show (FMeasure beta) = "F" ++ (show beta)
   show (MacroFMeasure beta) = "Macro-F" ++ (show beta)
+  show (SoftFMeasure beta) = "Soft-F" ++ (show beta)
   show NMI = "NMI"
   show (LogLossHashed nbOfBits) = "LogLossHashed" ++ (if
                                                        nbOfBits == defaultLogLossHashedSize
@@ -165,6 +170,9 @@ instance Read Metric where
   readsPrec p ('M':'u':'l':'t':'i':'L':'a':'b':'e':'l':'-':'F':theRest) = case readsPrec p theRest of
     [(beta, theRest)] -> [(MultiLabelFMeasure beta, theRest)]
     _ -> []
+  readsPrec p ('S':'o':'f':'t':'-':'F':theRest) = case readsPrec p theRest of
+    [(beta, theRest)] -> [(SoftFMeasure beta, theRest)]
+    _ -> []
   readsPrec p ('L':'o':'g':'L':'o':'s':'s':'H':'a':'s':'h':'e':'d':theRest) = case readsPrec p theRest of
     [(nbOfBits, theRest)] -> [(LogLossHashed nbOfBits, theRest)]
     _ -> [(LogLossHashed defaultLogLossHashedSize, theRest)]
@@ -198,6 +206,7 @@ getMetricOrdering Accuracy = TheHigherTheBetter
 getMetricOrdering ClippEU  = TheHigherTheBetter
 getMetricOrdering (FMeasure _) = TheHigherTheBetter
 getMetricOrdering (MacroFMeasure _) = TheHigherTheBetter
+getMetricOrdering (SoftFMeasure _) = TheHigherTheBetter
 getMetricOrdering NMI = TheHigherTheBetter
 getMetricOrdering (LogLossHashed _) = TheLowerTheBetter
 getMetricOrdering (LikelihoodHashed _) = TheHigherTheBetter
@@ -586,6 +595,7 @@ gevalCore' (FMeasure beta) _ = gevalCoreWithoutInput outParser outParser getCoun
           | prob >= detectionThreshold && prob <= 1.0 = Right True
           | otherwise = Left "expected probability"
         detectionThreshold = 0.5
+        getCount :: (Bool, Bool) -> (Int, Int, Int)
         getCount (True, True)   = (1, 1, 1)
         getCount (True, False)  = (0, 1, 0)
         getCount (False, True)  = (0, 0, 1)
@@ -615,10 +625,19 @@ gevalCore' (MacroFMeasure beta) _ = gevalCoreWithoutInput (Right . Just . strip)
                             insertMaybeToMap (Just c) m = M.insertWith (+) c 1 m
                             macroAverageOnCounts (tpMap, expectedMap, gotMap) =
                               (Prelude.sum
-                               $ Prelude.map (\c -> fMeasureOnCounts beta (M.lookupDefault 0 c tpMap,
+                               $ Prelude.map (\c -> fMeasureOnCounts beta (M.lookupDefault (0::Int) c tpMap,
                                                                          M.lookupDefault 0 c expectedMap,
                                                                          M.lookupDefault 0 c gotMap))
                                $ M.keys expectedMap) / (fromIntegral $ Prelude.length $ M.keys expectedMap)
+
+gevalCore' (SoftFMeasure beta) _ = gevalCoreWithoutInput parseAnnotations
+                                                         parseAnnotations
+                                                         getSoftCounts
+                                                         countAgg
+                                                         (fMeasureOnCounts beta)
+                      where getSoftCounts (expected, got) = (weightedMaxMatch matchScore expected got,
+                                                             Prelude.length expected,
+                                                             Prelude.length got)
 
 gevalCore' ClippEU _ = gevalCoreWithoutInput parseClippingSpecs parseClippings matchStep clippeuAgg finalStep
   where
@@ -680,8 +699,8 @@ gevalCore' MultiLabelLogLoss _ = gevalCoreWithoutInput intoWords
     where
       intoWords = Right . Data.Text.words
 
-countAgg :: Monad m => ConduitM (Int, Int, Int) o m (Int, Int, Int)
-countAgg = CC.foldl countFolder (0, 0, 0)
+countAgg :: (Num n, Monad m) => ConduitM (n, Int, Int) o m (n, Int, Int)
+countAgg = CC.foldl countFolder (fromInteger 0, 0, 0)
 
 gevalCoreByCorrelationMeasure :: (MonadUnliftIO m, MonadThrow m, MonadIO m) =>
                                 (V.Vector (Double, Double) -> Double) -> -- ^ correlation function
@@ -707,7 +726,7 @@ skipLineNumber fun = fun . snd
 -- | A helper function to run evaluation when the input is not needed to calculate the metric value.
 gevalCoreWithoutInput :: (MonadUnliftIO m, MonadThrow m, MonadIO m) =>
                       (Text -> Either String a) ->  -- ^ parser for values in the expected output
-                      (Text -> Either String b) ->  -- ^ parser for values in the output
+                      (Text -> Either String b) ->  -- ^ parser for values in the actual output
                       ((a, b) -> c) ->              -- ^ function which combines parsed values into a single value
                                                   -- (will be launched for each item, e.g. an error/cost function
                                                   -- could be calculated here)
