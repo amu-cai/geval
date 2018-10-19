@@ -64,7 +64,7 @@ Let's step into the repo and run GEval (I assume you added `geval`
 path to `$PATH`, so that you could just use `geval` instead of
 `/full/path/to/geval`):
 
-    cd submission-01229
+    cd wmt-2017
     geval
 
 Well, something apparently went wrong:
@@ -92,18 +92,6 @@ After a moment, you'll see the results:
     BLEU	0.27358
     GLEU	0.31404
     WER	0.55201
-    Accuracy	0.01660
-
-Ah, we forgot about the tokenization, in order to properly calculate
-BLEU (or GLEU) the way it was done within the official WMT-2017
-challenge, you need to tokenize the expected output and the actual
-output of your system using the right tokenizer:
-
-    geval -t dev-0 --metric GLEU --metric WER --metric Accuracy --tokenizer 13a
-
-    BLEU	0.26901
-    WER 0.58858
-    GLEU	0.30514
     Accuracy	0.01660
 
 The results do not look good anyway and I'm not talking about
@@ -212,6 +200,12 @@ and run GEval for one of the submissions (UEdin-NMT):
     0.3430
 
 where `-i` stands for the input file, `-o` — output file, `-e` — file with expected (reference) data.
+
+Note the tokenization, in order to properly calculate
+BLEU (or GLEU) the way it was done within the official WMT-2017
+challenge, you need to tokenize the expected output and the actual
+output of your system using the right tokenizer. (The test set packaged
+for Gonito.net challenge were already tokenized.)
 
 Let's evaluate another system:
 
