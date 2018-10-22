@@ -509,7 +509,7 @@ shouldReturnAlmost action expected = action >>= (@=~? expected)
 
 runGitTest :: String -> (FilePath -> IO a) -> IO a
 runGitTest name callback = do
-  withTempDirectory "/tmp" "geval-submit-test" $ \temp -> do
+  withSystemTempDirectory "geval-submit-test" $ \temp -> do
     copyFile ("test/_submit-tests/" ++ name ++ ".tar") (temp ++ "/" ++ name ++ ".tar")
     withCurrentDirectory temp $ do
       callCommand $ "tar xf " ++ name ++ ".tar"
