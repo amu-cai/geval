@@ -439,7 +439,7 @@ getInputSourceIfNeeded forced metrics directory inputFilePath
 
 fileAsLineSource :: SourceSpec -> (Text -> Text) -> LineSource (ResourceT IO)
 fileAsLineSource spec preprocess =
-  LineSource ((smartSource spec) .| autoDecompress $= CT.decodeUtf8Lenient =$= CT.lines) preprocess spec 1
+  LineSource ((smartSource spec) .| autoDecompress .| CT.decodeUtf8Lenient .| CT.lines) preprocess spec 1
 
 gevalCoreOnSingleLines :: Metric -> (Text -> Text) -> LineInFile -> LineInFile -> LineInFile -> IO (MetricValue)
 gevalCoreOnSingleLines metric preprocess inpLine expLine outLine =
@@ -766,10 +766,10 @@ gevalCoreGeneralized parserSpec itemStep aggregator finalStep context =
 
 gevalCoreGeneralized' :: forall m ctxt c d . (EvaluationContext ctxt m, MonadUnliftIO m, MonadThrow m, MonadIO m) => ParserSpec ctxt -> ((Word32, ParsedRecord ctxt) -> c) -> (ConduitT c Void (ResourceT m) d) -> (d -> Double) -> ctxt -> m (MetricValue)
 gevalCoreGeneralized' parserSpec itemStep aggregator finalStep context = do
-   v <- runResourceT $
+   v <- runResourceT $ runConduit $
      (((getZipSource $ (,)
        <$> ZipSource (CL.sourceList [(getFirstLineNo (Proxy :: Proxy m) context)..])
-       <*> (ZipSource $ recordSource context parserSpec)) .| CL.map (checkStep (Proxy :: Proxy m) itemStep)) $$ CL.catMaybes .| aggregator)
+       <*> (ZipSource $ recordSource context parserSpec)) .| CL.map (checkStep (Proxy :: Proxy m) itemStep)) .| CL.catMaybes .| aggregator)
    return $ finalStep v
 
 -- | A type family to handle all the evaluation "context".
