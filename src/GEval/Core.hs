@@ -108,7 +108,7 @@ defaultLogLossHashedSize = 10
 data Metric = RMSE | MSE | Pearson | Spearman | BLEU | GLEU | WER | Accuracy | ClippEU
               | FMeasure Double | MacroFMeasure Double | NMI
               | LogLossHashed Word32 | CharMatch | MAP | LogLoss | Likelihood
-              | BIOF1 | BIOF1Labels | LikelihoodHashed Word32 | MAE | MultiLabelFMeasure Double
+              | BIOF1 | BIOF1Labels | TokenAccuracy | LikelihoodHashed Word32 | MAE | MultiLabelFMeasure Double
               | MultiLabelLogLoss | MultiLabelLikelihood
               | SoftFMeasure Double
               deriving (Eq)
@@ -145,6 +145,7 @@ instance Show Metric where
   show Likelihood = "Likelihood"
   show BIOF1 = "BIO-F1"
   show BIOF1Labels = "BIO-F1-Labels"
+  show TokenAccuracy = "TokenAccuracy"
   show MAE = "MAE"
   show (MultiLabelFMeasure beta) = "MultiLabel-F" ++ (show beta)
   show MultiLabelLogLoss = "MultiLabel-Logloss"
@@ -185,6 +186,7 @@ instance Read Metric where
   readsPrec _ ('M':'A':'P':theRest) = [(MAP, theRest)]
   readsPrec _ ('B':'I':'O':'-':'F':'1':'-':'L':'a':'b':'e':'l':'s':theRest) = [(BIOF1Labels, theRest)]
   readsPrec _ ('B':'I':'O':'-':'F':'1':theRest) = [(BIOF1, theRest)]
+  readsPrec _ ('T':'o':'k':'e':'n':'A':'c':'c':'u':'r':'a':'c':'y':theRest) = [(TokenAccuracy, theRest)]
   readsPrec _ ('M':'A':'E':theRest) = [(MAE, theRest)]
   readsPrec _ ('M':'u':'l':'t':'i':'L':'a':'b':'e':'l':'-':'L':'o':'g':'L':'o':'s':'s':theRest) = [(MultiLabelLogLoss, theRest)]
   readsPrec _ ('M':'u':'l':'t':'i':'L':'a':'b':'e':'l':'-':'L':'i':'k':'e':'l':'i':'h':'o':'o':'d':theRest) = [(MultiLabelLikelihood, theRest)]
@@ -216,6 +218,7 @@ getMetricOrdering LogLoss = TheLowerTheBetter
 getMetricOrdering Likelihood = TheHigherTheBetter
 getMetricOrdering BIOF1 = TheHigherTheBetter
 getMetricOrdering BIOF1Labels = TheHigherTheBetter
+getMetricOrdering TokenAccuracy = TheHigherTheBetter
 getMetricOrdering MAE = TheLowerTheBetter
 getMetricOrdering (MultiLabelFMeasure _) = TheHigherTheBetter
 getMetricOrdering MultiLabelLogLoss = TheLowerTheBetter
@@ -293,6 +296,7 @@ data GEvalException = NoExpectedFile FilePath
                       | EmptyOutput
                       | UnexpectedData Word32 String
                       | UnexpectedMultipleOutputs
+                      | OtherException String
                       deriving (Eq)
 
 instance Exception GEvalException
@@ -313,6 +317,7 @@ instance Show GEvalException where
   show EmptyOutput = "The output file is empty"
   show (UnexpectedData lineNo message) = "Line " ++ (show lineNo) ++ ": Unexpected data [" ++ message ++ "]"
   show UnexpectedMultipleOutputs = "Multiple outputs are not possible in this mode, use -o option to select an output file"
+  show (OtherException message) = message
 
 somethingWrongWithFilesMessage :: String -> FilePath -> String
 somethingWrongWithFilesMessage msg filePath = Prelude.concat
@@ -681,6 +686,26 @@ gevalCore' BIOF1Labels _ = gevalCoreWithoutInput parseBioSequenceIntoEntitiesWit
    where parseBioSequenceIntoEntitiesWithoutNormalization s = do
            entities <- parseBioSequenceIntoEntities s
            return $ Prelude.map eraseNormalisation entities
+
+gevalCore' TokenAccuracy _ = gevalCoreWithoutInput intoTokens
+                                                   intoTokens
+                                                   countHitsAndTotals
+                                                   hitsAndTotalsAgg
+                                                   (\(hits, total) -> hits /. total)
+   where intoTokens = Right . Data.Text.words
+         countHitsAndTotals :: ([Text], [Text]) -> (Int, Int)
+         countHitsAndTotals (es, os) =
+             if Prelude.length os /= Prelude.length es
+               then throw $ OtherException "wrong number of tokens"
+               else Prelude.foldl matchFun
+                                  (0, 0)
+                                  (Prelude.zip es os)
+         matchFun :: (Int, Int) -> (Text, Text) -> (Int, Int)
+         matchFun (h, t) (e, o)
+           | e == (pack "*") = (h, t)
+           | o == e = (h + 1, t + 1)
+           | otherwise = (h, t + 1)
+         hitsAndTotalsAgg = CC.foldl (\(h1, t1) (h2, t2) -> (h1 + h2, t1 + t2)) (0, 0)
 
 gevalCore' (MultiLabelFMeasure beta) _ = gevalCoreWithoutInput intoWords
                                                                getWords

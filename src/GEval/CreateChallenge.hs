@@ -256,6 +256,15 @@ The output should be given in the BIO format with the normalized forms given aft
 The metric is F1 counted on entities (not labels).
 |] ++ (commonReadmeMDContents testName)
 
+readmeMDContents TokenAccuracy testName = [i|
+Get part of speech tags for each token
+======================================
+
+This is a sample challenge for TokenAccuracy. We just
+count the accuracy per token and skip entries marked as "*"
+in the expected file.
+|] ++ (commonReadmeMDContents testName)
+
 readmeMDContents (MultiLabelFMeasure beta) testName = [i|
 Tag names and their component
 =============================
@@ -400,6 +409,9 @@ trainContents BIOF1 = [hereLit|O O O B-surname/BOND O B-firstname/JAMES B-surnam
 O O O O O	There is no name here
 B-firstname/JOHN I-surname/VON I-surname/NEUMANN	John von Nueman
 |]
+trainContents TokenAccuracy = [hereLit|* V N	I like cats
+* * V * N	I can see the rainbow
+|]
 trainContents (MultiLabelFMeasure _) = [hereLit|I know Mr John Smith	person:3,4,5 first-name:4 surname:5
 Steven bloody Brown	person:1,3 first-name:1 surname:3
 James and James	first-name:1 firstname:3
@@ -458,6 +470,9 @@ devInContents BIOF1Labels = devInContents BIOF1
 devInContents BIOF1 = [hereLit|Adam and Eve
 Mr Jan Kowalski
 |]
+devInContents TokenAccuracy = [hereLit|The cats on the mat
+Ala has a cat
+|]
 devInContents (MultiLabelFMeasure _) = [hereLit|Jan Kowalski is here
 I see him
 Barbara
@@ -512,6 +527,9 @@ devExpectedContents LogLoss = [hereLit|1.0
 devExpectedContents BIOF1Labels = devExpectedContents BIOF1
 devExpectedContents BIOF1 = [hereLit|B-firstname/ADAM O B-firstname/EVE
 O B-firstname/JAN B-surname/KOWALSKI
+|]
+devExpectedContents TokenAccuracy = [hereLit|* N * * N
+N V * N
 |]
 devExpectedContents (MultiLabelFMeasure _) = [hereLit|person:1,2 first-name:1 surname:2
 
@@ -570,6 +588,9 @@ testInContents BIOF1Labels = testInContents BIOF1
 testInContents BIOF1 = [hereLit|Alan Tring
 No name here
 |]
+testInContents TokenAccuracy = [hereLit|I have cats
+I know
+|]
 testInContents (MultiLabelFMeasure _) = [hereLit|John bloody Smith
 Nobody is there
 I saw Marketa
@@ -623,6 +644,9 @@ testExpectedContents LogLoss = [hereLit|1.0
 testExpectedContents BIOF1Labels = testExpectedContents BIOF1
 testExpectedContents BIOF1 = [hereLit|B-firstname/ALAN B-surname/TURING
 O O O
+|]
+testExpectedContents TokenAccuracy = [hereLit|* V N
+* V
 |]
 testExpectedContents (MultiLabelFMeasure _) = [hereLit|person:1,3 first-name:1 surname:3
 
