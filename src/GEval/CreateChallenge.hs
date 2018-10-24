@@ -263,6 +263,10 @@ Get part of speech tags for each token
 This is a sample challenge for TokenAccuracy. We just
 count the accuracy per token and skip entries marked as "*"
 in the expected file.
+
+More than one option separated with semicolons can be given
+in the expected file (but not in the output file).
+
 |] ++ (commonReadmeMDContents testName)
 
 readmeMDContents (MultiLabelFMeasure beta) testName = [i|

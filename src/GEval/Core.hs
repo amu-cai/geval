@@ -703,7 +703,7 @@ gevalCore' TokenAccuracy _ = gevalCoreWithoutInput intoTokens
          matchFun :: (Int, Int) -> (Text, Text) -> (Int, Int)
          matchFun (h, t) (e, o)
            | e == (pack "*") = (h, t)
-           | o == e = (h + 1, t + 1)
+           | o `Prelude.elem` (splitOn (pack ";") e) = (h + 1, t + 1)
            | otherwise = (h, t + 1)
          hitsAndTotalsAgg = CC.foldl (\(h1, t1) (h2, t2) -> (h1 + h2, t1 + t2)) (0, 0)
 
