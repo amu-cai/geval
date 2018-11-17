@@ -197,7 +197,7 @@ and run GEval for one of the submissions (UEdin-NMT):
         -o wmt17-submitted-data/txt/system-outputs/newstest2017/de-en/newstest2017.uedin-nmt.4723.de-en \
         -e wmt17-submitted-data/txt/references/newstest2017-deen-ref.en
 
-    0.3430
+    0.3512
 
 where `-i` stands for the input file, `-o` — output file, `-e` — file with expected (reference) data.
 
@@ -214,7 +214,7 @@ Let's evaluate another system:
         -o wmt17-submitted-data/txt/system-outputs/newstest2017/de-en/newstest2017.LIUM-NMT.4733.de-en \
         -e wmt17-submitted-data/txt/references/newstest2017-deen-ref.en
 
-    0.2939
+    0.3010
 
 In general, LIUM is much worse than UEdin, but were there any utterance for which UEdin is worse than LIUM?
 You could use `--diff` option to find this:
@@ -227,16 +227,16 @@ You could use `--diff` option to find this:
 
 The above command will print out the 10 sentences for which the difference between UEdin and LIUM is the largest:
 
-    -0.5714285714285714     Hier eine Übersicht:    Here is an overview:    Here is an overview:    Here's an overview:
-    -0.5714285714285714     Eine Generation protestiert.    A generation is protesting.     A generation is protesting.     A generation protesting.
-    -0.5102564102564102     Bald stehen neue Container in der Wasenstraße   New containers will soon be located in Wasenstraße      New containers will soon be available on Wasenstraße    Soon, new containers are in the water road
-    -0.5    "Die ersten 100.000 Euro sind frei."    "The first 100,000 euros are free."     "The first 100.000 euros are free."     'the first £100,000 is free. '
-    -0.4736842105263158     Als gefährdet gelten auch Arizona und Georgia.  Arizona and Georgia are also at risk.   Arizona and Georgia are also at risk.   Arizona and Georgia are also considered to be at risk.
-    -0.4444444444444445     Das ist alles andere als erholsam.      This is anything but relaxing.  That is anything but relaxing.  This is far from relaxing.
-    -0.4285714285714286     Ein Haus bietet Zuflucht.       One house offers refuge.        A house offers refuge.  A house offers sanctuary.
-    -0.42307692307692313    Weshalb wir Simone, Gabby und Laurie brauchen   Why we need Simone, Gabby and Laurie    Why we need Simone, Gabby and Laurie    Why We Need Simone, Gabby and Laurie
-    -0.4009009009009009     Die "Identitäre Bewegung" ist eine Gruppierung mit französischen Wurzeln, die seit 2012 auch in Deutschland aktiv ist.  The "Identitäre Bewegung" is a group with French roots that has been active in Germany since 2012.     The "identitarian movement" is a group with French roots that has been active in Germany since 2012.    The "Identitarian Movement" is a grouping with French roots, which has also been active in Germany since 2012.
-    -0.4004524886877827     Der Mann soll nicht direkt angesprochen werden. The man should not be approached.       The man should not be addressed directly.       The man is not expected to be addressed directly.
+    -0.5714285714285714	Hier eine Übersicht:	Here is an overview:	Here is an overview:	Here's an overview:
+    -0.5714285714285714	Eine Generation protestiert.	A generation is protesting.	A generation is protesting.	A generation protesting.
+    -0.5333333333333333	"Die ersten 100.000 Euro sind frei."	"The first 100,000 euros are free."	"The first 100.000 euros are free."	'the first £100,000 is free. '
+    -0.5102564102564102	Bald stehen neue Container in der Wasenstraße	New containers will soon be located in Wasenstraße	New containers will soon be available on Wasenstraße	Soon, new containers are in the water road
+    -0.4736842105263158	Als gefährdet gelten auch Arizona und Georgia.	Arizona and Georgia are also at risk.	Arizona and Georgia are also at risk.	Arizona and Georgia are also considered to be at risk.
+    -0.4444444444444445	Das ist alles andere als erholsam.	This is anything but relaxing.	That is anything but relaxing.	This is far from relaxing.
+    -0.4285714285714286	Ein Haus bietet Zuflucht.	One house offers refuge.	A house offers refuge.	A house offers sanctuary.
+    -0.42307692307692313	Weshalb wir Simone, Gabby und Laurie brauchen	Why we need Simone, Gabby and Laurie	Why we need Simone, Gabby and Laurie	Why We Need Simone, Gabby and Laurie
+    -0.4004524886877827	Der Mann soll nicht direkt angesprochen werden.	The man should not be approached.	The man should not be addressed directly.	The man is not expected to be addressed directly.
+    -0.3787878787878788	Aber es lässt sich ja nicht in Abrede stellen, dass die Attentäter von Ansbach und Würzburg Flüchtlinge waren.	But it cannot be denied that the perpetrators of the attacks in Ansbach and Würzburg were refugees.	But it cannot be denied that the perpetrators of Ansbach and Würzburg were refugees.	But there is no denying that the bombers of Ansbach and Würzburg were refugees.
 
 The columns goes as follows:
 
@@ -258,16 +258,16 @@ easy for UEdin:
       --most-worsening-features wmt17-submitted-data/txt/system-outputs/newstest2017/de-en/newstest2017.LIUM-NMT.4733.de-en \
       -e wmt17-submitted-data/txt/references/newstest2017-deen-ref.en | head -n 10
 
-    exp:euros       31      -0.06888191     0.00000597009369023376
-    in<1>:Euro      31      -0.05745546     0.00001601359624974303
-    exp:be  295     0.01980564      0.00039919436507962510
-    exp:Federal     12      -0.05519148     0.00044208689767323860
-    exp:small       21      -0.02782365     0.00097178111718141370
-    exp:40  9       -0.05635973     0.00121990447157221800
-    in<1>:40        9       -0.05635973     0.00121990447157221800
-    out:interior    6       -0.07150121     0.00132944903870436640
-    exp:turnover    9       -0.09077533     0.00147928107739624940
-    exp:head        17      -0.03198173     0.00170431081987969600
+    exp:euros	31	-0.06468724	0.00001097343184385749
+    in<1>:Euro	31	-0.05335673	0.00002829695624789508
+    exp:be	296	0.02055637	0.00037328997500381740
+    exp:Federal	12	-0.05291327	0.00040500816936872160
+    exp:small	21	-0.02880722	0.00081606196875884380
+    exp:turnover	9	-0.09234316	0.00096449582346370200
+    out:$	36	-0.01926724	0.00101954071759940870
+    out:interior	6	-0.07061411	0.00130090392961781970
+    exp:head	17	-0.03205283	0.00159684081554980080
+    exp:will	187	0.01737604	0.00168212689205692070
 
 Hey, UEdin, you have a problem with euros… is it due to Brexit?
 
