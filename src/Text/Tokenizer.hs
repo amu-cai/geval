@@ -53,17 +53,20 @@ tokenizeWithSpaces (Just Minimalistic) t = T.strip tTokenized
 tokenizeWithSpaces (Just V14International) t =
   T.strip tTokenized
   where tTokenized =
-          gsub [re|\p{S}|] (\s -> space <> s <> space)
-          $ gsub [re|(\p{P})([^\d])|] (\(p:n:_) -> p <> space <> n)
-          $ gsub [re|([^\d])(\p{P})|] (\(n:p:_) -> n <> space <> p) t
+          gsub [re|\s+|] toSpace
+          $ gsub [re|\p{S}|] (\s -> space <> s <> space)
+          $ gsub [re|(\p{P})([^\d])|] (\(p:n:_) -> space <> p <> space <> n)
+          $ gsub [re|([^\d])(\p{P})|] (\(n:p:_) -> n <> space <> p <> space) t
+
 -- tokenization equivalent to mteval-v13a
 -- cf. tokenize_13a function in sacrebleu evaluator
 tokenizeWithSpaces (Just V13a) t = T.strip tTokenized
   where tTokenized =
-          gsub [re|([0-9])(-)|] (\(c:p:_) -> c <> space <> p)
-          $ gsub [re|([\.,])([^0-9])|] (\(c:p:_) -> c <> space <> p)
-          $ gsub [re|([^0-9])([\.,])|] (\(c:p:_) -> c <> space <> p)
-          $ gsub [re|[\{-\~\[-\` -\&\(-\+\:-\@\/]|] (space <>) tPadded
+          gsub [re|\s+|] toSpace
+          $ gsub [re|([0-9])(-)|] (\(c:p:_) -> c <> space <> p <> space)
+          $ gsub [re|([\.,])([^0-9])|] (\(c:p:_) -> space <> c <> space <> p)
+          $ gsub [re|([^0-9])([\.,])|] (\(c:p:_) -> c <> space <> p <> space)
+          $ gsub [re|[\{-\~\[-\` -\&\(-\+\:-\@\/]|] (\s -> space <> s <> space) tPadded
         tPadded = " " <> tReplaced <> " "
         tReplaced =
           T.replace "&gt;" ">"
@@ -73,3 +76,6 @@ tokenizeWithSpaces (Just V13a) t = T.strip tTokenized
           $ T.replace "\n" " "
           $ T.replace "-\n" ""
           $ T.replace "<skipped>" "" t
+
+toSpace :: T.Text -> T.Text
+toSpace _ = space
