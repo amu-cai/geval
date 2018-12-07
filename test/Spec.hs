@@ -368,7 +368,8 @@ main = hspec $ do
             gesPrecision = Nothing,
             gesTokenizer = Nothing,
             gesGonitoHost = Nothing,
-            gesToken = Nothing }
+            gesToken = Nothing,
+            gesGonitoGitAnnexRemote = Nothing}
     it "simple test" $ do
       results <- runLineByLineGeneralized KeepTheOriginalOrder sampleChallenge Data.Conduit.List.consume
       Prelude.map (\(LineRecord inp _ _ _ _) -> inp) results `shouldBe` ["foo",
