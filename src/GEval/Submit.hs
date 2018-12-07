@@ -34,9 +34,9 @@ import qualified Data.ByteString.Char8 as BS
 tokenFileName :: String
 tokenFileName = ".token"
 
-submit :: Maybe String -> Maybe String -> IO ()
-submit Nothing _ = failWith "Please provide a Gonito host with --gonito-host option"
-submit (Just host) tok = do
+submit :: Maybe String -> Maybe String -> Maybe String -> IO ()
+submit Nothing _ _ = failWith "Please provide a Gonito host with --gonito-host option"
+submit (Just host) tok mGitAnnexRemote = do
   branch <- getCurrentBranch
   challengeId <- getChallengeId
   repoUrl <- getRemoteUrl "origin"
@@ -46,18 +46,20 @@ submit (Just host) tok = do
     checkEverythingCommitted
     checkRemoteSynced
     token <- getToken tok
-    trigger host token branch challengeId repoUrl
+    trigger host token branch challengeId repoUrl mGitAnnexRemote
 
-trigger :: String -> String -> String -> String -> String -> IO ()
-trigger host token branch challengeId repoUrl = do
+trigger :: String -> String -> String -> String -> String -> Maybe String -> IO ()
+trigger host token branch challengeId repoUrl mGitAnnexRemote = do
     putStrLn $ "Triggering: " ++ url
     putStrLn "Please wait, it may take some time"
     req <- parseRequest url
-    let params = map (\(pname, pval) -> (BS.pack $ pname, BS.pack $ pval)) [
+    let params = map (\(pname, pval) -> (BS.pack $ pname, BS.pack $ pval)) ([
           ("challenge", challengeId),
           ("branch", branch),
           ("token", token),
-          ("url", repoUrl)]
+          ("url", repoUrl)] ++ case mGitAnnexRemote of
+                                 Just gitAnnexRemote -> [("git-annex-remote", gitAnnexRemote)]
+                                 Nothing -> [])
     let req' = setRequestBodyURLEncoded params req
     httpBS req' >>= BS.putStrLn . getResponseBody
   where url = "POST " ++ hostWithProtocol ++ "/trigger-remotely"

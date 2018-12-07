@@ -155,6 +155,12 @@ specParser = GEvalSpecification
           <> help "Submit ONLY: Token for authorization with Gonito instance."
         )
       )
+  <*> ( optional . strOption $
+        ( long "gonito-git-annex-remote"
+          <> metavar "GIT-ANNEX-REMOTE"
+          <> help "Submit ONLY: Specification of a git-annex remote."
+        )
+      )
 
 singletonMaybe :: Maybe a -> Maybe [a]
 singletonMaybe (Just x) = Just [x]
@@ -250,7 +256,7 @@ runGEval''' (Just JustTokenize) _ spec = do
   justTokenize (gesTokenizer spec)
   return Nothing
 runGEval''' (Just Submit) _ spec = do
-  submit (gesGonitoHost spec) (gesToken spec)
+  submit (gesGonitoHost spec) (gesToken spec) (gesGonitoGitAnnexRemote spec)
   return Nothing
 
 initChallenge :: GEvalSpecification -> IO ()
