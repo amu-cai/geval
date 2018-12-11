@@ -446,7 +446,7 @@ getInputSourceIfNeeded forced metrics directory inputFilePath
 
 fileAsLineSource :: SourceSpec -> (Text -> Text) -> LineSource (ResourceT IO)
 fileAsLineSource spec preprocess =
-  LineSource ((smartSource spec) .| autoDecompress .| CT.decodeUtf8Lenient .| CT.lines) preprocess spec 1
+  LineSource ((smartSource spec) .| autoDecompress .| CT.decodeUtf8Lenient .| CT.lines .| CC.map (dropAround (== '\r'))) preprocess spec 1
 
 gevalCoreOnSingleLines :: Metric -> (Text -> Text) -> LineInFile -> LineInFile -> LineInFile -> IO (MetricValue)
 gevalCoreOnSingleLines metric preprocess inpLine expLine outLine =
