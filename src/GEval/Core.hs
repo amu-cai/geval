@@ -632,18 +632,18 @@ skipLineNumber :: (x -> c) -> ((Word32, x) -> c)
 skipLineNumber fun = fun . snd
 
 -- | A helper function to run evaluation when the input is not needed to calculate the metric value.
-gevalCoreWithoutInput :: (MonadUnliftIO m, MonadThrow m, MonadIO m) =>
-                      (Text -> Either String a) ->  -- ^ parser for values in the expected output
-                      (Text -> Either String b) ->  -- ^ parser for values in the output
-                      ((a, b) -> c) ->              -- ^ function which combines parsed values into a single value
-                                                  -- (will be launched for each item, e.g. an error/cost function
-                                                  -- could be calculated here)
-                      (ConduitT c Void (ResourceT m) d) ->  -- ^ a Conduit which aggregates all the combined values into
-                                                  -- a "total" value
-                      (d -> Double) ->              -- ^ function to transform the "total" value into the final score
-                      LineSource (ResourceT m) ->  -- ^ source to read the expected output
-                      LineSource (ResourceT m) ->  -- ^ source to read the output
-                      m (MetricValue)             -- ^ metric values for the output against the expected output
+gevalCoreWithoutInput :: (MonadUnliftIO m, MonadThrow m, MonadIO m)
+                      => (Text -> Either String a) -- ^ parser for values in the expected output
+                      -> (Text -> Either String b) -- ^ parser for values in the output
+                      -> ((a, b) -> c)             -- ^ function which combines parsed values into a single value
+                                                   -- (will be launched for each item, e.g. an error/cost function
+                                                   -- could be calculated here)
+                      -> (ConduitT c Void (ResourceT m) d)  -- ^ a Conduit which aggregates all the combined values into
+                                                   -- a "total" value
+                      -> (d -> Double)             -- ^ function to transform the "total" value into the final score
+                      -> LineSource (ResourceT m)  -- ^ source to read the expected output
+                      -> LineSource (ResourceT m)  -- ^ source to read the output
+                      -> m (MetricValue)           -- ^ metric values for the output against the expected output
 gevalCoreWithoutInput expParser outParser itemStep aggregator finalStep expectedLineStream outLineStream =
   gevalCoreGeneralized (ParserSpecWithoutInput expParser outParser) (trans itemStep) aggregator finalStep (WithoutInput expectedLineStream outLineStream)
  where
@@ -661,14 +661,14 @@ gevalCore''' parserSpec itemStep aggregator finalStep context =
 -- was used. It could be seen as the "engine" to run the evaluation.
 -- If you are defining a new metric, you usually don't have to change anything
 -- here.
-gevalCoreGeneralized :: (EvaluationContext ctxt m, MonadUnliftIO m, MonadThrow m, MonadIO m) =>
-                     ParserSpec ctxt ->           -- ^ parsers to parse data
-                     (ParsedRecord ctxt -> c) ->   -- ^ function to go from the parsed value into
-                                                 -- some "local" score calculated for each line (item)
-                     (ConduitT c Void (ResourceT m) d) ->  -- ^ a Conduit to aggregate score into a "total"
-                     (d -> Double) ->              -- ^ function to transform the "total" value into the final score
-                     ctxt ->                      -- ^ "context", i.e. 2 or 3 sources needed to operate
-                     m (MetricValue)
+gevalCoreGeneralized :: (EvaluationContext ctxt m, MonadUnliftIO m, MonadThrow m, MonadIO m)
+                        => ParserSpec ctxt                   -- ^ parsers to parse data
+                        -> (ParsedRecord ctxt -> c)          -- ^ function to go from the parsed value into
+                                                             -- some "local" score calculated for each line (item)
+                        -> (ConduitT c Void (ResourceT m) d) -- ^ a Conduit to aggregate score into a "total"
+                        -> (d -> Double)                     -- ^ function to transform the "total" value into the final score
+                        -> ctxt                              -- ^ "context", i.e. 2 or 3 sources needed to operate
+                        -> m (MetricValue)
 gevalCoreGeneralized parserSpec itemStep aggregator finalStep context =
   gevalCoreGeneralized' parserSpec (skipLineNumber itemStep) aggregator finalStep context
 
