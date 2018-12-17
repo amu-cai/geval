@@ -142,7 +142,7 @@ specParser = GEvalSpecification
        ( long "tokenizer"
          <> short 'T'
          <> metavar "TOKENIZER"
-         <> help "Tokenizer on expected and actual output before running evaluation (makes sense mostly for metrics such BLEU), minimalistic, 13a and v14 tokenizers are implemented so far. Will be also used for tokenizing text into features when in --worst-features and --most-worsening-features modes." ))
+         <> help "Tokenizer on expected and actual output before running evaluation (makes sense mostly for metrics such BLEU), minimalistic, 13a, v14 and character-by-character tokenizers are implemented so far. Will be also used for tokenizing text into features when in --worst-features and --most-worsening-features modes." ))
   <*> ( optional . strOption $
         ( long "gonito-host"
           <> metavar "GONITO_HOST"

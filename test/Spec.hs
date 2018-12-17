@@ -455,6 +455,9 @@ main = hspec $ do
       tokenize (Just V13a) "To be or not to be, that's the question." `shouldBe`
         ["To", "be", "or", "not", "to", "be",
          ",", "that's", "the", "question", "."]
+    it "simple utterance with 'character-by-character' tokenizer" $ do
+      tokenize (Just CharacterByCharacter) "To be or not to be." `shouldBe`
+        ["T", "o", "_", "b", "e", "_", "o", "r", "_", "n", "o", "t", "_", "t", "o", "_", "b", "e", "."]
   describe "submit" $ do
     it "current branch" $ do
       runGitTest "branch-test" (\_ -> getCurrentBranch) `shouldReturn` "develop"

@@ -9,19 +9,22 @@ import Data.Monoid ((<>))
 
 import Text.Regex.PCRE.Heavy
 
-data Tokenizer = Minimalistic | V13a | V14International
+data Tokenizer = Minimalistic | V13a | V14International | CharacterByCharacter
   deriving (Eq)
 
 instance Show Tokenizer where
   show Minimalistic = "minimalistic"
   show V13a = "13a"
   show V14International = "v14"
+  show CharacterByCharacter = "character-by-character"
 
 instance Read Tokenizer where
   readsPrec _ ('m':'i':'n':'i':'m':'a':'l':'i':'s':'t':'i':'c':theRest) =
             [(Minimalistic, theRest)]
   readsPrec _ ('1':'3':'a':theRest) = [(V13a, theRest)]
   readsPrec _ ('v':'1':'4':theRest) = [(V14International, theRest)]
+  readsPrec _ ('c':'h':'a':'r':'a':'c':'t':'e':'r':'-':'b':'y':'-':'c':'h':'a':'r':'a':'c':'t':'e':'r':theRest) =
+    [(CharacterByCharacter, theRest)]
 
 tokenize :: Maybe Tokenizer -> T.Text -> [T.Text]
 tokenize mTokenizer = T.words . (tokenizeWithSpaces mTokenizer)
@@ -77,5 +80,14 @@ tokenizeWithSpaces (Just V13a) t = T.strip tTokenized
           $ T.replace "-\n" ""
           $ T.replace "<skipped>" "" t
 
+tokenizeWithSpaces (Just CharacterByCharacter) t = T.intercalate " "
+                                                   $ map T.singleton
+                                                   $ map escapeSpace
+                                                   $ T.unpack t
+
 toSpace :: T.Text -> T.Text
 toSpace _ = space
+
+escapeSpace :: Char -> Char
+escapeSpace ' ' = '_'
+escapeSpace c = c
