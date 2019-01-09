@@ -106,10 +106,10 @@ extractFeaturesAndPValues spec =
   .| uScoresCounter
 
 
-data RankedFeature = RankedFeature Text Double MetricValue
+data RankedFeature = RankedFeature Feature Double MetricValue
                      deriving (Show)
 
-data FeatureWithPValue = FeatureWithPValue Text        -- ^ feature itself
+data FeatureWithPValue = FeatureWithPValue Feature     -- ^ feature itself
                                            Double      -- ^ p-value
                                            MetricValue -- ^ average metric value
                                            Integer     -- ^ count
@@ -117,7 +117,7 @@ data FeatureWithPValue = FeatureWithPValue Text        -- ^ feature itself
 
 formatFeatureWithPValue :: FeatureWithPValue -> Text
 formatFeatureWithPValue (FeatureWithPValue f p avg c) =
-  Data.Text.intercalate "\t" [f,
+  Data.Text.intercalate "\t" [pack $ show f,
                               (pack $ show c),
                               (pack $ printf "%0.8f" avg),
                               (pack $ printf "%0.20f" p)]
@@ -139,7 +139,7 @@ uScoresCounter = CC.map (\(RankedFeature feature r score) -> (feature, (r, score
            M.toList
            $ M.fromListWith (\(r1, s1, c1) (r2, s2, c2) -> ((r1 + r2), (s1 + s2), (c1 + c2))) l
 
-pValueCalculator :: Monad m => ConduitT (Text, (Double, MetricValue, Integer)) FeatureWithPValue (StateT Integer m) ()
+pValueCalculator :: Monad m => ConduitT (Feature, (Double, MetricValue, Integer)) FeatureWithPValue (StateT Integer m) ()
 pValueCalculator = do
   firstVal <- await
   case firstVal of
@@ -149,7 +149,7 @@ pValueCalculator = do
       CC.map $ calculatePValue total
     Nothing -> return ()
 
-calculatePValue :: Integer -> (Text, (Double, MetricValue, Integer)) -> FeatureWithPValue
+calculatePValue :: Integer -> (Feature, (Double, MetricValue, Integer)) -> FeatureWithPValue
 calculatePValue total (f, (r, s, c)) = FeatureWithPValue f
                                                          (pvalue (r - minusR c) c (total - c))
                                                          (s / (fromIntegral c))
