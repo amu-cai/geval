@@ -42,6 +42,7 @@ import Control.Monad.State.Strict
 import Data.Monoid ((<>))
 
 import GEval.FeatureExtractor
+import GEval.BlackBoxDebugging
 
 import Data.Word
 
@@ -71,14 +72,15 @@ runLineByLine ordering spec = runLineByLineGeneralized ordering spec consum
          formatScore :: MetricValue -> Text
          formatScore = Data.Text.pack . printf "%f"
 
-runWorstFeatures :: ResultOrdering -> GEvalSpecification -> IO ()
-runWorstFeatures ordering spec = runLineByLineGeneralized ordering' spec (worstFeaturesPipeline False spec)
+runWorstFeatures :: ResultOrdering -> GEvalSpecification -> BlackBoxDebuggingOptions -> IO ()
+runWorstFeatures ordering spec bbdo = runLineByLineGeneralized ordering' spec (worstFeaturesPipeline False spec bbdo)
   where ordering' = forceSomeOrdering ordering
 
 
-worstFeaturesPipeline :: Bool -> GEvalSpecification -> ConduitT LineRecord Void (ResourceT IO) ()
-worstFeaturesPipeline reversed spec = rank (lessByMetric reversed $ gesMainMetric spec)
-                                      .| evalStateC 0 (extractFeaturesAndPValues spec)
+
+worstFeaturesPipeline :: Bool -> GEvalSpecification -> BlackBoxDebuggingOptions -> ConduitT LineRecord Void (ResourceT IO) ()
+worstFeaturesPipeline reversed spec bbdo = rank (lessByMetric reversed $ gesMainMetric spec)
+                                      .| evalStateC 0 (extractFeaturesAndPValues spec bbdo)
                                       .| gobbleAndDo (sortBy featureOrder)
                                       .| CL.map (encodeUtf8 . formatFeatureWithPValue)
                                       .| CC.unlinesAscii
@@ -99,11 +101,11 @@ forceSomeOrdering :: ResultOrdering -> ResultOrdering
 forceSomeOrdering FirstTheBest = FirstTheBest
 forceSomeOrdering KeepTheOriginalOrder = FirstTheWorst
 
-extractFeaturesAndPValues :: Monad m => GEvalSpecification -> ConduitT (Double, LineRecord) FeatureWithPValue (StateT Integer m) ()
-extractFeaturesAndPValues spec =
+extractFeaturesAndPValues :: Monad m => GEvalSpecification -> BlackBoxDebuggingOptions -> ConduitT (Double, LineRecord) FeatureWithPValue (StateT Integer m) ()
+extractFeaturesAndPValues spec bbdo =
   totalCounter
   .| featureExtractor spec
-  .| uScoresCounter
+  .| uScoresCounter (bbdoMinFrequency bbdo)
 
 
 data RankedFeature = RankedFeature Feature Double MetricValue
@@ -131,22 +133,27 @@ featureExtractor spec = CC.map extract .| CC.concat
               extractUnigramFeaturesFromTabbed mTokenizer "in" inLine,
               extractUnigramFeatures mTokenizer "out" outLine]
         mTokenizer = gesTokenizer spec
-uScoresCounter :: Monad m => ConduitT RankedFeature FeatureWithPValue (StateT Integer m) ()
-uScoresCounter = CC.map (\(RankedFeature feature r score) -> (feature, (r, score, 1)))
-                 .| gobbleAndDo countUScores
-                 .| pValueCalculator
+
+uScoresCounter :: Monad m => Integer -> ConduitT RankedFeature FeatureWithPValue (StateT Integer m) ()
+uScoresCounter minFreq = CC.map (\(RankedFeature feature r score) -> (feature, (r, score, 1)))
+                         .| gobbleAndDo countUScores
+                         .| lowerFreqFiltre
+                         .| pValueCalculator minFreq
   where countUScores l =
            M.toList
            $ M.fromListWith (\(r1, s1, c1) (r2, s2, c2) -> ((r1 + r2), (s1 + s2), (c1 + c2))) l
+        lowerFreqFiltre = CC.filter (\(_, (_, _, c)) -> c >= minFreq)
 
-pValueCalculator :: Monad m => ConduitT (Feature, (Double, MetricValue, Integer)) FeatureWithPValue (StateT Integer m) ()
-pValueCalculator = do
+pValueCalculator :: Monad m => Integer -> ConduitT (Feature, (Double, MetricValue, Integer)) FeatureWithPValue (StateT Integer m) ()
+pValueCalculator minFreq = do
   firstVal <- await
   case firstVal of
-    Just i -> do
+    Just i@(_, (_, _, c)) -> do
       total <- lift get
-      yield $ calculatePValue total i
-      CC.map $ calculatePValue total
+      if total - c >= minFreq
+        then yield $ calculatePValue total i
+        else return ()
+      CC.filter (\(_, (_, _, c)) -> total - c >= minFreq) .| CC.map (calculatePValue total)
     Nothing -> return ()
 
 calculatePValue :: Integer -> (Feature, (Double, MetricValue, Integer)) -> FeatureWithPValue
@@ -225,8 +232,8 @@ runDiff ordering otherOut spec = runDiffGeneralized ordering otherOut spec consu
         formatScoreDiff :: Double -> Text
         formatScoreDiff = Data.Text.pack . printf "%f"
 
-runMostWorseningFeatures :: ResultOrdering -> FilePath -> GEvalSpecification -> IO ()
-runMostWorseningFeatures ordering otherOut spec = runDiffGeneralized ordering' otherOut spec consum
+runMostWorseningFeatures :: ResultOrdering -> FilePath -> GEvalSpecification -> BlackBoxDebuggingOptions -> IO ()
+runMostWorseningFeatures ordering otherOut spec bbdo = runDiffGeneralized ordering' otherOut spec consum
   where ordering' = forceSomeOrdering ordering
         reversed = case ordering of
           KeepTheOriginalOrder -> False
@@ -234,7 +241,7 @@ runMostWorseningFeatures ordering otherOut spec = runDiffGeneralized ordering' o
           FirstTheBest -> True
         consum :: ConduitT (LineRecord, LineRecord) Void (ResourceT IO) ()
         consum = CC.map prepareFakeLineRecord
-                 .| (worstFeaturesPipeline reversed spec)
+                 .| (worstFeaturesPipeline reversed spec bbdo)
         prepareFakeLineRecord :: (LineRecord, LineRecord) -> LineRecord
         prepareFakeLineRecord (LineRecord _ _ _ _ scorePrev, LineRecord inp exp out c score) =
           LineRecord inp exp out c (score - scorePrev)

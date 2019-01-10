@@ -26,6 +26,7 @@ import GEval.Core
 import GEval.CreateChallenge
 import GEval.LineByLine
 import GEval.Submit (submit)
+import GEval.BlackBoxDebugging
 
 import Data.Conduit.SmartSource
 
@@ -88,6 +89,7 @@ optionsParser = GEvalOptions
           <> help "When in line-by-line or diff mode, sort the results from the best to the worst"))
         <|> pure KeepTheOriginalOrder)
    <*> specParser
+   <*> blackBoxDebuggingOptionsParser
 
 precisionArgParser :: Parser Int
 precisionArgParser = option auto
@@ -162,6 +164,15 @@ specParser = GEvalSpecification
         )
       )
 
+blackBoxDebuggingOptionsParser :: Parser BlackBoxDebuggingOptions
+blackBoxDebuggingOptionsParser = BlackBoxDebuggingOptions
+  <$> option auto
+    ( long "min-frequency"
+      <> metavar "N"
+      <> help "Minimum frequency for the worst features"
+      <> value 1
+      <> showDefault)
+
 singletonMaybe :: Maybe a -> Maybe [a]
 singletonMaybe (Just x) = Just [x]
 singletonMaybe Nothing = Nothing
@@ -228,34 +239,41 @@ attemptToReadOptsFromConfigFile args opts = do
 
 
 runGEval'' :: GEvalOptions -> IO (Maybe [(SourceSpec, [MetricValue])])
-runGEval'' opts = runGEval''' (geoSpecialCommand opts) (geoResultOrdering opts) (geoSpec opts)
+runGEval'' opts = runGEval''' (geoSpecialCommand opts)
+                              (geoResultOrdering opts)
+                              (geoSpec opts)
+                              (geoBlackBoxDebugginsOptions opts)
 
-runGEval''' :: Maybe GEvalSpecialCommand -> ResultOrdering -> GEvalSpecification -> IO (Maybe [(SourceSpec, [MetricValue])])
-runGEval''' Nothing _ spec = do
+runGEval''' :: Maybe GEvalSpecialCommand
+              -> ResultOrdering
+              -> GEvalSpecification
+              -> BlackBoxDebuggingOptions
+              -> IO (Maybe [(SourceSpec, [MetricValue])])
+runGEval''' Nothing _ spec _ = do
   vals <- geval spec
   return $ Just vals
-runGEval''' (Just Init) _ spec = do
+runGEval''' (Just Init) _ spec _ = do
   initChallenge spec
   return Nothing
-runGEval''' (Just PrintVersion) _ _ = do
+runGEval''' (Just PrintVersion) _ _ _ = do
   putStrLn ("geval " ++ showVersion version)
   return Nothing
-runGEval''' (Just LineByLine) ordering spec = do
+runGEval''' (Just LineByLine) ordering spec _ = do
   runLineByLine ordering spec
   return Nothing
-runGEval''' (Just WorstFeatures) ordering spec = do
-  runWorstFeatures ordering spec
+runGEval''' (Just WorstFeatures) ordering spec bbdo = do
+  runWorstFeatures ordering spec bbdo
   return Nothing
-runGEval''' (Just (Diff otherOut)) ordering spec = do
+runGEval''' (Just (Diff otherOut)) ordering spec _ = do
   runDiff ordering otherOut spec
   return Nothing
-runGEval''' (Just (MostWorseningFeatures otherOut)) ordering spec = do
-  runMostWorseningFeatures ordering otherOut spec
+runGEval''' (Just (MostWorseningFeatures otherOut)) ordering spec bbdo = do
+  runMostWorseningFeatures ordering otherOut spec bbdo
   return Nothing
-runGEval''' (Just JustTokenize) _ spec = do
+runGEval''' (Just JustTokenize) _ spec _ = do
   justTokenize (gesTokenizer spec)
   return Nothing
-runGEval''' (Just Submit) _ spec = do
+runGEval''' (Just Submit) _ spec _ = do
   submit (gesGonitoHost spec) (gesToken spec) (gesGonitoGitAnnexRemote spec)
   return Nothing
 

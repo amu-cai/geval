@@ -86,6 +86,7 @@ import GEval.WER
 import Data.Conduit.AutoDecompress
 import Text.Tokenizer
 import GEval.Annotation
+import GEval.BlackBoxDebugging
 
 import qualified Data.HashMap.Strict as M
 import qualified Data.Vector as V
@@ -280,7 +281,8 @@ data ResultOrdering = KeepTheOriginalOrder | FirstTheWorst | FirstTheBest
 data GEvalOptions = GEvalOptions
                     { geoSpecialCommand :: Maybe GEvalSpecialCommand,
                       geoResultOrdering :: ResultOrdering,
-                      geoSpec :: GEvalSpecification }
+                      geoSpec :: GEvalSpecification,
+                      geoBlackBoxDebugginsOptions :: BlackBoxDebuggingOptions }
 
 data GEvalException = NoExpectedFile FilePath
                       | NoOutFile FilePath

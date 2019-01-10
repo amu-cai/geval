@@ -1,5 +1,5 @@
 name:                geval
-version:             1.11.3.0
+version:             1.12.0.0
 synopsis:            Machine learning evaluation tools
 description:         Please see README.md
 homepage:            http://github.com/name/project
@@ -37,6 +37,7 @@ library
                      , GEval.WER
                      , Text.Tokenizer
                      , GEval.Annotation
+                     , GEval.BlackBoxDebugging
                      , Paths_geval
   build-depends:       base >= 4.7 && < 5
                      , cond
