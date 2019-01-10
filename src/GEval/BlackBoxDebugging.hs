@@ -4,5 +4,6 @@ module GEval.BlackBoxDebugging
 
 data BlackBoxDebuggingOptions = BlackBoxDebuggingOptions {
   bbdoMinFrequency :: Integer,
-  bbdoWordShapes :: Bool
+  bbdoWordShapes :: Bool,
+  bbdoBigrams :: Bool
 }

@@ -175,6 +175,9 @@ blackBoxDebuggingOptionsParser = BlackBoxDebuggingOptions
   <*> switch
     ( long "word-shapes"
       <> help "Consider word shapes")
+  <*> switch
+    ( long "bigrams"
+      <> help "Consider feature bigrams")
 
 singletonMaybe :: Maybe a -> Maybe [a]
 singletonMaybe (Just x) = Just [x]

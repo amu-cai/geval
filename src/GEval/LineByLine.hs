@@ -129,9 +129,9 @@ featureExtractor spec bbdo = CC.map extract .| CC.concat
   where extract (rank, LineRecord inLine expLine outLine _ score) =
           Prelude.map (\f -> RankedFeature f rank score)
           $ Data.List.concat [
-              extractUnigramFeatures mTokenizer bbdo "exp" expLine,
-              extractUnigramFeaturesFromTabbed mTokenizer bbdo "in" inLine,
-              extractUnigramFeatures mTokenizer bbdo "out" outLine]
+              extractFeatures mTokenizer bbdo "exp" expLine,
+              extractFeaturesFromTabbed mTokenizer bbdo "in" inLine,
+              extractFeatures mTokenizer bbdo "out" outLine]
         mTokenizer = gesTokenizer spec
 
 uScoresCounter :: Monad m => Integer -> ConduitT RankedFeature FeatureWithPValue (StateT Integer m) ()

@@ -2,8 +2,8 @@
 
 
 module GEval.FeatureExtractor
-  (extractUnigramFeatures,
-   extractUnigramFeaturesFromTabbed,
+  (extractFeatures,
+   extractFeaturesFromTabbed,
    Feature(..))
   where
 
@@ -13,9 +13,17 @@ import Data.Monoid ((<>))
 import Text.Tokenizer
 import Text.WordShape
 import GEval.BlackBoxDebugging
+import GEval.Common
 
-data Feature = SimpleFeature FeatureNamespace AtomicFeature
+data Feature = SimpleFeature FeatureNamespace SimpleFeature
                deriving (Eq, Ord)
+
+data SimpleFeature = SimpleAtomicFeature AtomicFeature | BigramFeature AtomicFeature AtomicFeature
+               deriving (Eq, Ord)
+
+instance Show SimpleFeature where
+  show (SimpleAtomicFeature feature) = show feature
+  show (BigramFeature featureA featureB) = (show featureA) ++ "++" ++ (show featureB)
 
 instance Show Feature where
   show (SimpleFeature namespace feature) = (show namespace) ++ ":" ++ (show feature)
@@ -46,15 +54,21 @@ extractAtomicFeatures mTokenizer bbdo t = [Data.List.map TextFeature tokens] ++
     else [])
   where tokens = nub $ (tokenizeForFeatures mTokenizer) t
 
+extractSimpleFeatures :: (Maybe Tokenizer) -> BlackBoxDebuggingOptions -> Text -> [SimpleFeature]
+extractSimpleFeatures mTokenizer bbdo t = Data.List.concat $ (Prelude.map (Prelude.map SimpleAtomicFeature) atomss) ++
+                                                             if bbdoBigrams bbdo
+                                                             then Prelude.map bigramFeatures atomss
+                                                             else []
+  where atomss = extractAtomicFeatures mTokenizer bbdo t
+        bigramFeatures atoms = Prelude.map (\(a, b) -> BigramFeature a b) $ bigrams atoms
 
-extractUnigramFeatures :: (Maybe Tokenizer) -> BlackBoxDebuggingOptions -> Text -> Text -> [Feature]
-extractUnigramFeatures mTokenizer bbdo namespace record =
+extractFeatures :: (Maybe Tokenizer) -> BlackBoxDebuggingOptions -> Text -> Text -> [Feature]
+extractFeatures mTokenizer bbdo namespace record =
   Prelude.map (\af -> SimpleFeature (FeatureNamespace namespace) af)
-  $ Data.List.concat
-  $ extractAtomicFeatures mTokenizer bbdo record
+  $ extractSimpleFeatures mTokenizer bbdo record
 
-extractUnigramFeaturesFromTabbed :: (Maybe Tokenizer) -> BlackBoxDebuggingOptions -> Text -> Text -> [Feature]
-extractUnigramFeaturesFromTabbed mTokenizer bbdo namespace record =
+extractFeaturesFromTabbed :: (Maybe Tokenizer) -> BlackBoxDebuggingOptions -> Text -> Text -> [Feature]
+extractFeaturesFromTabbed mTokenizer bbdo namespace record =
   Data.List.concat
-  $ Prelude.map (\(n, t) -> Prelude.map (\af -> SimpleFeature (FeatureTabbedNamespace namespace n) af) $ Data.List.concat $ extractAtomicFeatures mTokenizer bbdo t)
+  $ Prelude.map (\(n, t) -> Prelude.map (\af -> SimpleFeature (FeatureTabbedNamespace namespace n) af) $ extractSimpleFeatures mTokenizer bbdo t)
   $ Prelude.zip [1..] (splitOn "\t" record)
