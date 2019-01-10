@@ -14,7 +14,6 @@ module GEval.Core
       Metric(..),
       MetricOrdering(..),
       getMetricOrdering,
-      MetricValue,
       GEvalSpecialCommand(..),
       GEvalSpecification(..),
       ResultOrdering(..),
@@ -99,8 +98,6 @@ import Data.Proxy
 import Data.Word
 
 import System.FilePath.Glob
-
-type MetricValue = Double
 
 defaultLogLossHashedSize :: Word32
 defaultLogLossHashedSize = 10

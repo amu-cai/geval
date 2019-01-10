@@ -20,6 +20,7 @@ module GEval.LineByLine
        ) where
 
 import GEval.Core
+import GEval.Common
 import Text.Tokenizer
 
 import Data.Conduit.AutoDecompress (doNothing)
@@ -56,6 +57,7 @@ import Statistics.Distribution (cumulative)
 import Statistics.Distribution.Normal (normalDistr)
 
 import qualified Data.Map.Strict as M
+import qualified Data.Set as S
 
 data LineRecord = LineRecord Text Text Text Word32 MetricValue
                   deriving (Eq, Show)
@@ -125,22 +127,40 @@ formatFeatureWithPValue (FeatureWithPValue f p avg c) =
                               (pack $ printf "%0.20f" p)]
 
 featureExtractor :: Monad m => GEvalSpecification -> BlackBoxDebuggingOptions -> ConduitT (Double, LineRecord) RankedFeature m ()
-featureExtractor spec bbdo = CC.map extract .| CC.concat
+featureExtractor spec bbdo = CC.map extract
+                             .| finalFeatures (bbdoCartesian bbdo) (bbdoMinFrequency bbdo)
+                             .| CC.map unwrapFeatures
+                             .| CC.concat
   where extract (rank, line@(LineRecord _ _ _ _ score)) =
-          Prelude.map (\f -> RankedFeature f rank score)
-          $ getFeatures mTokenizer bbdo line
+          LineWithPeggedFeatures rank score $ getFeatures mTokenizer bbdo line
         mTokenizer = gesTokenizer spec
+        unwrapFeatures (LineWithFeatures rank score fs) = Prelude.map (\f -> RankedFeature f rank score) fs
 
-getFeatures :: Maybe Tokenizer -> BlackBoxDebuggingOptions -> LineRecord -> [Feature]
-getFeatures mTokenizer bbdo (LineRecord inLine expLine outLine _ _) = Prelude.map UnaryFeature unaryFeatures ++
-  if bbdoCartesian bbdo
-    then cartesianFeatures unaryFeatures
-    else []
-  where unaryFeatures =
-          Data.List.concat [
-             extractFeatures mTokenizer bbdo "exp" expLine,
-             extractFeaturesFromTabbed mTokenizer bbdo "in" inLine,
-             extractFeatures mTokenizer bbdo "out" outLine]
+finalFeatures False _ = CC.map peggedToUnaryLine
+finalFeatures True minFreq = do
+  ls <- CC.sinkList
+  let unaryFeaturesFrequentEnough = S.fromList
+                                    $ Prelude.map (\(f, c) -> f)
+                                    $ Prelude.filter (\(f, c) -> c >= minFreq)
+                                    $ M.toList
+                                    $ M.fromListWith (+)
+                                    $ Data.List.concat
+                                    $ Prelude.map (\(LineWithPeggedFeatures _ _ fs) -> Prelude.map (\f -> (f, 1)) fs) ls
+
+  (CC.yieldMany $ ls) .| CC.map (addCartesian unaryFeaturesFrequentEnough)
+  where addCartesian wanted (LineWithPeggedFeatures rank score fs) = LineWithFeatures rank score
+                                                                     $ ((Prelude.map UnaryFeature fs) ++
+                                                                        (cartesianFeatures $ Prelude.filter ((flip S.member) wanted) fs))
+
+peggedToUnaryLine :: LineWithPeggedFeatures -> LineWithFeatures
+peggedToUnaryLine (LineWithPeggedFeatures rank score fs) = LineWithFeatures rank score (Prelude.map UnaryFeature fs)
+
+getFeatures :: Maybe Tokenizer -> BlackBoxDebuggingOptions -> LineRecord -> [PeggedFeature]
+getFeatures mTokenizer bbdo (LineRecord inLine expLine outLine _ _) =
+  Data.List.concat [
+     extractFeatures mTokenizer bbdo "exp" expLine,
+     extractFeaturesFromTabbed mTokenizer bbdo "in" inLine,
+     extractFeatures mTokenizer bbdo "out" outLine]
 
 uScoresCounter :: Monad m => Integer -> ConduitT RankedFeature FeatureWithPValue (StateT Integer m) ()
 uScoresCounter minFreq = CC.map (\(RankedFeature feature r score) -> (feature, (r, score, 1)))

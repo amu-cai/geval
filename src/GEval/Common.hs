@@ -6,6 +6,8 @@ import Data.Text.Read as TR
 
 import Data.Attoparsec.Text
 
+type MetricValue = Double
+
 -- some operations can be "hard" (on ints) or "soft" (on doubles),
 -- introduce a typeclass so that we could generalise easily
 class ConvertibleToDouble n where

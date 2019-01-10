@@ -1,10 +1,12 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-
 module GEval.FeatureExtractor
   (extractFeatures,
    extractFeaturesFromTabbed,
    cartesianFeatures,
+   LineWithFeatures(..),
+   LineWithPeggedFeatures(..),
+   PeggedFeature(..),
    Feature(..))
   where
 
@@ -16,12 +18,18 @@ import Text.WordShape
 import GEval.BlackBoxDebugging
 import GEval.Common
 
+data LineWithFeatures = LineWithFeatures Double MetricValue [Feature]
+                              deriving (Eq, Ord)
+
 data Feature = UnaryFeature PeggedFeature | CartesianFeature PeggedFeature PeggedFeature
                deriving (Eq, Ord)
 
 instance Show Feature where
   show (UnaryFeature feature) = show feature
   show (CartesianFeature featureA featureB) = (show featureA) ++ "~~" ++ (show featureB)
+
+data LineWithPeggedFeatures = LineWithPeggedFeatures Double MetricValue [PeggedFeature]
+                              deriving (Eq, Ord)
 
 data PeggedFeature = PeggedFeature FeatureNamespace SimpleFeature
                deriving (Eq, Ord)
@@ -80,6 +88,12 @@ extractFeaturesFromTabbed mTokenizer bbdo namespace record =
   Data.List.concat
   $ Prelude.map (\(n, t) -> Prelude.map (\af -> PeggedFeature (FeatureTabbedNamespace namespace n) af) $ extractSimpleFeatures mTokenizer bbdo t)
   $ Prelude.zip [1..] (splitOn "\t" record)
+
+addCartesianFeatures :: BlackBoxDebuggingOptions -> [LineWithPeggedFeatures] -> [LineWithFeatures]
+addCartesianFeatures bbdo linesWithPeggedFeatures = addCartesianFeatures' (bbdoCartesian bbdo) linesWithPeggedFeatures
+  where addCartesianFeatures' _ linesWithPeggedFeatures
+          = Prelude.map (\(LineWithPeggedFeatures rank score fs) ->
+                            LineWithFeatures rank score (Prelude.map UnaryFeature fs)) linesWithPeggedFeatures
 
 cartesianFeatures :: [PeggedFeature] -> [Feature]
 cartesianFeatures features = nub $ [CartesianFeature a b | a <- features, b <- features, a < b]

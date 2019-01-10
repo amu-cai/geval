@@ -23,6 +23,7 @@ import Data.String.Here
 import Data.Monoid ((<>))
 
 import GEval.Core
+import GEval.Common
 import GEval.CreateChallenge
 import GEval.LineByLine
 import GEval.Submit (submit)

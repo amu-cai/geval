@@ -4,6 +4,7 @@
 import Test.Hspec
 
 import GEval.Core
+import GEval.Common
 import GEval.OptionsParser
 import GEval.BLEU
 import GEval.ClippEU

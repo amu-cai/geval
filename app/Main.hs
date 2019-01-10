@@ -1,6 +1,7 @@
 module Main where
 
 import GEval.Core
+import GEval.Common
 import GEval.OptionsParser
 import GEval.ParseParams
 
