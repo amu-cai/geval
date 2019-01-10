@@ -126,13 +126,21 @@ formatFeatureWithPValue (FeatureWithPValue f p avg c) =
 
 featureExtractor :: Monad m => GEvalSpecification -> BlackBoxDebuggingOptions -> ConduitT (Double, LineRecord) RankedFeature m ()
 featureExtractor spec bbdo = CC.map extract .| CC.concat
-  where extract (rank, LineRecord inLine expLine outLine _ score) =
+  where extract (rank, line@(LineRecord _ _ _ _ score)) =
           Prelude.map (\f -> RankedFeature f rank score)
-          $ Data.List.concat [
-              extractFeatures mTokenizer bbdo "exp" expLine,
-              extractFeaturesFromTabbed mTokenizer bbdo "in" inLine,
-              extractFeatures mTokenizer bbdo "out" outLine]
+          $ getFeatures mTokenizer bbdo line
         mTokenizer = gesTokenizer spec
+
+getFeatures :: Maybe Tokenizer -> BlackBoxDebuggingOptions -> LineRecord -> [Feature]
+getFeatures mTokenizer bbdo (LineRecord inLine expLine outLine _ _) = Prelude.map UnaryFeature unaryFeatures ++
+  if bbdoCartesian bbdo
+    then cartesianFeatures unaryFeatures
+    else []
+  where unaryFeatures =
+          Data.List.concat [
+             extractFeatures mTokenizer bbdo "exp" expLine,
+             extractFeaturesFromTabbed mTokenizer bbdo "in" inLine,
+             extractFeatures mTokenizer bbdo "out" outLine]
 
 uScoresCounter :: Monad m => Integer -> ConduitT RankedFeature FeatureWithPValue (StateT Integer m) ()
 uScoresCounter minFreq = CC.map (\(RankedFeature feature r score) -> (feature, (r, score, 1)))

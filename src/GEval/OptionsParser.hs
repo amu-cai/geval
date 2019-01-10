@@ -178,6 +178,9 @@ blackBoxDebuggingOptionsParser = BlackBoxDebuggingOptions
   <*> switch
     ( long "bigrams"
       <> help "Consider feature bigrams")
+  <*> switch
+    ( long "cartesian"
+      <> help "Consider Cartesian combination of all features (computationally expensive!)")
 
 singletonMaybe :: Maybe a -> Maybe [a]
 singletonMaybe (Just x) = Just [x]
