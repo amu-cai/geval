@@ -14,6 +14,7 @@ import GEval.LineByLine
 import GEval.ParseParams
 import GEval.Submit
 import Text.Tokenizer
+import Text.WordShape
 import Data.Attoparsec.Text
 import Options.Applicative
 import Data.Text
@@ -458,6 +459,15 @@ main = hspec $ do
     it "simple utterance with 'character-by-character' tokenizer" $ do
       tokenize (Just CharacterByCharacter) "To be or not to be." `shouldBe`
         ["T", "o", "_", "b", "e", "_", "o", "r", "_", "n", "o", "t", "_", "t", "o", "_", "b", "e", "."]
+  describe "shapify" $ do
+    it "simple tests" $ do
+      shapify "Poznań" `shouldBe` (WordShape "Aa+")
+      shapify "2019" `shouldBe` (WordShape "9999")
+      shapify "Ala ma (czarnego) kota?" `shouldBe` (WordShape "Aa+ a+ (a+( a+.")
+      shapify "" `shouldBe` (WordShape "")
+      shapify "PCMCIA" `shouldBe` (WordShape "A+")
+      shapify "a" `shouldBe` (WordShape "a")
+      shapify "B5" `shouldBe` (WordShape "A9")
   describe "submit" $ do
     it "current branch" $ do
       runGitTest "branch-test" (\_ -> getCurrentBranch) `shouldReturn` "develop"

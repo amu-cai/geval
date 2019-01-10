@@ -104,7 +104,7 @@ forceSomeOrdering KeepTheOriginalOrder = FirstTheWorst
 extractFeaturesAndPValues :: Monad m => GEvalSpecification -> BlackBoxDebuggingOptions -> ConduitT (Double, LineRecord) FeatureWithPValue (StateT Integer m) ()
 extractFeaturesAndPValues spec bbdo =
   totalCounter
-  .| featureExtractor spec
+  .| featureExtractor spec bbdo
   .| uScoresCounter (bbdoMinFrequency bbdo)
 
 
@@ -124,14 +124,14 @@ formatFeatureWithPValue (FeatureWithPValue f p avg c) =
                               (pack $ printf "%0.8f" avg),
                               (pack $ printf "%0.20f" p)]
 
-featureExtractor :: Monad m => GEvalSpecification -> ConduitT (Double, LineRecord) RankedFeature m ()
-featureExtractor spec = CC.map extract .| CC.concat
+featureExtractor :: Monad m => GEvalSpecification -> BlackBoxDebuggingOptions -> ConduitT (Double, LineRecord) RankedFeature m ()
+featureExtractor spec bbdo = CC.map extract .| CC.concat
   where extract (rank, LineRecord inLine expLine outLine _ score) =
           Prelude.map (\f -> RankedFeature f rank score)
           $ Data.List.concat [
-              extractUnigramFeatures mTokenizer "exp" expLine,
-              extractUnigramFeaturesFromTabbed mTokenizer "in" inLine,
-              extractUnigramFeatures mTokenizer "out" outLine]
+              extractUnigramFeatures mTokenizer bbdo "exp" expLine,
+              extractUnigramFeaturesFromTabbed mTokenizer bbdo "in" inLine,
+              extractUnigramFeatures mTokenizer bbdo "out" outLine]
         mTokenizer = gesTokenizer spec
 
 uScoresCounter :: Monad m => Integer -> ConduitT RankedFeature FeatureWithPValue (StateT Integer m) ()

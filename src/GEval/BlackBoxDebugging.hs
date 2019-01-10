@@ -3,5 +3,6 @@ module GEval.BlackBoxDebugging
   where
 
 data BlackBoxDebuggingOptions = BlackBoxDebuggingOptions {
-  bbdoMinFrequency :: Integer
+  bbdoMinFrequency :: Integer,
+  bbdoWordShapes :: Bool
 }

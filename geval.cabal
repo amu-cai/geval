@@ -38,6 +38,7 @@ library
                      , Text.Tokenizer
                      , GEval.Annotation
                      , GEval.BlackBoxDebugging
+                     , Text.WordShape
                      , Paths_geval
   build-depends:       base >= 4.7 && < 5
                      , cond

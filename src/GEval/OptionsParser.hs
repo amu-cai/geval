@@ -172,6 +172,9 @@ blackBoxDebuggingOptionsParser = BlackBoxDebuggingOptions
       <> help "Minimum frequency for the worst features"
       <> value 1
       <> showDefault)
+  <*> switch
+    ( long "word-shapes"
+      <> help "Consider word shapes")
 
 singletonMaybe :: Maybe a -> Maybe [a]
 singletonMaybe (Just x) = Just [x]
