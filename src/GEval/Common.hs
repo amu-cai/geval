@@ -53,3 +53,8 @@ whitespace = many1 (satisfy isHorizontalSpace)
 indicator :: Bool -> Double
 indicator True = 1.0
 indicator False = 0.0
+
+bigrams :: [a] -> [(a, a)]
+bigrams [] = []
+bigrams [_] = []
+bigrams u = zip u $ tail u

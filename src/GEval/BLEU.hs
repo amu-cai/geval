@@ -55,11 +55,6 @@ precisionCount refs = sum . map (lookFor refs) . MS.toOccurList . MS.fromList
 upToTetragrams :: [a] -> ([a], [(a, a)], [(a, a, a)], [(a, a, a, a)])
 upToTetragrams l = (l, bigrams l, trigrams l, tetragrams l)
 
-bigrams :: [a] -> [(a, a)]
-bigrams [] = []
-bigrams [_] = []
-bigrams u = zip u $ tail u
-
 trigrams :: [a] -> [(a, a, a)]
 trigrams [] = []
 trigrams [_] = []
