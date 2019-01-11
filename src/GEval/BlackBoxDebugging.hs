@@ -6,5 +6,6 @@ data BlackBoxDebuggingOptions = BlackBoxDebuggingOptions {
   bbdoMinFrequency :: Integer,
   bbdoWordShapes :: Bool,
   bbdoBigrams :: Bool,
-  bbdoCartesian :: Bool
+  bbdoCartesian :: Bool,
+  bbdoMinCartesianFrequency :: Maybe Integer
 }

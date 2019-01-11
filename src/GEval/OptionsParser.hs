@@ -165,13 +165,16 @@ specParser = GEvalSpecification
         )
       )
 
+defaultMinFrequency :: Integer
+defaultMinFrequency = 1
+
 blackBoxDebuggingOptionsParser :: Parser BlackBoxDebuggingOptions
 blackBoxDebuggingOptionsParser = BlackBoxDebuggingOptions
   <$> option auto
     ( long "min-frequency"
       <> metavar "N"
       <> help "Minimum frequency for the worst features"
-      <> value 1
+      <> value defaultMinFrequency
       <> showDefault)
   <*> switch
     ( long "word-shapes"
@@ -182,6 +185,10 @@ blackBoxDebuggingOptionsParser = BlackBoxDebuggingOptions
   <*> switch
     ( long "cartesian"
       <> help "Consider Cartesian combination of all features (computationally expensive!)")
+  <*> optional (option auto
+                ( long "min-cartesian-frequency"
+                  <> metavar "N"
+                  <> help "When combining features into Cartesian features, consider only features whose frequency exceeds the threshold given"))
 
 singletonMaybe :: Maybe a -> Maybe [a]
 singletonMaybe (Just x) = Just [x]

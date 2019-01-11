@@ -32,6 +32,7 @@ import qualified Data.Conduit.Text as CT
 import Data.Text
 import Data.Text.Encoding
 import Data.Conduit.Rank
+import Data.Maybe (fromMaybe)
 
 import Data.List (sortBy, sort, concat)
 
@@ -129,7 +130,7 @@ formatFeatureWithPValue (FeatureWithPValue f p avg c) =
 
 featureExtractor :: Monad m => GEvalSpecification -> BlackBoxDebuggingOptions -> ConduitT (Double, LineRecord) RankedFeature m ()
 featureExtractor spec bbdo = CC.map extract
-                             .| finalFeatures (bbdoCartesian bbdo) (bbdoMinFrequency bbdo)
+                             .| finalFeatures (bbdoCartesian bbdo) (fromMaybe (bbdoMinFrequency bbdo) (bbdoMinCartesianFrequency bbdo))
                              .| CC.map unwrapFeatures
                              .| CC.concat
   where extract (rank, line@(LineRecord _ _ _ _ score)) =
