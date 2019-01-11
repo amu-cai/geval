@@ -1,12 +1,12 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 module GEval.FeatureExtractor
-  (extractFeatures,
-   extractFeaturesFromTabbed,
+  (extractFactors,
+   extractFactorsFromTabbed,
    cartesianFeatures,
    LineWithFeatures(..),
-   LineWithPeggedFeatures(..),
-   PeggedFeature(..),
+   LineWithPeggedFactors(..),
+   PeggedFactor(..),
    Feature(..))
   where
 
@@ -21,35 +21,35 @@ import GEval.Common
 data LineWithFeatures = LineWithFeatures Double MetricValue [Feature]
                               deriving (Eq, Ord)
 
-data Feature = UnaryFeature PeggedFeature | CartesianFeature PeggedFeature PeggedFeature
+data Feature = UnaryFeature PeggedFactor | CartesianFeature PeggedFactor PeggedFactor
                deriving (Eq, Ord)
 
 instance Show Feature where
-  show (UnaryFeature feature) = show feature
-  show (CartesianFeature featureA featureB) = (show featureA) ++ "~~" ++ (show featureB)
+  show (UnaryFeature factor) = show factor
+  show (CartesianFeature factorA factorB) = (show factorA) ++ "~~" ++ (show factorB)
 
-data LineWithPeggedFeatures = LineWithPeggedFeatures Double MetricValue [PeggedFeature]
+data LineWithPeggedFactors = LineWithPeggedFactors Double MetricValue [PeggedFactor]
                               deriving (Eq, Ord)
 
-data PeggedFeature = PeggedFeature FeatureNamespace SimpleFeature
+data PeggedFactor = PeggedFactor FeatureNamespace SimpleFactor
                deriving (Eq, Ord)
 
-instance Show PeggedFeature where
-  show (PeggedFeature namespace feature) = (show namespace) ++ ":" ++ (show feature)
+instance Show PeggedFactor where
+  show (PeggedFactor namespace factor) = (show namespace) ++ ":" ++ (show factor)
 
-data SimpleFeature = SimpleAtomicFeature AtomicFeature | BigramFeature AtomicFeature AtomicFeature
+data SimpleFactor = SimpleAtomicFactor AtomicFactor | BigramFactor AtomicFactor AtomicFactor
                deriving (Eq, Ord)
 
-instance Show SimpleFeature where
-  show (SimpleAtomicFeature feature) = show feature
-  show (BigramFeature featureA featureB) = (show featureA) ++ "++" ++ (show featureB)
+instance Show SimpleFactor where
+  show (SimpleAtomicFactor factor) = show factor
+  show (BigramFactor factorA factorB) = (show factorA) ++ "++" ++ (show factorB)
 
-data AtomicFeature = TextFeature Text | ShapeFeature WordShape
+data AtomicFactor = TextFactor Text | ShapeFactor WordShape
                      deriving (Eq, Ord)
 
-instance Show AtomicFeature where
-  show (TextFeature t) = unpack t
-  show (ShapeFeature (WordShape t)) = 'S':'H':'A':'P':'E':':':(unpack t)
+instance Show AtomicFactor where
+  show (TextFactor t) = unpack t
+  show (ShapeFactor (WordShape t)) = 'S':'H':'A':'P':'E':':':(unpack t)
 
 data FeatureNamespace = FeatureNamespace Text | FeatureTabbedNamespace Text Int
                         deriving (Eq, Ord)
@@ -58,42 +58,42 @@ instance Show FeatureNamespace where
   show (FeatureNamespace namespace) = unpack namespace
   show (FeatureTabbedNamespace namespace column) = ((unpack namespace) ++ "<" ++ (show column) ++ ">")
 
-tokenizeForFeatures :: (Maybe Tokenizer) -> Text -> [Text]
-tokenizeForFeatures Nothing t = Data.List.filter (not . Data.Text.null) $ split splitPred t
+tokenizeForFactors :: (Maybe Tokenizer) -> Text -> [Text]
+tokenizeForFactors Nothing t = Data.List.filter (not . Data.Text.null) $ split splitPred t
    where splitPred c = c == ' ' || c == '\t' || c == ':'
-tokenizeForFeatures mTokenizer t = tokenize mTokenizer t
+tokenizeForFactors mTokenizer t = tokenize mTokenizer t
 
-extractAtomicFeatures :: (Maybe Tokenizer) -> BlackBoxDebuggingOptions -> Text -> [[AtomicFeature]]
-extractAtomicFeatures mTokenizer bbdo t = [Data.List.map TextFeature tokens] ++
+extractAtomicFactors :: (Maybe Tokenizer) -> BlackBoxDebuggingOptions -> Text -> [[AtomicFactor]]
+extractAtomicFactors mTokenizer bbdo t = [Data.List.map TextFactor tokens] ++
   (if bbdoWordShapes bbdo
-    then [nub $ Data.List.map (ShapeFeature . shapify) tokens]
+    then [nub $ Data.List.map (ShapeFactor . shapify) tokens]
     else [])
-  where tokens = nub $ (tokenizeForFeatures mTokenizer) t
+  where tokens = nub $ (tokenizeForFactors mTokenizer) t
 
-extractSimpleFeatures :: (Maybe Tokenizer) -> BlackBoxDebuggingOptions -> Text -> [SimpleFeature]
-extractSimpleFeatures mTokenizer bbdo t = Data.List.concat $ (Prelude.map (Prelude.map SimpleAtomicFeature) atomss) ++
+extractSimpleFactors :: (Maybe Tokenizer) -> BlackBoxDebuggingOptions -> Text -> [SimpleFactor]
+extractSimpleFactors mTokenizer bbdo t = Data.List.concat $ (Prelude.map (Prelude.map SimpleAtomicFactor) atomss) ++
                                                              if bbdoBigrams bbdo
-                                                             then Prelude.map bigramFeatures atomss
+                                                             then Prelude.map bigramFactors atomss
                                                              else []
-  where atomss = extractAtomicFeatures mTokenizer bbdo t
-        bigramFeatures atoms = Prelude.map (\(a, b) -> BigramFeature a b) $ bigrams atoms
+  where atomss = extractAtomicFactors mTokenizer bbdo t
+        bigramFactors atoms = Prelude.map (\(a, b) -> BigramFactor a b) $ bigrams atoms
 
-extractFeatures :: (Maybe Tokenizer) -> BlackBoxDebuggingOptions -> Text -> Text -> [PeggedFeature]
-extractFeatures mTokenizer bbdo namespace record =
-  Prelude.map (\af -> PeggedFeature (FeatureNamespace namespace) af)
-  $ extractSimpleFeatures mTokenizer bbdo record
+extractFactors :: (Maybe Tokenizer) -> BlackBoxDebuggingOptions -> Text -> Text -> [PeggedFactor]
+extractFactors mTokenizer bbdo namespace record =
+  Prelude.map (\af -> PeggedFactor (FeatureNamespace namespace) af)
+  $ extractSimpleFactors mTokenizer bbdo record
 
-extractFeaturesFromTabbed :: (Maybe Tokenizer) -> BlackBoxDebuggingOptions -> Text -> Text -> [PeggedFeature]
-extractFeaturesFromTabbed mTokenizer bbdo namespace record =
+extractFactorsFromTabbed :: (Maybe Tokenizer) -> BlackBoxDebuggingOptions -> Text -> Text -> [PeggedFactor]
+extractFactorsFromTabbed mTokenizer bbdo namespace record =
   Data.List.concat
-  $ Prelude.map (\(n, t) -> Prelude.map (\af -> PeggedFeature (FeatureTabbedNamespace namespace n) af) $ extractSimpleFeatures mTokenizer bbdo t)
+  $ Prelude.map (\(n, t) -> Prelude.map (\af -> PeggedFactor (FeatureTabbedNamespace namespace n) af) $ extractSimpleFactors mTokenizer bbdo t)
   $ Prelude.zip [1..] (splitOn "\t" record)
 
-addCartesianFeatures :: BlackBoxDebuggingOptions -> [LineWithPeggedFeatures] -> [LineWithFeatures]
-addCartesianFeatures bbdo linesWithPeggedFeatures = addCartesianFeatures' (bbdoCartesian bbdo) linesWithPeggedFeatures
-  where addCartesianFeatures' _ linesWithPeggedFeatures
-          = Prelude.map (\(LineWithPeggedFeatures rank score fs) ->
-                            LineWithFeatures rank score (Prelude.map UnaryFeature fs)) linesWithPeggedFeatures
+addCartesianFactors :: BlackBoxDebuggingOptions -> [LineWithPeggedFactors] -> [LineWithFeatures]
+addCartesianFactors bbdo linesWithPeggedFactors = addCartesianFactors' (bbdoCartesian bbdo) linesWithPeggedFactors
+  where addCartesianFactors' _ linesWithPeggedFactors
+          = Prelude.map (\(LineWithPeggedFactors rank score fs) ->
+                            LineWithFeatures rank score (Prelude.map UnaryFeature fs)) linesWithPeggedFactors
 
-cartesianFeatures :: [PeggedFeature] -> [Feature]
-cartesianFeatures features = nub $ [CartesianFeature a b | a <- features, b <- features, a < b]
+cartesianFeatures :: [PeggedFactor] -> [Feature]
+cartesianFeatures factors = nub $ [CartesianFeature a b | a <- factors, b <- factors, a < b]
