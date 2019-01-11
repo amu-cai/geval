@@ -84,6 +84,7 @@ worstFeaturesPipeline :: Bool -> GEvalSpecification -> BlackBoxDebuggingOptions 
 worstFeaturesPipeline reversed spec bbdo = rank (lessByMetric reversed $ gesMainMetric spec)
                                       .| evalStateC 0 (extractFeaturesAndPValues spec bbdo)
                                       .| gobbleAndDo (sortBy featureOrder)
+                                      .| filtreCartesian (bbdoCartesian bbdo)
                                       .| CL.map (encodeUtf8 . formatFeatureWithPValue)
                                       .| CC.unlinesAscii
                                       .| CC.stdout
@@ -151,6 +152,13 @@ finalFeatures True minFreq = do
   where addCartesian wanted (LineWithPeggedFeatures rank score fs) = LineWithFeatures rank score
                                                                      $ ((Prelude.map UnaryFeature fs) ++
                                                                         (cartesianFeatures $ Prelude.filter ((flip S.member) wanted) fs))
+
+filtreCartesian False = CC.map id
+filtreCartesian True = CC.concatMapAccum step S.empty
+   where step f@(FeatureWithPValue (UnaryFeature p) _ _ _) mp = (S.insert p mp, [f])
+         step f@(FeatureWithPValue (CartesianFeature pA pB) _ _ _) mp = (mp, if pA `S.member` mp || pB `S.member` mp
+                                                      then []
+                                                      else [f])
 
 peggedToUnaryLine :: LineWithPeggedFeatures -> LineWithFeatures
 peggedToUnaryLine (LineWithPeggedFeatures rank score fs) = LineWithFeatures rank score (Prelude.map UnaryFeature fs)
