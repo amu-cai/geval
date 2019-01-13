@@ -103,7 +103,7 @@ worstFeaturesPipeline reversed spec bbdo = rank (lessByMetric reversed $ gesMain
 -- does not make sense at all)
 forceSomeOrdering :: ResultOrdering -> ResultOrdering
 forceSomeOrdering FirstTheBest = FirstTheBest
-forceSomeOrdering KeepTheOriginalOrder = FirstTheWorst
+forceSomeOrdering _ = FirstTheWorst
 
 extractFeaturesAndPValues :: Monad m => GEvalSpecification -> BlackBoxDebuggingOptions -> ConduitT (Double, LineRecord) FeatureWithPValue (StateT Integer m) ()
 extractFeaturesAndPValues spec bbdo =
