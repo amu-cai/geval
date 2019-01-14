@@ -278,6 +278,7 @@ data ResultOrdering = KeepTheOriginalOrder | FirstTheWorst | FirstTheBest
 data GEvalOptions = GEvalOptions
                     { geoSpecialCommand :: Maybe GEvalSpecialCommand,
                       geoResultOrdering :: ResultOrdering,
+                      geoFilter :: Maybe String,
                       geoSpec :: GEvalSpecification,
                       geoBlackBoxDebugginsOptions :: BlackBoxDebuggingOptions }
 

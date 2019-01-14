@@ -89,6 +89,10 @@ optionsParser = GEvalOptions
           <> short 'r'
           <> help "When in line-by-line or diff mode, sort the results from the best to the worst"))
         <|> pure KeepTheOriginalOrder)
+   <*> optional (strOption
+                 ( long "filter"
+                   <> metavar "FEATURE"
+                   <> help "When in line-by-line or diff mode, show only items with a given feature"))
    <*> specParser
    <*> blackBoxDebuggingOptionsParser
 
@@ -258,39 +262,41 @@ attemptToReadOptsFromConfigFile args opts = do
 runGEval'' :: GEvalOptions -> IO (Maybe [(SourceSpec, [MetricValue])])
 runGEval'' opts = runGEval''' (geoSpecialCommand opts)
                               (geoResultOrdering opts)
+                              (geoFilter opts)
                               (geoSpec opts)
                               (geoBlackBoxDebugginsOptions opts)
 
 runGEval''' :: Maybe GEvalSpecialCommand
               -> ResultOrdering
+              -> Maybe String
               -> GEvalSpecification
               -> BlackBoxDebuggingOptions
               -> IO (Maybe [(SourceSpec, [MetricValue])])
-runGEval''' Nothing _ spec _ = do
+runGEval''' Nothing _ _ spec _ = do
   vals <- geval spec
   return $ Just vals
-runGEval''' (Just Init) _ spec _ = do
+runGEval''' (Just Init) _ _ spec _ = do
   initChallenge spec
   return Nothing
-runGEval''' (Just PrintVersion) _ _ _ = do
+runGEval''' (Just PrintVersion) _ _ _ _ = do
   putStrLn ("geval " ++ showVersion version)
   return Nothing
-runGEval''' (Just LineByLine) ordering spec _ = do
-  runLineByLine ordering spec
+runGEval''' (Just LineByLine) ordering featureFilter spec bbdo = do
+  runLineByLine ordering featureFilter spec bbdo
   return Nothing
-runGEval''' (Just WorstFeatures) ordering spec bbdo = do
+runGEval''' (Just WorstFeatures) ordering _ spec bbdo = do
   runWorstFeatures ordering spec bbdo
   return Nothing
-runGEval''' (Just (Diff otherOut)) ordering spec _ = do
-  runDiff ordering otherOut spec
+runGEval''' (Just (Diff otherOut)) ordering featureFilter spec bbdo = do
+  runDiff ordering featureFilter otherOut spec bbdo
   return Nothing
-runGEval''' (Just (MostWorseningFeatures otherOut)) ordering spec bbdo = do
+runGEval''' (Just (MostWorseningFeatures otherOut)) ordering _ spec bbdo = do
   runMostWorseningFeatures ordering otherOut spec bbdo
   return Nothing
-runGEval''' (Just JustTokenize) _ spec _ = do
+runGEval''' (Just JustTokenize) _ _ spec _ = do
   justTokenize (gesTokenizer spec)
   return Nothing
-runGEval''' (Just Submit) _ spec _ = do
+runGEval''' (Just Submit) _ _ spec _ = do
   submit (gesGonitoHost spec) (gesToken spec) (gesGonitoGitAnnexRemote spec)
   return Nothing
 

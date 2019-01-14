@@ -63,10 +63,10 @@ import qualified Data.Set as S
 data LineRecord = LineRecord Text Text Text Word32 MetricValue
                   deriving (Eq, Show)
 
-runLineByLine :: ResultOrdering -> GEvalSpecification -> IO ()
-runLineByLine ordering spec = runLineByLineGeneralized ordering spec consum
+runLineByLine :: ResultOrdering -> Maybe String -> GEvalSpecification -> BlackBoxDebuggingOptions -> IO ()
+runLineByLine ordering featureFilter spec bbdo = runLineByLineGeneralized ordering spec consum
    where consum :: ConduitT LineRecord Void (ResourceT IO) ()
-         consum = (CL.map (encodeUtf8 . formatOutput) .| CC.unlinesAscii .| CC.stdout)
+         consum = (runFeatureFilter featureFilter spec bbdo .| CL.map (encodeUtf8 . formatOutput) .| CC.unlinesAscii .| CC.stdout)
          formatOutput (LineRecord inp exp out _ score) = Data.Text.intercalate "\t" [
            formatScore score,
            escapeTabs inp,
@@ -74,6 +74,16 @@ runLineByLine ordering spec = runLineByLineGeneralized ordering spec consum
            escapeTabs out]
          formatScore :: MetricValue -> Text
          formatScore = Data.Text.pack . printf "%f"
+
+runFeatureFilter :: (Monad m, FeatureSource s) => Maybe String -> GEvalSpecification -> BlackBoxDebuggingOptions -> ConduitT s s m ()
+runFeatureFilter Nothing _ _ = doNothing
+runFeatureFilter (Just feature) spec bbdo = CC.map (\l -> (fakeRank, l))
+                                            .| featureExtractor mTokenizer bbdo
+                                            .| CC.filter (checkFeature feature)
+                                            .| CC.map fst
+  where mTokenizer = gesTokenizer spec
+        fakeRank = 0.0
+        checkFeature feature (_, LineWithFeatures _ _ fs) = feature `elem` (Prelude.map show fs)
 
 runWorstFeatures :: ResultOrdering -> GEvalSpecification -> BlackBoxDebuggingOptions -> IO ()
 runWorstFeatures ordering spec bbdo = runLineByLineGeneralized ordering' spec (worstFeaturesPipeline False spec bbdo)
@@ -108,7 +118,7 @@ forceSomeOrdering _ = FirstTheWorst
 extractFeaturesAndPValues :: Monad m => GEvalSpecification -> BlackBoxDebuggingOptions -> ConduitT (Double, LineRecord) FeatureWithPValue (StateT Integer m) ()
 extractFeaturesAndPValues spec bbdo =
   totalCounter
-  .| featureExtractor spec bbdo
+  .| rankedFeatureExtractor spec bbdo
   .| uScoresCounter (bbdoMinFrequency bbdo)
 
 
@@ -128,17 +138,34 @@ formatFeatureWithPValue (FeatureWithPValue f p avg c) =
                               (pack $ printf "%0.8f" avg),
                               (pack $ printf "%0.20f" p)]
 
-featureExtractor :: Monad m => GEvalSpecification -> BlackBoxDebuggingOptions -> ConduitT (Double, LineRecord) RankedFeature m ()
-featureExtractor spec bbdo = CC.map extract
-                             .| finalFeatures (bbdoCartesian bbdo) (fromMaybe (bbdoMinFrequency bbdo) (bbdoMinCartesianFrequency bbdo))
-                             .| CC.map unwrapFeatures
-                             .| CC.concat
-  where extract (rank, line@(LineRecord _ _ _ _ score)) =
-          LineWithPeggedFactors rank score $ getFeatures mTokenizer bbdo line
-        mTokenizer = gesTokenizer spec
+rankedFeatureExtractor :: Monad m => GEvalSpecification -> BlackBoxDebuggingOptions -> ConduitT (Double, LineRecord) RankedFeature m ()
+rankedFeatureExtractor spec bbdo = featureExtractor mTokenizer bbdo
+                                   .| CC.map snd
+                                   .| CC.map unwrapFeatures
+                                   .| CC.concat
+  where mTokenizer = gesTokenizer spec
         unwrapFeatures (LineWithFeatures rank score fs) = Prelude.map (\f -> RankedFeature f rank score) fs
 
-finalFeatures False _ = CC.map peggedToUnaryLine
+class FeatureSource a where
+  getScore :: a -> MetricValue
+  mainLineRecord :: a -> LineRecord
+
+instance FeatureSource LineRecord where
+  getScore (LineRecord _ _ _ _ score) = score
+  mainLineRecord l = l
+
+instance FeatureSource (LineRecord, LineRecord) where
+  getScore (LineRecord _ _ _ _ scoreA, LineRecord _ _ _ _ scoreB) = scoreB - scoreA
+  mainLineRecord (_, l) = l
+
+featureExtractor :: (Monad m, FeatureSource s) => Maybe Tokenizer -> BlackBoxDebuggingOptions -> ConduitT (Double, s) (s, LineWithFeatures) m ()
+featureExtractor mTokenizer bbdo = CC.map extract
+                                   .| finalFeatures (bbdoCartesian bbdo) (fromMaybe (bbdoMinFrequency bbdo) (bbdoMinCartesianFrequency bbdo))
+  where extract (rank, line) =
+          (line, LineWithPeggedFactors rank (getScore line) $ getFeatures mTokenizer bbdo (mainLineRecord line))
+
+finalFeatures :: Monad m => Bool -> Integer -> ConduitT (a, LineWithPeggedFactors) (a, LineWithFeatures) m ()
+finalFeatures False _ = CC.map (\(l, p) -> (l, peggedToUnaryLine p))
 finalFeatures True minFreq = do
   ls <- CC.sinkList
   let unaryFeaturesFrequentEnough = S.fromList
@@ -147,12 +174,13 @@ finalFeatures True minFreq = do
                                     $ M.toList
                                     $ M.fromListWith (+)
                                     $ Data.List.concat
-                                    $ Prelude.map (\(LineWithPeggedFactors _ _ fs) -> Prelude.map (\f -> (f, 1)) fs) ls
+                                    $ Prelude.map (\(LineWithPeggedFactors _ _ fs) -> Prelude.map (\f -> (f, 1)) fs)
+                                    $ Prelude.map snd ls
 
   (CC.yieldMany $ ls) .| CC.map (addCartesian unaryFeaturesFrequentEnough)
-  where addCartesian wanted (LineWithPeggedFactors rank score fs) = LineWithFeatures rank score
-                                                                     $ ((Prelude.map UnaryFeature fs) ++
-                                                                        (cartesianFeatures $ Prelude.filter ((flip S.member) wanted) fs))
+  where addCartesian wanted (l, LineWithPeggedFactors rank score fs) = (l, LineWithFeatures rank score
+                                                                           $ ((Prelude.map UnaryFeature fs) ++
+                                                                              (cartesianFeatures $ Prelude.filter ((flip S.member) wanted) fs)))
 
 filtreCartesian False = CC.map id
 filtreCartesian True = CC.concatMapAccum step S.empty
@@ -254,10 +282,14 @@ gobbleAndDo fun = do
   l <- CC.sinkList
   CC.yieldMany $ fun l
 
-runDiff :: ResultOrdering -> FilePath -> GEvalSpecification -> IO ()
-runDiff ordering otherOut spec = runDiffGeneralized ordering otherOut spec consum
+runDiff :: ResultOrdering -> Maybe String -> FilePath -> GEvalSpecification -> BlackBoxDebuggingOptions -> IO ()
+runDiff ordering featureFilter otherOut spec bbdo = runDiffGeneralized ordering otherOut spec consum
   where consum :: ConduitT (LineRecord, LineRecord) Void (ResourceT IO) ()
-        consum = (CL.filter shouldBeShown .| CL.map (encodeUtf8 . formatOutput) .| CC.unlinesAscii .| CC.stdout)
+        consum = CL.filter shouldBeShown
+                 .| runFeatureFilter featureFilter spec bbdo
+                 .| CL.map (encodeUtf8 . formatOutput)
+                 .| CC.unlinesAscii
+                 .| CC.stdout
         shouldBeShown (LineRecord _ _ outA _ scoreA, LineRecord _ _ outB _ scoreB) =
           outA /= outB && scoreA /= scoreB
         formatOutput (LineRecord inp exp outA _ scoreA, LineRecord _ _ outB _ scoreB) = Data.Text.intercalate "\t" [
