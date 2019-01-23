@@ -7,5 +7,6 @@ data BlackBoxDebuggingOptions = BlackBoxDebuggingOptions {
   bbdoWordShapes :: Bool,
   bbdoBigrams :: Bool,
   bbdoCartesian :: Bool,
-  bbdoMinCartesianFrequency :: Maybe Integer
+  bbdoMinCartesianFrequency :: Maybe Integer,
+  bbdoConsiderNumericalFeatures :: Bool
 }

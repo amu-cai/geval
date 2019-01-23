@@ -21,6 +21,8 @@ import Options.Applicative
 import Data.Text
 import Text.EditDistance
 import GEval.Annotation
+import GEval.BlackBoxDebugging
+import GEval.FeatureExtractor
 
 import Data.Map.Strict
 
@@ -32,6 +34,8 @@ import System.Exit
 import System.IO
 import System.IO.Temp
 import System.IO.Silently
+
+import Data.List (sort)
 
 import qualified Test.HUnit as HU
 
@@ -507,6 +511,36 @@ main = hspec $ do
           token <- readToken
           return $ token == (Just "BBBB")
        ) `shouldReturn` True
+  describe "extracting features" $ do
+    it "extract factors" $ do
+      let bbdo = BlackBoxDebuggingOptions {
+         bbdoMinFrequency = 1,
+         bbdoWordShapes = False,
+         bbdoBigrams = True,
+         bbdoCartesian = False,
+         bbdoMinCartesianFrequency = Nothing,
+         bbdoConsiderNumericalFeatures = True }
+      (sort $ extractFactorsFromTabbed Nothing bbdo "in" "I like this\t34.3\ttests") `shouldBe` [
+         PeggedFactor (FeatureTabbedNamespace "in" 1)
+                      (SimpleAtomicFactor (TextFactor "I")),
+         PeggedFactor (FeatureTabbedNamespace "in" 1)
+                      (SimpleAtomicFactor (TextFactor "like")),
+         PeggedFactor (FeatureTabbedNamespace "in" 1)
+                      (SimpleAtomicFactor (TextFactor "this")),
+         PeggedFactor (FeatureTabbedNamespace "in" 1)
+                      (BigramFactor (TextFactor "I") (TextFactor "like")),
+         PeggedFactor (FeatureTabbedNamespace "in" 1)
+                      (BigramFactor (TextFactor "like") (TextFactor "this")),
+         PeggedFactor (FeatureTabbedNamespace "in" 1)
+                      (NumericalFactor Nothing 11),
+         PeggedFactor (FeatureTabbedNamespace "in" 2)
+                      (SimpleAtomicFactor (TextFactor "34.3")),
+         PeggedFactor (FeatureTabbedNamespace "in" 2)
+                      (NumericalFactor (Just 34.3) 4),
+         PeggedFactor (FeatureTabbedNamespace "in" 3)
+                      (SimpleAtomicFactor (TextFactor "tests")),
+         PeggedFactor (FeatureTabbedNamespace "in" 3)
+                      (NumericalFactor Nothing 5) ]
 
 checkConduitPure conduit inList expList = do
   let outList = runConduitPure $ CC.yieldMany inList .| conduit .| CC.sinkList

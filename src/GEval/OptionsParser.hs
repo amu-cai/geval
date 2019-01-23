@@ -193,6 +193,9 @@ blackBoxDebuggingOptionsParser = BlackBoxDebuggingOptions
                 ( long "min-cartesian-frequency"
                   <> metavar "N"
                   <> help "When combining features into Cartesian features, consider only features whose frequency exceeds the threshold given"))
+  <*> switch
+    ( long "numerical-features"
+      <> help "Consider numerical features or field lengths")
 
 singletonMaybe :: Maybe a -> Maybe [a]
 singletonMaybe (Just x) = Just [x]
