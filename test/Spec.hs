@@ -522,23 +522,23 @@ main = hspec $ do
          bbdoConsiderNumericalFeatures = True }
       (sort $ extractFactorsFromTabbed Nothing bbdo "in" "I like this\t34.3\ttests") `shouldBe` [
          PeggedFactor (FeatureTabbedNamespace "in" 1)
-                      (SimpleAtomicFactor (TextFactor "I")),
+                      (SimpleExistentialFactor (SimpleAtomicFactor (TextFactor "I"))),
          PeggedFactor (FeatureTabbedNamespace "in" 1)
-                      (SimpleAtomicFactor (TextFactor "like")),
+                      (SimpleExistentialFactor (SimpleAtomicFactor (TextFactor "like"))),
          PeggedFactor (FeatureTabbedNamespace "in" 1)
-                      (SimpleAtomicFactor (TextFactor "this")),
+                      (SimpleExistentialFactor (SimpleAtomicFactor (TextFactor "this"))),
          PeggedFactor (FeatureTabbedNamespace "in" 1)
-                      (BigramFactor (TextFactor "I") (TextFactor "like")),
+                      (SimpleExistentialFactor (BigramFactor (TextFactor "I") (TextFactor "like"))),
          PeggedFactor (FeatureTabbedNamespace "in" 1)
-                      (BigramFactor (TextFactor "like") (TextFactor "this")),
+                      (SimpleExistentialFactor (BigramFactor (TextFactor "like") (TextFactor "this"))),
          PeggedFactor (FeatureTabbedNamespace "in" 1)
                       (NumericalFactor Nothing 11),
          PeggedFactor (FeatureTabbedNamespace "in" 2)
-                      (SimpleAtomicFactor (TextFactor "34.3")),
+                      (SimpleExistentialFactor (SimpleAtomicFactor (TextFactor "34.3"))),
          PeggedFactor (FeatureTabbedNamespace "in" 2)
                       (NumericalFactor (Just 34.3) 4),
          PeggedFactor (FeatureTabbedNamespace "in" 3)
-                      (SimpleAtomicFactor (TextFactor "tests")),
+                      (SimpleExistentialFactor (SimpleAtomicFactor (TextFactor "tests"))),
          PeggedFactor (FeatureTabbedNamespace "in" 3)
                       (NumericalFactor Nothing 5) ]
 

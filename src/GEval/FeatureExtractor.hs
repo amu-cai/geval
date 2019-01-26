@@ -9,6 +9,7 @@ module GEval.FeatureExtractor
    PeggedFactor(..),
    Feature(..),
    SimpleFactor(..),
+   ExistentialFactor(..),
    AtomicFactor(..),
    FeatureNamespace(..))
   where
@@ -41,14 +42,20 @@ data PeggedFactor = PeggedFactor FeatureNamespace SimpleFactor
 instance Show PeggedFactor where
   show (PeggedFactor namespace factor) = (show namespace) ++ ":" ++ (show factor)
 
-data SimpleFactor = SimpleAtomicFactor AtomicFactor | BigramFactor AtomicFactor AtomicFactor | NumericalFactor (Maybe Double) Int
+data SimpleFactor = SimpleExistentialFactor ExistentialFactor | NumericalFactor (Maybe Double) Int
                deriving (Eq, Ord)
 
 instance Show SimpleFactor where
-  show (SimpleAtomicFactor factor) = show factor
-  show (BigramFactor factorA factorB) = (show factorA) ++ "++" ++ (show factorB)
+  show (SimpleExistentialFactor factor) = show factor
   show (NumericalFactor (Just v) _) = ("=" ++ (show v))
   show (NumericalFactor (Nothing) l) = ("=#" ++ (show l))
+
+data ExistentialFactor = SimpleAtomicFactor AtomicFactor | BigramFactor AtomicFactor AtomicFactor
+                         deriving (Eq, Ord)
+
+instance Show ExistentialFactor where
+  show (SimpleAtomicFactor factor) = show factor
+  show (BigramFactor factorA factorB) = (show factorA) ++ "++" ++ (show factorB)
 
 data AtomicFactor = TextFactor Text | ShapeFactor WordShape
                      deriving (Eq, Ord)
@@ -77,15 +84,15 @@ extractAtomicFactors mTokenizer bbdo t = [Data.List.map TextFactor tokens] ++
   where tokens = nub $ (tokenizeForFactors mTokenizer) t
 
 extractSimpleFactors :: (Maybe Tokenizer) -> BlackBoxDebuggingOptions -> Text -> [SimpleFactor]
-extractSimpleFactors mTokenizer bbdo t = Data.List.concat $ (Prelude.map (Prelude.map SimpleAtomicFactor) atomss) ++
-                                                             (if bbdoBigrams bbdo
-                                                              then Prelude.map bigramFactors atomss
-                                                              else [])
-                                                                                                                  ++
-                                                             (if bbdoConsiderNumericalFeatures bbdo
-                                                              then [numericalFactor t]
-                                                              else [])
+extractSimpleFactors mTokenizer bbdo t = Data.List.concat $ (Prelude.map (Prelude.map SimpleExistentialFactor) existentials) ++
+                                                            (if bbdoConsiderNumericalFeatures bbdo
+                                                             then [numericalFactor t]
+                                                             else [])
   where atomss = extractAtomicFactors mTokenizer bbdo t
+        existentials = (Prelude.map (Prelude.map SimpleAtomicFactor) atomss) ++
+                       (if bbdoBigrams bbdo
+                        then Prelude.map bigramFactors atomss
+                        else [])
         bigramFactors atoms = Prelude.map (\(a, b) -> BigramFactor a b) $ bigrams atoms
         numericalFactor t = [NumericalFactor (readMaybe $ unpack t) (Data.Text.length t)]
 extractFactors :: (Maybe Tokenizer) -> BlackBoxDebuggingOptions -> Text -> Text -> [PeggedFactor]
