@@ -4,11 +4,11 @@ module GEval.FeatureExtractor
   (extractFactors,
    extractFactorsFromTabbed,
    cartesianFeatures,
-   LineWithFeatures(..),
+   LineWithFactors(..),
    LineWithPeggedFactors(..),
    PeggedFactor(..),
    PeggedExistentialFactor(..),
-   Feature(..),
+   Factor(..),
    SimpleFactor(..),
    ExistentialFactor(..),
    AtomicFactor(..),
@@ -26,15 +26,15 @@ import GEval.BlackBoxDebugging
 import GEval.Common
 import Text.Read (readMaybe)
 
-data LineWithFeatures = LineWithFeatures Double MetricValue [Feature]
+data LineWithFactors = LineWithFactors Double MetricValue [Factor]
                               deriving (Eq, Ord)
 
-data Feature = UnaryFeature PeggedFactor | CartesianFeature PeggedExistentialFactor PeggedExistentialFactor
+data Factor = UnaryFactor PeggedFactor | CartesianFactor PeggedExistentialFactor PeggedExistentialFactor
                deriving (Eq, Ord)
 
-instance Show Feature where
-  show (UnaryFeature factor) = show factor
-  show (CartesianFeature factorA factorB) = (show factorA) ++ "~~" ++ (show factorB)
+instance Show Factor where
+  show (UnaryFactor factor) = show factor
+  show (CartesianFactor factorA factorB) = (show factorA) ++ "~~" ++ (show factorB)
 
 data LineWithPeggedFactors = LineWithPeggedFactors Double MetricValue [PeggedFactor]
                               deriving (Eq, Ord)
@@ -115,14 +115,14 @@ extractFactorsFromTabbed mTokenizer bbdo namespace record =
   $ Prelude.map (\(n, t) -> Prelude.map (\af -> PeggedFactor (FeatureTabbedNamespace namespace n) af) $ extractSimpleFactors mTokenizer bbdo t)
   $ Prelude.zip [1..] (splitOn "\t" record)
 
-addCartesianFactors :: BlackBoxDebuggingOptions -> [LineWithPeggedFactors] -> [LineWithFeatures]
+addCartesianFactors :: BlackBoxDebuggingOptions -> [LineWithPeggedFactors] -> [LineWithFactors]
 addCartesianFactors bbdo linesWithPeggedFactors = addCartesianFactors' (bbdoCartesian bbdo) linesWithPeggedFactors
   where addCartesianFactors' _ linesWithPeggedFactors
           = Prelude.map (\(LineWithPeggedFactors rank score fs) ->
-                            LineWithFeatures rank score (Prelude.map UnaryFeature fs)) linesWithPeggedFactors
+                            LineWithFactors rank score (Prelude.map UnaryFactor fs)) linesWithPeggedFactors
 
-cartesianFeatures :: [PeggedExistentialFactor] -> [Feature]
-cartesianFeatures factors = nub $ [CartesianFeature a b | a <- factors, b <- factors, a < b]
+cartesianFeatures :: [PeggedExistentialFactor] -> [Factor]
+cartesianFeatures factors = nub $ [CartesianFactor a b | a <- factors, b <- factors, a < b]
 
 filterExistentialFactors :: [PeggedFactor] -> [PeggedExistentialFactor]
 filterExistentialFactors factors = catMaybes $ Prelude.map toExistential factors

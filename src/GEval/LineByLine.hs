@@ -83,7 +83,7 @@ runFeatureFilter (Just feature) spec bbdo = CC.map (\l -> (fakeRank, l))
                                             .| CC.map fst
   where mTokenizer = gesTokenizer spec
         fakeRank = 0.0
-        checkFeature feature (_, LineWithFeatures _ _ fs) = feature `elem` (Prelude.map show fs)
+        checkFeature feature (_, LineWithFactors _ _ fs) = feature `elem` (Prelude.map show fs)
 
 runWorstFeatures :: ResultOrdering -> GEvalSpecification -> BlackBoxDebuggingOptions -> IO ()
 runWorstFeatures ordering spec bbdo = runLineByLineGeneralized ordering' spec (worstFeaturesPipeline False spec bbdo)
@@ -122,10 +122,10 @@ extractFeaturesAndPValues spec bbdo =
   .| uScoresCounter (bbdoMinFrequency bbdo)
 
 
-data RankedFeature = RankedFeature Feature Double MetricValue
-                     deriving (Show)
+data RankedFactor = RankedFactor Factor Double MetricValue
+                    deriving (Show)
 
-data FeatureWithPValue = FeatureWithPValue Feature     -- ^ feature itself
+data FeatureWithPValue = FeatureWithPValue Factor      -- ^ feature itself
                                            Double      -- ^ p-value
                                            MetricValue -- ^ average metric value
                                            Integer     -- ^ count
@@ -138,13 +138,13 @@ formatFeatureWithPValue (FeatureWithPValue f p avg c) =
                               (pack $ printf "%0.8f" avg),
                               (pack $ printf "%0.20f" p)]
 
-rankedFeatureExtractor :: Monad m => GEvalSpecification -> BlackBoxDebuggingOptions -> ConduitT (Double, LineRecord) RankedFeature m ()
+rankedFeatureExtractor :: Monad m => GEvalSpecification -> BlackBoxDebuggingOptions -> ConduitT (Double, LineRecord) RankedFactor m ()
 rankedFeatureExtractor spec bbdo = featureExtractor mTokenizer bbdo
                                    .| CC.map snd
                                    .| CC.map unwrapFeatures
                                    .| CC.concat
   where mTokenizer = gesTokenizer spec
-        unwrapFeatures (LineWithFeatures rank score fs) = Prelude.map (\f -> RankedFeature f rank score) fs
+        unwrapFeatures (LineWithFactors rank score fs) = Prelude.map (\f -> RankedFactor f rank score) fs
 
 class FeatureSource a where
   getScore :: a -> MetricValue
@@ -158,13 +158,13 @@ instance FeatureSource (LineRecord, LineRecord) where
   getScore (LineRecord _ _ _ _ scoreA, LineRecord _ _ _ _ scoreB) = scoreB - scoreA
   mainLineRecord (_, l) = l
 
-featureExtractor :: (Monad m, FeatureSource s) => Maybe Tokenizer -> BlackBoxDebuggingOptions -> ConduitT (Double, s) (s, LineWithFeatures) m ()
+featureExtractor :: (Monad m, FeatureSource s) => Maybe Tokenizer -> BlackBoxDebuggingOptions -> ConduitT (Double, s) (s, LineWithFactors) m ()
 featureExtractor mTokenizer bbdo = CC.map extract
                                    .| finalFeatures (bbdoCartesian bbdo) (fromMaybe (bbdoMinFrequency bbdo) (bbdoMinCartesianFrequency bbdo))
   where extract (rank, line) =
           (line, LineWithPeggedFactors rank (getScore line) $ getFeatures mTokenizer bbdo (mainLineRecord line))
 
-finalFeatures :: Monad m => Bool -> Integer -> ConduitT (a, LineWithPeggedFactors) (a, LineWithFeatures) m ()
+finalFeatures :: Monad m => Bool -> Integer -> ConduitT (a, LineWithPeggedFactors) (a, LineWithFactors) m ()
 finalFeatures False _ = CC.map (\(l, p) -> (l, peggedToUnaryLine p))
 finalFeatures True minFreq = do
   ls <- CC.sinkList
@@ -178,20 +178,20 @@ finalFeatures True minFreq = do
                                     $ Prelude.map snd ls
 
   (CC.yieldMany $ ls) .| CC.map (addCartesian unaryFeaturesFrequentEnough)
-  where addCartesian wanted (l, LineWithPeggedFactors rank score fs) = (l, LineWithFeatures rank score
-                                                                           $ ((Prelude.map UnaryFeature fs) ++
+  where addCartesian wanted (l, LineWithPeggedFactors rank score fs) = (l, LineWithFactors rank score
+                                                                           $ ((Prelude.map UnaryFactor fs) ++
                                                                               (cartesianFeatures $ Prelude.filter ((flip S.member) wanted) $ filterExistentialFactors fs)))
 
 filtreCartesian False = CC.map id
 filtreCartesian True = CC.concatMapAccum step S.empty
-   where step f@(FeatureWithPValue (UnaryFeature (PeggedFactor namespace (SimpleExistentialFactor p))) _ _ _) mp = (S.insert (PeggedExistentialFactor namespace p) mp, [f])
-         step f@(FeatureWithPValue (UnaryFeature (PeggedFactor namespace (NumericalFactor _ _))) _ _ _) mp = (mp, [f])
-         step f@(FeatureWithPValue (CartesianFeature pA pB) _ _ _) mp = (mp, if pA `S.member` mp || pB `S.member` mp
+   where step f@(FeatureWithPValue (UnaryFactor (PeggedFactor namespace (SimpleExistentialFactor p))) _ _ _) mp = (S.insert (PeggedExistentialFactor namespace p) mp, [f])
+         step f@(FeatureWithPValue (UnaryFactor (PeggedFactor namespace (NumericalFactor _ _))) _ _ _) mp = (mp, [f])
+         step f@(FeatureWithPValue (CartesianFactor pA pB) _ _ _) mp = (mp, if pA `S.member` mp || pB `S.member` mp
                                                       then []
                                                       else [f])
 
-peggedToUnaryLine :: LineWithPeggedFactors -> LineWithFeatures
-peggedToUnaryLine (LineWithPeggedFactors rank score fs) = LineWithFeatures rank score (Prelude.map UnaryFeature fs)
+peggedToUnaryLine :: LineWithPeggedFactors -> LineWithFactors
+peggedToUnaryLine (LineWithPeggedFactors rank score fs) = LineWithFactors rank score (Prelude.map UnaryFactor fs)
 
 getFeatures :: Maybe Tokenizer -> BlackBoxDebuggingOptions -> LineRecord -> [PeggedFactor]
 getFeatures mTokenizer bbdo (LineRecord inLine expLine outLine _ _) =
@@ -200,8 +200,8 @@ getFeatures mTokenizer bbdo (LineRecord inLine expLine outLine _ _) =
      extractFactorsFromTabbed mTokenizer bbdo "in" inLine,
      extractFactors mTokenizer bbdo "out" outLine]
 
-uScoresCounter :: Monad m => Integer -> ConduitT RankedFeature FeatureWithPValue (StateT Integer m) ()
-uScoresCounter minFreq = CC.map (\(RankedFeature feature r score) -> (feature, (r, score, 1)))
+uScoresCounter :: Monad m => Integer -> ConduitT RankedFactor FeatureWithPValue (StateT Integer m) ()
+uScoresCounter minFreq = CC.map (\(RankedFactor feature r score) -> (feature, (r, score, 1)))
                          .| gobbleAndDo countUScores
                          .| lowerFreqFiltre
                          .| pValueCalculator minFreq
@@ -210,7 +210,7 @@ uScoresCounter minFreq = CC.map (\(RankedFeature feature r score) -> (feature, (
            $ M.fromListWith (\(r1, s1, c1) (r2, s2, c2) -> ((r1 + r2), (s1 + s2), (c1 + c2))) l
         lowerFreqFiltre = CC.filter (\(_, (_, _, c)) -> c >= minFreq)
 
-pValueCalculator :: Monad m => Integer -> ConduitT (Feature, (Double, MetricValue, Integer)) FeatureWithPValue (StateT Integer m) ()
+pValueCalculator :: Monad m => Integer -> ConduitT (Factor, (Double, MetricValue, Integer)) FeatureWithPValue (StateT Integer m) ()
 pValueCalculator minFreq = do
   firstVal <- await
   case firstVal of
@@ -222,7 +222,7 @@ pValueCalculator minFreq = do
       CC.filter (\(_, (_, _, c)) -> total - c >= minFreq) .| CC.map (calculatePValue total)
     Nothing -> return ()
 
-calculatePValue :: Integer -> (Feature, (Double, MetricValue, Integer)) -> FeatureWithPValue
+calculatePValue :: Integer -> (Factor, (Double, MetricValue, Integer)) -> FeatureWithPValue
 calculatePValue total (f, (r, s, c)) = FeatureWithPValue f
                                                          (pvalue (r - minusR c) c (total - c))
                                                          (s / (fromIntegral c))
