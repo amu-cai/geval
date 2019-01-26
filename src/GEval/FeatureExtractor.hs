@@ -7,16 +7,19 @@ module GEval.FeatureExtractor
    LineWithFeatures(..),
    LineWithPeggedFactors(..),
    PeggedFactor(..),
+   PeggedExistentialFactor(..),
    Feature(..),
    SimpleFactor(..),
    ExistentialFactor(..),
    AtomicFactor(..),
-   FeatureNamespace(..))
+   FeatureNamespace(..),
+   filterExistentialFactors)
   where
 
 import Data.Text
 import Data.List
 import Data.Monoid ((<>))
+import Data.Maybe (catMaybes)
 import Text.Tokenizer
 import Text.WordShape
 import GEval.BlackBoxDebugging
@@ -26,7 +29,7 @@ import Text.Read (readMaybe)
 data LineWithFeatures = LineWithFeatures Double MetricValue [Feature]
                               deriving (Eq, Ord)
 
-data Feature = UnaryFeature PeggedFactor | CartesianFeature PeggedFactor PeggedFactor
+data Feature = UnaryFeature PeggedFactor | CartesianFeature PeggedExistentialFactor PeggedExistentialFactor
                deriving (Eq, Ord)
 
 instance Show Feature where
@@ -41,6 +44,12 @@ data PeggedFactor = PeggedFactor FeatureNamespace SimpleFactor
 
 instance Show PeggedFactor where
   show (PeggedFactor namespace factor) = (show namespace) ++ ":" ++ (show factor)
+
+data PeggedExistentialFactor = PeggedExistentialFactor FeatureNamespace ExistentialFactor
+                               deriving (Eq, Ord)
+
+instance Show PeggedExistentialFactor where
+  show (PeggedExistentialFactor namespace factor) = (show namespace) ++ ":" ++ (show factor)
 
 data SimpleFactor = SimpleExistentialFactor ExistentialFactor | NumericalFactor (Maybe Double) Int
                deriving (Eq, Ord)
@@ -112,5 +121,10 @@ addCartesianFactors bbdo linesWithPeggedFactors = addCartesianFactors' (bbdoCart
           = Prelude.map (\(LineWithPeggedFactors rank score fs) ->
                             LineWithFeatures rank score (Prelude.map UnaryFeature fs)) linesWithPeggedFactors
 
-cartesianFeatures :: [PeggedFactor] -> [Feature]
+cartesianFeatures :: [PeggedExistentialFactor] -> [Feature]
 cartesianFeatures factors = nub $ [CartesianFeature a b | a <- factors, b <- factors, a < b]
+
+filterExistentialFactors :: [PeggedFactor] -> [PeggedExistentialFactor]
+filterExistentialFactors factors = catMaybes $ Prelude.map toExistential factors
+  where toExistential (PeggedFactor namespace (SimpleExistentialFactor factor)) = Just $ PeggedExistentialFactor namespace factor
+        toExistential _ = Nothing

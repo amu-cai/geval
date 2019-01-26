@@ -174,17 +174,18 @@ finalFeatures True minFreq = do
                                     $ M.toList
                                     $ M.fromListWith (+)
                                     $ Data.List.concat
-                                    $ Prelude.map (\(LineWithPeggedFactors _ _ fs) -> Prelude.map (\f -> (f, 1)) fs)
+                                    $ Prelude.map (\(LineWithPeggedFactors _ _ fs) -> Prelude.map (\f -> (f, 1)) $ filterExistentialFactors fs)
                                     $ Prelude.map snd ls
 
   (CC.yieldMany $ ls) .| CC.map (addCartesian unaryFeaturesFrequentEnough)
   where addCartesian wanted (l, LineWithPeggedFactors rank score fs) = (l, LineWithFeatures rank score
                                                                            $ ((Prelude.map UnaryFeature fs) ++
-                                                                              (cartesianFeatures $ Prelude.filter ((flip S.member) wanted) fs)))
+                                                                              (cartesianFeatures $ Prelude.filter ((flip S.member) wanted) $ filterExistentialFactors fs)))
 
 filtreCartesian False = CC.map id
 filtreCartesian True = CC.concatMapAccum step S.empty
-   where step f@(FeatureWithPValue (UnaryFeature p) _ _ _) mp = (S.insert p mp, [f])
+   where step f@(FeatureWithPValue (UnaryFeature (PeggedFactor namespace (SimpleExistentialFactor p))) _ _ _) mp = (S.insert (PeggedExistentialFactor namespace p) mp, [f])
+         step f@(FeatureWithPValue (UnaryFeature (PeggedFactor namespace (NumericalFactor _ _))) _ _ _) mp = (mp, [f])
          step f@(FeatureWithPValue (CartesianFeature pA pB) _ _ _) mp = (mp, if pA `S.member` mp || pB `S.member` mp
                                                       then []
                                                       else [f])
