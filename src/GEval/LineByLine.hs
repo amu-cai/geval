@@ -34,7 +34,9 @@ import Data.Text.Encoding
 import Data.Conduit.Rank
 import Data.Maybe (fromMaybe)
 
-import Data.List (sortBy, sort, concat)
+import qualified Data.Vector as V
+
+import Data.List (sortBy, sortOn, sort, concat)
 
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Resource
@@ -56,6 +58,7 @@ import System.FilePath
 
 import Statistics.Distribution (cumulative)
 import Statistics.Distribution.Normal (normalDistr)
+import Data.Statistics.Kendall (kendallZ)
 
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
@@ -125,7 +128,7 @@ extractFeaturesAndPValues spec bbdo =
 data RankedFactor = RankedFactor Factor Double MetricValue
                     deriving (Show)
 
-data FeatureWithPValue = FeatureWithPValue Factor      -- ^ feature itself
+data FeatureWithPValue = FeatureWithPValue Feature     -- ^ feature itself
                                            Double      -- ^ p-value
                                            MetricValue -- ^ average metric value
                                            Integer     -- ^ count
@@ -184,11 +187,12 @@ finalFeatures True minFreq = do
 
 filtreCartesian False = CC.map id
 filtreCartesian True = CC.concatMapAccum step S.empty
-   where step f@(FeatureWithPValue (UnaryFactor (PeggedFactor namespace (SimpleExistentialFactor p))) _ _ _) mp = (S.insert (PeggedExistentialFactor namespace p) mp, [f])
-         step f@(FeatureWithPValue (UnaryFactor (PeggedFactor namespace (NumericalFactor _ _))) _ _ _) mp = (mp, [f])
-         step f@(FeatureWithPValue (CartesianFactor pA pB) _ _ _) mp = (mp, if pA `S.member` mp || pB `S.member` mp
-                                                      then []
-                                                      else [f])
+   where step f@(FeatureWithPValue (UnaryFeature fac) _ _ _) mp = (S.insert fac mp, [f])
+         step f@(FeatureWithPValue (CartesianFeature pA pB) _ _ _) mp = (mp, if pA `S.member` mp || pB `S.member` mp
+                                                                             then []
+                                                                             else [f])
+         step f@(FeatureWithPValue (NumericalFeature _ _ _) _ _ _) mp = (mp, [f])
+
 
 peggedToUnaryLine :: LineWithPeggedFactors -> LineWithFactors
 peggedToUnaryLine (LineWithPeggedFactors rank score fs) = LineWithFactors rank score (Prelude.map UnaryFactor fs)
@@ -200,33 +204,69 @@ getFeatures mTokenizer bbdo (LineRecord inLine expLine outLine _ _) =
      extractFactorsFromTabbed mTokenizer bbdo "in" inLine,
      extractFactors mTokenizer bbdo "out" outLine]
 
+data FeatureAggregate = ExistentialFactorAggregate Double MetricValue Integer
+                        | NumericalValueAggregate [Double] [MetricValue] [Int] [MetricValue]
+                        | LengthAggregate [Double] [MetricValue] [Int]
+
+aggreggate :: FeatureAggregate -> FeatureAggregate -> FeatureAggregate
+aggreggate (ExistentialFactorAggregate r1 s1 c1) (ExistentialFactorAggregate r2 s2 c2) =
+  ExistentialFactorAggregate (r1 + r2) (s1 + s2) (c1 + c2)
+aggreggate (NumericalValueAggregate ranks1 scores1 lengths1 values1) (NumericalValueAggregate ranks2 scores2 lengths2 values2) =
+  NumericalValueAggregate (ranks1 ++ ranks2) (scores1 ++ scores2) (lengths1 ++ lengths2) (values1 ++ values2)
+aggreggate (NumericalValueAggregate ranks1 scores1 lengths1 _) (LengthAggregate ranks2 scores2 lengths2) =
+  LengthAggregate (ranks1 ++ ranks2) (scores1 ++ scores2) (lengths1 ++ lengths2)
+aggreggate (LengthAggregate ranks1 scores1 lengths1) (NumericalValueAggregate ranks2 scores2 lengths2 _) =
+  LengthAggregate (ranks1 ++ ranks2) (scores1 ++ scores2) (lengths1 ++ lengths2)
+aggreggate (LengthAggregate ranks1 scores1 lengths1) (LengthAggregate ranks2 scores2 lengths2) =
+  LengthAggregate (ranks1 ++ ranks2) (scores1 ++ scores2) (lengths1 ++ lengths2)
+aggreggate _ _ = error "Mismatched aggregates!"
+
+initAggregate :: RankedFactor -> (Featuroid, FeatureAggregate)
+initAggregate (RankedFactor (UnaryFactor (PeggedFactor namespace (NumericalFactor Nothing l))) r s)  =
+  (NumericalFeaturoid namespace, LengthAggregate [r] [s] [l])
+initAggregate (RankedFactor (UnaryFactor (PeggedFactor namespace (NumericalFactor (Just v) l))) r s) =
+  (NumericalFeaturoid namespace, NumericalValueAggregate [r] [s] [l] [v])
+initAggregate (RankedFactor (UnaryFactor (PeggedFactor namespace (SimpleExistentialFactor f))) r s) =
+  (UnaryFeaturoid (PeggedExistentialFactor namespace f), ExistentialFactorAggregate r s 1)
+initAggregate (RankedFactor (CartesianFactor pA pB) r s) =
+  (CartesianFeaturoid pA pB, ExistentialFactorAggregate r s 1)
+
+filterAggregateByFreq :: Integer -> (Maybe Integer) -> FeatureAggregate -> Bool
+filterAggregateByFreq minFreq Nothing (ExistentialFactorAggregate _ _ c) = c >= minFreq
+filterAggregateByFreq minFreq (Just total) (ExistentialFactorAggregate _ _ c) = c >= minFreq && total - c >= minFreq
+filterAggregateByFreq _ _ _ = True
+
 uScoresCounter :: Monad m => Integer -> ConduitT RankedFactor FeatureWithPValue (StateT Integer m) ()
-uScoresCounter minFreq = CC.map (\(RankedFactor feature r score) -> (feature, (r, score, 1)))
+uScoresCounter minFreq = CC.map initAggregate
                          .| gobbleAndDo countUScores
                          .| lowerFreqFiltre
                          .| pValueCalculator minFreq
   where countUScores l =
            M.toList
-           $ M.fromListWith (\(r1, s1, c1) (r2, s2, c2) -> ((r1 + r2), (s1 + s2), (c1 + c2))) l
-        lowerFreqFiltre = CC.filter (\(_, (_, _, c)) -> c >= minFreq)
+           $ M.fromListWith aggreggate l
+        lowerFreqFiltre = CC.filter (\(_, fAgg) -> filterAggregateByFreq minFreq Nothing fAgg)
 
-pValueCalculator :: Monad m => Integer -> ConduitT (Factor, (Double, MetricValue, Integer)) FeatureWithPValue (StateT Integer m) ()
+pValueCalculator :: Monad m => Integer -> ConduitT (Featuroid, FeatureAggregate) FeatureWithPValue (StateT Integer m) ()
 pValueCalculator minFreq = do
   firstVal <- await
   case firstVal of
-    Just i@(_, (_, _, c)) -> do
+    Just i@(_, fAgg) -> do
       total <- lift get
-      if total - c >= minFreq
+      if filterAggregateByFreq minFreq (Just total) fAgg
         then yield $ calculatePValue total i
         else return ()
-      CC.filter (\(_, (_, _, c)) -> total - c >= minFreq) .| CC.map (calculatePValue total)
+      CC.filter (\(_, fAgg) -> filterAggregateByFreq minFreq (Just total) fAgg) .| CC.map (calculatePValue total)
     Nothing -> return ()
 
-calculatePValue :: Integer -> (Factor, (Double, MetricValue, Integer)) -> FeatureWithPValue
-calculatePValue total (f, (r, s, c)) = FeatureWithPValue f
-                                                         (pvalue (r - minusR c) c (total - c))
-                                                         (s / (fromIntegral c))
-                                                         c
+calculatePValue :: Integer -> (Featuroid, FeatureAggregate) -> FeatureWithPValue
+calculatePValue _ (NumericalFeaturoid namespace, NumericalValueAggregate ranks scores _ values) =
+                kendallPValueFeature namespace DirectValue ranks scores values
+calculatePValue _ (NumericalFeaturoid namespace, LengthAggregate ranks scores lens) =
+                kendallPValueFeature namespace LengthOf ranks scores lens
+calculatePValue total (f, ExistentialFactorAggregate r s c) = FeatureWithPValue (featoroidToFeature f)
+                                                                                (pvalue (r - minusR c) c (total - c))
+                                                                                (s / (fromIntegral c))
+                                                                                c
   where minusR c = (c' * (c' + 1)) / 2.0
               where c' = fromIntegral c
         -- calulating p-value from Mann–Whitney U test
@@ -237,6 +277,26 @@ calculatePValue total (f, (r, s, c)) = FeatureWithPValue f
                              sigma = sqrt $ n1' * n2' * (n1' + n2' + 1) / 12
                              z = (u - mean) / sigma
                          in cumulative (normalDistr 0.0 1.0) z
+        featoroidToFeature (UnaryFeaturoid fac) = UnaryFeature fac
+        featoroidToFeature (CartesianFeaturoid facA facB) = (CartesianFeature facA facB)
+
+
+kendallPValueFeature :: Ord a => FeatureNamespace -> NumericalType -> [Double] -> [MetricValue] -> [a] -> FeatureWithPValue
+kendallPValueFeature namespace ntype ranks scores values = FeatureWithPValue (NumericalFeature namespace ntype ndirection)
+                                                                      pv
+                                                                      ((sum selectedScores) / (fromIntegral selected))
+                                                                      (fromIntegral selected)
+                     where z = kendallZ (V.fromList $ Prelude.zip ranks values)
+                           pv = 2 * (cumulative (normalDistr 0.0 1.0) (- (abs z)))
+                           ndirection = if z > 0
+                                        then Small
+                                        else Big
+                           selected = (Prelude.length scores) `div` 4
+
+                           selectedScores = Prelude.take selected $ Prelude.map snd $ turner $ sortOn fst $ Prelude.zip values scores
+                           turner = case ndirection of
+                             Small -> id
+                             Big -> Prelude.reverse
 
 
 totalCounter :: Monad m => ConduitT a a (StateT Integer m) ()
