@@ -4,6 +4,10 @@ module GEval.FeatureExtractor
   (extractFactors,
    extractFactorsFromTabbed,
    cartesianFeatures,
+   Feature(..),
+   NumericalType(..),
+   NumericalDirection(..),
+   Featuroid(..),
    LineWithFactors(..),
    LineWithPeggedFactors(..),
    PeggedFactor(..),
@@ -26,15 +30,55 @@ import GEval.BlackBoxDebugging
 import GEval.Common
 import Text.Read (readMaybe)
 
+data Feature = UnaryFeature PeggedExistentialFactor
+               | CartesianFeature PeggedExistentialFactor PeggedExistentialFactor
+               | NumericalFeature FeatureNamespace NumericalType NumericalDirection
+                 deriving (Eq, Ord)
+
+instance Show Feature where
+  show (UnaryFeature p) = show p
+  show (CartesianFeature pA pB) = formatCartesian pA pB
+  show (NumericalFeature namespace ntype direction) = (show namespace) ++ ":" ++ (show ntype) ++ (show direction)
+
+data NumericalType = DirectValue | LengthOf
+                     deriving (Eq, Ord)
+
+instance Show NumericalType where
+  show DirectValue = "="
+  show LengthOf = "=#"
+
+data NumericalDirection = Big | Small
+                          deriving (Eq, Ord)
+
+instance Show NumericalDirection where
+  show Big = "+"
+  show Small = "-"
+
+-- | Featuroid is something between a factor and a feature, i.e. for numerical factors
+-- it's not a single value, but still without the direction.
+data Featuroid = UnaryFeaturoid PeggedExistentialFactor
+                 | CartesianFeaturoid PeggedExistentialFactor PeggedExistentialFactor
+                 | NumericalFeaturoid FeatureNamespace
+                 deriving (Eq, Ord)
+
+instance Show Featuroid where
+  show (UnaryFeaturoid p) = show p
+  show (CartesianFeaturoid pA pB) = formatCartesian pA pB
+  show (NumericalFeaturoid namespace) = (show namespace) ++ ":="
+
 data LineWithFactors = LineWithFactors Double MetricValue [Factor]
                               deriving (Eq, Ord)
 
+-- | A factor extracted from a single item (its input, expected output or actual output).
 data Factor = UnaryFactor PeggedFactor | CartesianFactor PeggedExistentialFactor PeggedExistentialFactor
                deriving (Eq, Ord)
 
 instance Show Factor where
   show (UnaryFactor factor) = show factor
-  show (CartesianFactor factorA factorB) = (show factorA) ++ "~~" ++ (show factorB)
+  show (CartesianFactor factorA factorB) = formatCartesian factorA factorB
+
+formatCartesian :: PeggedExistentialFactor -> PeggedExistentialFactor -> String
+formatCartesian factorA factorB = (show factorA) ++ "~~" ++ (show factorB)
 
 data LineWithPeggedFactors = LineWithPeggedFactors Double MetricValue [PeggedFactor]
                               deriving (Eq, Ord)

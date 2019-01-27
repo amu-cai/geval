@@ -40,6 +40,7 @@ import Data.List (sort)
 import qualified Test.HUnit as HU
 
 import qualified Data.IntSet as IS
+import qualified Data.Vector as V
 
 import Data.Conduit.SmartSource
 import Data.Conduit.Rank
@@ -48,6 +49,10 @@ import Data.Conduit
 import Control.Monad.Trans.Resource
 import qualified Data.Conduit.List as CL
 import qualified Data.Conduit.Combinators as CC
+
+import Statistics.Distribution (cumulative)
+import Statistics.Distribution.Normal (normalDistr)
+import Data.Statistics.Kendall (kendall, kendallZ)
 
 informationRetrievalBookExample :: [(String, Int)]
 informationRetrievalBookExample = [("o", 2), ("o", 2), ("d", 2), ("x", 3), ("d", 3),
@@ -541,6 +546,14 @@ main = hspec $ do
                       (SimpleExistentialFactor (SimpleAtomicFactor (TextFactor "tests"))),
          PeggedFactor (FeatureTabbedNamespace "in" 3)
                       (NumericalFactor Nothing 5) ]
+  describe "Kendall's tau" $ do
+    it "tau" $ do
+      kendall (V.fromList $ Prelude.zip [12, 2, 1, 12, 2] [1, 4, 7, 1, 0]) `shouldBeAlmost` (-0.47140452079103173)
+    it "z" $ do
+      kendallZ (V.fromList $ Prelude.zip [12, 2, 1, 12, 2] [1, 4, 7, 1, 0]) `shouldBeAlmost` (-1.0742)
+    it "p-value" $ do
+      (2 * (cumulative (normalDistr 0.0 1.0) $ kendallZ (V.fromList $ Prelude.zip [12, 2, 1, 12, 2] [1, 4, 7, 1, 0]))) `shouldBeAlmost` 0.2827
+
 
 checkConduitPure conduit inList expList = do
   let outList = runConduitPure $ CC.yieldMany inList .| conduit .| CC.sinkList
