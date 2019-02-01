@@ -97,6 +97,7 @@ runWorstFeatures ordering spec bbdo = runLineByLineGeneralized ordering' spec (w
 worstFeaturesPipeline :: Bool -> GEvalSpecification -> BlackBoxDebuggingOptions -> ConduitT LineRecord Void (ResourceT IO) ()
 worstFeaturesPipeline reversed spec bbdo = rank (lessByMetric reversed $ gesMainMetric spec)
                                       .| evalStateC 0 (extractFeaturesAndPValues spec bbdo)
+                                      .| CC.filter (\(FeatureWithPValue _ p _ _) -> not $ isNaN p) -- NaN values would poison sorting
                                       .| gobbleAndDo (sortBy featureOrder)
                                       .| filtreCartesian (bbdoCartesian bbdo)
                                       .| CL.map (encodeUtf8 . formatFeatureWithPValue)
