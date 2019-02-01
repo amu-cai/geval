@@ -230,6 +230,16 @@ isInputNeeded :: Metric -> Bool
 isInputNeeded CharMatch = True
 isInputNeeded _ = False
 
+-- | Could output be preprocessable
+isPreprocessable :: Metric -> Bool
+isPreprocessable BLEU = True
+isPreprocessable GLEU = True
+isPreprocessable WER = True
+isPreprocessable Accuracy = True
+isPreprocessable CharMatch = True
+isPreprocessable TokenAccuracy = True
+isPreprocessable _ = False
+
 defaultOutDirectory = "."
 defaultTestName = "test-A"
 defaultOutFile = "out.tsv"
@@ -454,8 +464,11 @@ fileAsLineSource spec preprocess =
 gevalCoreOnSingleLines :: Metric -> (Text -> Text) -> LineInFile -> LineInFile -> LineInFile -> IO (MetricValue)
 gevalCoreOnSingleLines metric preprocess inpLine expLine outLine =
   gevalCoreOnSources metric (singleLineAsLineSource inpLine preprocess)
-                            (singleLineAsLineSource expLine preprocess)
-                            (singleLineAsLineSource outLine preprocess)
+                            (singleLineAsLineSource expLine outputPreprocess)
+                            (singleLineAsLineSource outLine outputPreprocess)
+  where outputPreprocess = if isPreprocessable metric
+                           then preprocess
+                           else id
 
 singleLineAsLineSource :: LineInFile -> (Text -> Text) -> LineSource (ResourceT IO)
 singleLineAsLineSource (LineInFile sourceSpec lineNo line) preprocess =
