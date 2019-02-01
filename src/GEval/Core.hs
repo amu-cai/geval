@@ -106,7 +106,7 @@ defaultLogLossHashedSize = 10
 data Metric = RMSE | MSE | Pearson | Spearman | BLEU | GLEU | WER | Accuracy | ClippEU
               | FMeasure Double | MacroFMeasure Double | NMI
               | LogLossHashed Word32 | CharMatch | MAP | LogLoss | Likelihood
-              | BIOF1 | BIOF1Labels | TokenAccuracy | LikelihoodHashed Word32 | MAE | MultiLabelFMeasure Double
+              | BIOF1 | BIOF1Labels | TokenAccuracy | LikelihoodHashed Word32 | MAE | SMAPE | MultiLabelFMeasure Double
               | MultiLabelLogLoss | MultiLabelLikelihood
               | SoftFMeasure Double
               deriving (Eq)
@@ -145,6 +145,7 @@ instance Show Metric where
   show BIOF1Labels = "BIO-F1-Labels"
   show TokenAccuracy = "TokenAccuracy"
   show MAE = "MAE"
+  show SMAPE = "SMAPE"
   show (MultiLabelFMeasure beta) = "MultiLabel-F" ++ (show beta)
   show MultiLabelLogLoss = "MultiLabel-Logloss"
   show MultiLabelLikelihood = "MultiLabel-Likelihood"
@@ -186,6 +187,7 @@ instance Read Metric where
   readsPrec _ ('B':'I':'O':'-':'F':'1':theRest) = [(BIOF1, theRest)]
   readsPrec _ ('T':'o':'k':'e':'n':'A':'c':'c':'u':'r':'a':'c':'y':theRest) = [(TokenAccuracy, theRest)]
   readsPrec _ ('M':'A':'E':theRest) = [(MAE, theRest)]
+  readsPrec _ ('S':'M':'A':'P':'E':theRest) = [(SMAPE, theRest)]
   readsPrec _ ('M':'u':'l':'t':'i':'L':'a':'b':'e':'l':'-':'L':'o':'g':'L':'o':'s':'s':theRest) = [(MultiLabelLogLoss, theRest)]
   readsPrec _ ('M':'u':'l':'t':'i':'L':'a':'b':'e':'l':'-':'L':'i':'k':'e':'l':'i':'h':'o':'o':'d':theRest) = [(MultiLabelLikelihood, theRest)]
 
@@ -218,6 +220,7 @@ getMetricOrdering BIOF1 = TheHigherTheBetter
 getMetricOrdering BIOF1Labels = TheHigherTheBetter
 getMetricOrdering TokenAccuracy = TheHigherTheBetter
 getMetricOrdering MAE = TheLowerTheBetter
+getMetricOrdering SMAPE = TheLowerTheBetter
 getMetricOrdering (MultiLabelFMeasure _) = TheHigherTheBetter
 getMetricOrdering MultiLabelLogLoss = TheLowerTheBetter
 getMetricOrdering MultiLabelLikelihood = TheHigherTheBetter
@@ -540,6 +543,10 @@ gevalCore' MSE _ = gevalCoreWithoutInput outParser outParser itemSquaredError av
 
 gevalCore' MAE _ = gevalCoreWithoutInput outParser outParser itemAbsoluteError averageC id
   where outParser = getValue . TR.double
+
+gevalCore' SMAPE _ = gevalCoreWithoutInput outParser outParser smape averageC (* 100.0)
+  where outParser = getValue . TR.double
+        smape (exp, out) = (abs (exp-out)) / ((abs exp) + (abs out))
 
 gevalCore' Pearson _ = gevalCoreByCorrelationMeasure pearson
 gevalCore' Spearman _ = gevalCoreByCorrelationMeasure spearman

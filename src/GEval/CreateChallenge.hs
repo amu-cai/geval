@@ -603,6 +603,9 @@ testInContents MultiLabelLikelihood = testInContents MultiLabelLogLoss
 testInContents MultiLabelLogLoss = [hereLit|I am very sad
 I hate
 |]
+testInContents _ = [hereLit|0.72	0	0.007
+9.54	62	0.054
+|]
 
 testExpectedContents :: Metric -> String
 testExpectedContents GLEU = testExpectedContents BLEU
