@@ -68,6 +68,13 @@ to happen on macOS, as these packages are usually installed out of box on Linux)
     chmod u+x geval
     ./geval --help
 
+If this binary does not work on your Linux (likely to happen on Arch Linux), try another one:
+
+    wget https://gonito.net/get/bin/geval-alt
+    mv geval-alt geval
+    chmod u+x geval
+    ./geval --help
+
 ## Quick tour
 
 Let's use GEval to evaluate machine translation (MT) systems (but keep
