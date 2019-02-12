@@ -559,7 +559,7 @@ gevalCore' MAE _ = gevalCoreWithoutInput outParser outParser itemAbsoluteError a
 
 gevalCore' SMAPE _ = gevalCoreWithoutInput outParser outParser smape averageC (* 100.0)
   where outParser = getValue . TR.double
-        smape (exp, out) = (abs (exp-out)) / ((abs exp) + (abs out))
+        smape (exp, out) = (abs (exp-out)) `safeDoubleDiv` ((abs exp) + (abs out))
 
 gevalCore' Pearson _ = gevalCoreByCorrelationMeasure pearson
 gevalCore' Spearman _ = gevalCoreByCorrelationMeasure spearman
