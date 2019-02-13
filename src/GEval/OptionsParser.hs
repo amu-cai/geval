@@ -28,6 +28,7 @@ import GEval.CreateChallenge
 import GEval.LineByLine
 import GEval.Submit (submit)
 import GEval.BlackBoxDebugging
+import GEval.Selector
 
 import Data.Conduit.SmartSource
 
@@ -122,6 +123,7 @@ specParser = GEvalSpecification
     <> showDefault
     <> metavar "NAME"
     <> help "Test name (i.e. subdirectory with results or expected results)" )
+  <*> (optional $ selectorParser)
   <*> strOption
   ( long "out-file"
     <> short 'o'
@@ -171,6 +173,13 @@ specParser = GEvalSpecification
 
 defaultMinFrequency :: Integer
 defaultMinFrequency = 1
+
+selectorParser :: Parser Selector
+selectorParser = parseSelector <$> (strOption $
+                                    ( long "selector"
+                                      <> metavar "JSON_PATH"
+                                      <> help "Selector to an item to be considered"
+                                    ))
 
 blackBoxDebuggingOptionsParser :: Parser BlackBoxDebuggingOptions
 blackBoxDebuggingOptionsParser = BlackBoxDebuggingOptions

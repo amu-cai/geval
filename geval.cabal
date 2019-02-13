@@ -40,6 +40,7 @@ library
                      , GEval.BlackBoxDebugging
                      , Text.WordShape
                      , Data.Statistics.Kendall
+                     , GEval.Selector
                      , Paths_geval
   build-depends:       base >= 4.7 && < 5
                      , cond
@@ -82,6 +83,8 @@ library
                      , array
                      , Munkres
                      , vector-algorithms
+                     , aeson
+                     , aeson-pretty
   default-language:    Haskell2010
 
 executable geval

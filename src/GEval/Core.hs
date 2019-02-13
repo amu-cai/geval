@@ -39,7 +39,8 @@ module GEval.Core
       checkMultipleOuts,
       checkMultipleOutsCore,
       gesMainMetric,
-      gesPreprocess
+      gesPreprocess,
+      getDataDecoder
     ) where
 
 import Data.Conduit
@@ -58,9 +59,10 @@ import qualified System.Directory as D
 import System.Posix
 import System.FilePath
 import Data.Maybe
+import Data.Either (rights)
 import Data.Tuple
 import qualified Data.List.Split as DLS
-import Data.List (sortBy)
+import Data.List (sortBy, isSuffixOf)
 import Text.NaturalComp
 
 import Control.Monad.IO.Class
@@ -84,6 +86,7 @@ import GEval.ProbList
 import GEval.WER
 import Data.Conduit.AutoDecompress
 import Text.Tokenizer
+import GEval.Selector
 import GEval.Annotation
 import GEval.BlackBoxDebugging
 
@@ -257,6 +260,7 @@ data GEvalSpecification = GEvalSpecification
                           { gesOutDirectory :: FilePath,
                             gesExpectedDirectory :: Maybe FilePath,
                             gesTestName :: String,
+                            gesSelector :: Maybe Selector,
                             gesOutFile :: String,
                             gesExpectedFile :: String,
                             gesInputFile :: String,
@@ -341,6 +345,7 @@ defaultGEvalSpecification = GEvalSpecification {
   gesOutDirectory = defaultOutDirectory,
   gesExpectedDirectory = Nothing,
   gesTestName = defaultTestName,
+  gesSelector = Nothing,
   gesOutFile = defaultOutFile,
   gesExpectedFile = defaultExpectedFile,
   gesInputFile = defaultInputFile,
@@ -356,8 +361,13 @@ isEmptyFile path = do
     stat <- getFileStatus path
     return ((fileSize stat) == 0)
 
+-- | Extensions handled (tried) by default. Files with other
+-- extensions are handled only when given explicitly.
+-- Compressor extensions (e.g. "gz") should not be given here.
+extensionsHandled :: [String]
+extensionsHandled = ["tsv", "jsonl"]
 
-data LineSource m = LineSource (ConduitT () Text m ()) (Text -> Text) SourceSpec Word32
+data LineSource m = LineSource (ConduitT () Text m ()) (Text -> ItemTarget) (Text -> Text) SourceSpec Word32
 
 geval :: GEvalSpecification -> IO [(SourceSpec, [MetricValue])]
 geval gevalSpec = do
@@ -367,10 +377,11 @@ geval gevalSpec = do
 
 gevalOnSingleOut :: GEvalSpecification -> SourceSpec -> SourceSpec -> SourceSpec -> IO (SourceSpec, [MetricValue])
 gevalOnSingleOut gevalSpec inputSource expectedSource outSource = do
-  vals <- Prelude.mapM (\metric -> gevalCore metric preprocess inputSource expectedSource outSource) metrics
+  vals <- Prelude.mapM (\metric -> gevalCore metric mSelector preprocess inputSource expectedSource outSource) metrics
   return (outSource, vals)
   where metrics = gesMetrics gevalSpec
         preprocess = gesPreprocess gevalSpec
+        mSelector = gesSelector gevalSpec
 
 checkAndGetFilesSingleOut :: Bool -> GEvalSpecification -> IO (SourceSpec, SourceSpec, SourceSpec)
 checkAndGetFilesSingleOut forceInput gevalSpec = do
@@ -397,7 +408,7 @@ checkAndGetFiles forceInput gevalSpec = do
        osss <- case mMultipleOuts of
          Just filePaths -> return $ Prelude.map (\fp -> FilePathSpec fp) filePaths
          Nothing -> do
-           oss <- getSmartSourceSpec outTestDirectory "out.tsv" outFile
+           oss <- checkSingleOut outTestDirectory outFile
            case oss of
              Left NoSpecGiven -> throwM $ NoOutFile outFile
              Left (NoFile fp) -> throwM $ NoOutFile fp
@@ -418,22 +429,39 @@ checkAndGetFiles forceInput gevalSpec = do
           inputFile = gesInputFile gevalSpec
           metrics = gesMetrics gevalSpec
 
+checkSingleOut :: FilePath -> FilePath -> IO (Either SmartSourceError SourceSpec)
+checkSingleOut outTestDirectory outFile
+  | outFile == defaultOutFile = do
+      -- if the default output file name is used try alternative formats (e.g. jsonl)
+      specs <- Prelude.mapM (\ext -> getSmartSourceSpec outTestDirectory defaultOutFile (outFile -<.> ext)) extensionsHandled
+      return $ case rights specs of
+                  [] -> Prelude.head specs
+                  rspecs@_ -> Right $ Prelude.head rspecs
+  | otherwise = getSmartSourceSpec outTestDirectory defaultOutFile outFile
+
 checkMultipleOuts :: GEvalSpecification -> IO (Maybe [FilePath])
 checkMultipleOuts gevalSpec = checkMultipleOutsCore outDirectory testName outFile
   where outFile = gesOutFile gevalSpec
         outDirectory = gesOutDirectory gevalSpec
         testName = gesTestName gevalSpec
 
+-- | Looks for multiple output files.
 checkMultipleOutsCore :: FilePath -> FilePath -> FilePath -> IO (Maybe [FilePath])
 checkMultipleOutsCore outDirectory testName outFile = do
-  -- if the out.tsv is there, just use it
-  outFilePath <- lookForCompressedFiles (outTestDirectory </> outFile)
-  isSimpleOutThere <- D.doesFileExist outFilePath
+  -- if the out.tsv is there (possibly with an alternative extension,
+  -- e.g. jsonl and compressed), just use it - but here we just check
+  -- this (`Nothing` will be returned in such a case, anyway)
+  outFilePaths <- Prelude.mapM (\ext -> lookForCompressedFiles (outTestDirectory </> outFile -<.> ext))
+                              extensionsHandled
+  isSimpleOutTheres <- Prelude.mapM D.doesFileExist outFilePaths
+  let isSimpleOutThere = Prelude.and isSimpleOutTheres
 
-  let patterns = Prelude.map (\ext -> compile ("out-*.tsv" ++ ext)) ["", ".gz", ".bz2", ".xz"]
+  let patterns = [compile ("out-*" <.> dataExt ++ compressorExt) |
+                          dataExt <- extensionsHandled,
+                          compressorExt <- ("":compressedFilesHandled)]
   multipleOuts <- Prelude.concat <$> globDir patterns outTestDirectory
 
-  if outFile == "out.tsv" && not isSimpleOutThere && multipleOuts /= []
+  if outFile == defaultOutFile && not isSimpleOutThere && multipleOuts /= []
     then
       return $ Just multipleOuts
     else
@@ -457,39 +485,62 @@ getInputSourceIfNeeded forced metrics directory inputFilePath
          Right sourceSpec -> return sourceSpec
    | otherwise = return NoSource
 
-fileAsLineSource :: SourceSpec -> (Text -> Text) -> LineSource (ResourceT IO)
-fileAsLineSource spec preprocess =
-  LineSource ((smartSource spec) .| autoDecompress .| CT.decodeUtf8Lenient .| CT.lines .| CC.map (dropAround (== '\r'))) preprocess spec 1
+fileAsLineSource :: SourceSpec -> Maybe Selector -> (Text -> Text) -> LineSource (ResourceT IO)
+fileAsLineSource spec mSelector preprocess =
+  LineSource ((smartSource spec) .| autoDecompress .| CT.decodeUtf8Lenient .| CT.lines) (select (getDataFormat spec) mSelector) preprocess spec 1
 
-gevalCoreOnSingleLines :: Metric -> (Text -> Text) -> LineInFile -> LineInFile -> LineInFile -> IO (MetricValue)
-gevalCoreOnSingleLines metric preprocess inpLine expLine outLine =
-  gevalCoreOnSources metric (singleLineAsLineSource inpLine preprocess)
-                            (singleLineAsLineSource expLine outputPreprocess)
-                            (singleLineAsLineSource outLine outputPreprocess)
+getDataDecoder :: LineSource (ResourceT IO) -> (Text -> ItemTarget)
+getDataDecoder (LineSource _ dd _ _ _) = dd
+
+getDataFormat :: SourceSpec -> DataFormat
+getDataFormat (FilePathSpec filePath) = getDataFormatFromFilePath filePath
+getDataFormat Stdin = Tsv
+getDataFormat NoSource = Tsv
+getDataFormat (Http url) = getDataFormatFromFilePath url
+getDataFormat (Https url) = getDataFormatFromFilePath url
+
+getDataFormatFromFilePath :: FilePath -> DataFormat
+getDataFormatFromFilePath path =
+   case takeExtensions path' of
+        ".jsonl" -> Jsonl
+        _ -> Tsv
+   where  path' = if Prelude.or $ Prelude.map (\ext -> ext `Data.List.isSuffixOf` path)
+                                              compressedFilesHandled
+                  then dropExtension path
+                  else path
+
+dataDecoder fmt mSelector = CC.map (select fmt mSelector)
+
+gevalCoreOnSingleLines :: Metric -> (Text -> Text) -> (Text -> ItemTarget) -> LineInFile -> (Text -> ItemTarget) -> LineInFile -> (Text -> ItemTarget) -> LineInFile -> IO (MetricValue)
+gevalCoreOnSingleLines metric preprocess inpDecoder inpLine expDecoder expLine outDecoder outLine =
+  gevalCoreOnSources metric (singleLineAsLineSource inpLine inpDecoder preprocess)
+                            (singleLineAsLineSource expLine expDecoder outputPreprocess)
+                            (singleLineAsLineSource outLine outDecoder outputPreprocess)
   where outputPreprocess = if isPreprocessable metric
                            then preprocess
                            else id
 
-singleLineAsLineSource :: LineInFile -> (Text -> Text) -> LineSource (ResourceT IO)
-singleLineAsLineSource (LineInFile sourceSpec lineNo line) preprocess =
-  LineSource (CL.sourceList [line]) preprocess sourceSpec lineNo
+singleLineAsLineSource :: LineInFile -> (Text -> ItemTarget) -> (Text -> Text) -> LineSource (ResourceT IO)
+singleLineAsLineSource (LineInFile sourceSpec lineNo line) itemDecoder preprocess =
+  LineSource (CL.sourceList [line]) itemDecoder preprocess sourceSpec lineNo
 
 -- | Runs evaluation for a given metric using the sources specified
 -- for input, expected output and output. Returns the metric value.
 -- Throws @GEvalException@ if something was wrong in the data (e.g.
 -- inconsistent number of lines in the sources).
 gevalCore :: Metric           -- ^ evaluation metric
+          -> Maybe Selector   -- ^ selector to be used
           -> (Text -> Text)    -- ^ preprocessing function (e.g. tokenization)
           -> SourceSpec       -- ^ source specification for the input values
           -> SourceSpec       -- ^ source specification for the expected output
           -> SourceSpec       -- ^ source specification for the output
           -> IO (MetricValue) -- ^ metric value for the output against the expected output
-gevalCore metric preprocess inputSource expectedSource outSource = do
+gevalCore metric mSelector preprocess inputSource expectedSource outSource = do
   whenM (isEmptyFileSource outSource) $ throwM $ EmptyOutput
   gevalCoreOnSources metric
-                     (fileAsLineSource inputSource preprocess)
-                     (fileAsLineSource expectedSource preprocess)
-                     (fileAsLineSource outSource preprocess)
+                     (fileAsLineSource inputSource mSelector preprocess)
+                     (fileAsLineSource expectedSource mSelector preprocess)
+                     (fileAsLineSource outSource mSelector preprocess)
 
 isEmptyFileSource :: SourceSpec -> IO Bool
 isEmptyFileSource (FilePathSpec filePath) = isEmptyFile filePath
@@ -687,7 +738,7 @@ gevalCore' MAP _ = gevalCoreWithoutInput (Right . DLS.splitOn "\t" . unpack)
 gevalCore' (LogLossHashed nbOfBits) _ = helper nbOfBits
   -- for LogLossHashed we "salt" each hash with the line number
   where helper nbOfBits expectedLineSource outLineSource =
-          gevalCore''' (ParserSpecWithoutInput (Right . id) tentativeParser) (\(lineNo, (t,d)) -> calculateLogLoss nbOfBits lineNo t (parseDistributionWrapper nbOfBits lineNo d)) averageC negate (WithoutInput expectedLineSource outLineSource)
+          gevalCore''' (ParserSpecWithoutInput (liftOp (Right . id)) (liftOp tentativeParser)) (\(lineNo, (t,d)) -> calculateLogLoss nbOfBits lineNo t (parseDistributionWrapper nbOfBits lineNo d)) averageC negate (WithoutInput expectedLineSource outLineSource)
         -- Unfortunately, we're parsing the distribution twice. We need to
         -- tentatively parse the distribution when the line number is unknown
         -- (so we just set it to 1)
@@ -699,8 +750,10 @@ gevalCore' (LogLossHashed nbOfBits) _ = helper nbOfBits
 gevalCore' CharMatch inputLineSource = helper inputLineSource
  where
    helper inputLineSource expectedLineSource outputLineSource = do
-     gevalCoreGeneralized (ParserSpecWithInput (Right . unpack) (Right . unpack) (Right . unpack)) step countAgg (fMeasureOnCounts charMatchBeta) (WithInput inputLineSource expectedLineSource outputLineSource)
+     gevalCoreGeneralized (ParserSpecWithInput justUnpack justUnpack justUnpack) step countAgg (fMeasureOnCounts charMatchBeta) (WithInput inputLineSource expectedLineSource outputLineSource)
    step (ParsedRecordWithInput inp exp out) = getCharMatchCount inp exp out
+   justUnpack = liftOp (Right . unpack)
+
 
 gevalCore' BIOF1 _ = gevalCoreWithoutInput parseBioSequenceIntoEntities parseBioSequenceIntoEntities (uncurry gatherCountsForBIO) countAgg f1MeasureOnCounts
 
@@ -784,7 +837,7 @@ gevalCoreWithoutInput :: (MonadUnliftIO m, MonadThrow m, MonadIO m)
                       -> LineSource (ResourceT m)  -- ^ source to read the output
                       -> m (MetricValue)           -- ^ metric values for the output against the expected output
 gevalCoreWithoutInput expParser outParser itemStep aggregator finalStep expectedLineStream outLineStream =
-  gevalCoreGeneralized (ParserSpecWithoutInput expParser outParser) (trans itemStep) aggregator finalStep (WithoutInput expectedLineStream outLineStream)
+  gevalCoreGeneralized (ParserSpecWithoutInput (liftOp expParser) (liftOp outParser)) (trans itemStep) aggregator finalStep (WithoutInput expectedLineStream outLineStream)
  where
    trans :: ((a, b) -> c) -> ParsedRecord (WithoutInput m a b) -> c
    trans step (ParsedRecordWithoutInput x y) = step (x, y)
@@ -838,12 +891,12 @@ class EvaluationContext ctxt m where
 data WithoutInput m e o = WithoutInput (LineSource (ResourceT m)) (LineSource (ResourceT m))
 
 instance (MonadUnliftIO m, MonadIO m, MonadThrow m) => EvaluationContext (WithoutInput m e o) m where
-  data ParserSpec (WithoutInput m e o) = ParserSpecWithoutInput (Text -> Either String e) (Text -> Either String o)
+  data ParserSpec (WithoutInput m e o) = ParserSpecWithoutInput (ItemTarget -> Either String e) (ItemTarget -> Either String o)
   data WrappedParsedRecord (WithoutInput m e o) = WrappedParsedRecordWithoutInput (SourceItem e) (SourceItem o)
   data ParsedRecord (WithoutInput m e o) = ParsedRecordWithoutInput e o
-  getFirstLineNo _ (WithoutInput _ (LineSource _ _ _ lineNo)) = lineNo
-  getExpectedSource (WithoutInput (LineSource _ _ expectedSource _) _) = expectedSource
-  getOutSource (WithoutInput _ (LineSource _ _ outSource _)) = outSource
+  getFirstLineNo _ (WithoutInput _ (LineSource _ _ _ _ lineNo)) = lineNo
+  getExpectedSource (WithoutInput (LineSource _ _ _ expectedSource _) _) = expectedSource
+  getOutSource (WithoutInput _ (LineSource _ _ _ outSource _)) = outSource
   recordSource (WithoutInput expectedLineSource outLineSource) (ParserSpecWithoutInput expParser outParser) = getZipSource $ WrappedParsedRecordWithoutInput
                         <$> ZipSource (items expectedLineSource expParser)
                         <*> ZipSource (items outLineSource outParser)
@@ -864,15 +917,15 @@ instance (MonadUnliftIO m, MonadIO m, MonadThrow m) => EvaluationContext (Withou
 
 data WithInput m i e o = WithInput (LineSource (ResourceT m)) (LineSource (ResourceT m)) (LineSource (ResourceT m))
 
-getInputFilePath (WithInput (LineSource _ _ inputFilePath _) _ _) = inputFilePath
+getInputFilePath (WithInput (LineSource _ _ _ inputFilePath _) _ _) = inputFilePath
 
 instance (MonadUnliftIO m, MonadIO m, MonadThrow m) => EvaluationContext (WithInput m i e o) m where
-  data ParserSpec (WithInput m i e o) = ParserSpecWithInput (Text -> Either String i) (Text -> Either String e) (Text -> Either String o)
+  data ParserSpec (WithInput m i e o) = ParserSpecWithInput (ItemTarget -> Either String i) (ItemTarget -> Either String e) (ItemTarget -> Either String o)
   data WrappedParsedRecord (WithInput m i e o) = WrappedParsedRecordWithInput (SourceItem i) (SourceItem e) (SourceItem o)
   data ParsedRecord (WithInput m i e o) = ParsedRecordWithInput i e o
-  getFirstLineNo _ (WithInput _ _ (LineSource _ _ _ lineNo)) = lineNo
-  getExpectedSource (WithInput _ (LineSource _ _ expectedSource _) _) = expectedSource
-  getOutSource (WithInput _ _ (LineSource _ _ outSource _)) = outSource
+  getFirstLineNo _ (WithInput _ _ (LineSource _ _ _ _ lineNo)) = lineNo
+  getExpectedSource (WithInput _ (LineSource _ _ _ expectedSource _) _) = expectedSource
+  getOutSource (WithInput _ _ (LineSource _ _ _ outSource _)) = outSource
   recordSource (WithInput inputLineSource expectedLineSource outLineSource) (ParserSpecWithInput inpParser expParser outParser) = getZipSource $ (\x (y,z) -> WrappedParsedRecordWithInput x y z)
          <$> ZipSource (items inputLineSource inpParser)                                                                         <*> (ZipSource $ getZipSource $ (,)
                         <$> ZipSource (items expectedLineSource expParser)
@@ -906,11 +959,13 @@ averageC = getZipSink
   <$> ZipSink CC.sum
   <*> ZipSink CC.length
 
-items :: MonadResource m => LineSource m -> (Text -> Either String a) -> ConduitT () (SourceItem a) m ()
-items (LineSource lineSource preprocess _ _) parser =
-  (lineSource .| CL.map (toItem . parser . preprocess)) >> yield Done
+items :: MonadResource m => LineSource m -> (ItemTarget -> Either String a) -> ConduitT () (SourceItem a) m ()
+items (LineSource lineSource itemDecoder preprocess _ _) parser =
+  (lineSource .| CL.map (toItem . parser . preprocess' . itemDecoder)) >> yield Done
   where toItem (Right x) = Got x
         toItem (Left m) = Wrong m
+        preprocess' (RawItemTarget t) = RawItemTarget $ preprocess t
+        preprocess' (PartiallyParsedItemTarget ts) = PartiallyParsedItemTarget $ Prelude.map preprocess ts
 
 itemAbsoluteError :: (Double, Double) -> Double
 itemAbsoluteError (exp, out) = abs (exp-out)

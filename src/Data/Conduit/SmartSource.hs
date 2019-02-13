@@ -102,8 +102,10 @@ checkRefFormat ref =
         isUnwantedChar '\177' = True
         isUnwantedChar c = ord c < 32
 
+compressedFilesHandled = [".gz", ".xz", ".bz2"]
+
 lookForCompressedFiles :: FilePath -> IO FilePath
-lookForCompressedFiles = lookForAlternativeFiles [".gz", ".xz", ".bz2"]
+lookForCompressedFiles = lookForAlternativeFiles compressedFilesHandled
 
 lookForAlternativeFiles :: [String] -> FilePath -> IO FilePath
 lookForAlternativeFiles suffixes filePath

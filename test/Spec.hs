@@ -369,12 +369,16 @@ main = hspec $ do
   describe "automatic decompression" $ do
     it "more complex test" $ do
       runGEvalTest "charmatch-complex-compressed" `shouldReturnAlmost` 0.1923076923076923
+  describe "handling jsonl format" $ do
+    it "simple test" $
+      runGEvalTestExtraOptions ["-e", "expected.jsonl" ] "jsonl-simple" `shouldReturnAlmost` 0.5
   describe "line by line mode" $ do
     let sampleChallenge =
           GEvalSpecification
           { gesOutDirectory = "test/likelihood-simple/likelihood-simple-solution",
             gesExpectedDirectory = Just "test/likelihood-simple/likelihood-simple",
             gesTestName = "test-A",
+            gesSelector = Nothing,
             gesOutFile = "out.tsv",
             gesExpectedFile = "expected.tsv",
             gesInputFile = "in.tsv",

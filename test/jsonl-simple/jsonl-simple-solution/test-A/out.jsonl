@@ -1,0 +1,3 @@
+{"id": 0, "root":{"foo":"bar", "items":[{"aaa":12, "bbb":"x"}, {"aaa":14, "bbb":"a"}]}}
+{"id": 1, "root":{"foo":"baz", "items":[{"aaa": 13, "bbb":"y"}]}}
+{"id": 2, "root":{"foo":"baz", "items":[{"aaa":3, "bbb":"abc"}]}}
