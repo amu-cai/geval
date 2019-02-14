@@ -41,7 +41,8 @@ module GEval.Core
       gesMainMetric,
       gesPreprocess,
       getDataDecoder,
-      threeLineSource
+      threeLineSource,
+      extensionsHandled
     ) where
 
 import Data.Conduit
