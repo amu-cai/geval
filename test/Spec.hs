@@ -23,6 +23,7 @@ import Text.EditDistance
 import GEval.Annotation
 import GEval.BlackBoxDebugging
 import GEval.FeatureExtractor
+import GEval.Selector
 
 import Data.Map.Strict
 
@@ -287,8 +288,11 @@ main = hspec $ do
       runGEvalTest "multilabel-likelihood-simple" `shouldReturnAlmost` 0.115829218528827
   describe "evaluating single lines" $ do
     it "RMSE" $ do
-      gevalCoreOnSingleLines RMSE id (LineInFile (FilePathSpec "stub1") 1 "blabla")
+      gevalCoreOnSingleLines RMSE id RawItemTarget
+                                     (LineInFile (FilePathSpec "stub1") 1 "blabla")
+                                     RawItemTarget
                                      (LineInFile (FilePathSpec "stub2") 1 "3.4")
+                                     RawItemTarget
                                      (LineInFile (FilePathSpec "stub3") 1 "2.6") `shouldReturnAlmost` 0.8
   describe "Annotation format" $ do
     it "just parse" $ do

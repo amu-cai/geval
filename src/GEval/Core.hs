@@ -40,7 +40,8 @@ module GEval.Core
       checkMultipleOutsCore,
       gesMainMetric,
       gesPreprocess,
-      getDataDecoder
+      getDataDecoder,
+      threeLineSource
     ) where
 
 import Data.Conduit
@@ -951,7 +952,11 @@ instance (MonadUnliftIO m, MonadIO m, MonadThrow m) => EvaluationContext (WithIn
   checkStepM _ (_, WrappedParsedRecordWithInput Done Done Done) = return Nothing
 
 
-
+threeLineSource :: (MonadUnliftIO m, MonadIO m, MonadThrow m) => WithInput m Text Text Text -> ConduitT () (WrappedParsedRecord (WithInput m Text Text Text)) (ResourceT m) ()
+threeLineSource (WithInput inputLineSource expectedLineSource outLineSource) = getZipSource $ (\x (y,z) -> WrappedParsedRecordWithInput x y z)
+         <$> ZipSource (linesAsItems inputLineSource)                                             <*> (ZipSource $ getZipSource $ (,)
+                        <$> ZipSource (linesAsItems expectedLineSource)
+                        <*> ZipSource (linesAsItems outLineSource))
 
 averageC :: MonadResource m => ConduitT Double Void m Double
 averageC = getZipSink
@@ -959,6 +964,8 @@ averageC = getZipSink
   <$> ZipSink CC.sum
   <*> ZipSink CC.length
 
+-- | Takes a source of lines and returns a source of lines and returns a conduit of
+-- items (using a given preprocessor and parser).
 items :: MonadResource m => LineSource m -> (ItemTarget -> Either String a) -> ConduitT () (SourceItem a) m ()
 items (LineSource lineSource itemDecoder preprocess _ _) parser =
   (lineSource .| CL.map (toItem . parser . preprocess' . itemDecoder)) >> yield Done
@@ -966,6 +973,12 @@ items (LineSource lineSource itemDecoder preprocess _ _) parser =
         toItem (Left m) = Wrong m
         preprocess' (RawItemTarget t) = RawItemTarget $ preprocess t
         preprocess' (PartiallyParsedItemTarget ts) = PartiallyParsedItemTarget $ Prelude.map preprocess ts
+
+-- | Takes a source of lines and returns a conduit of lines represented as
+-- items (without preprocessing and parsing!) to be used in line-by-line modes.
+linesAsItems :: MonadResource m => LineSource m -> ConduitT () (SourceItem Text) m ()
+linesAsItems (LineSource lineSource _ _ _ _) =
+  (lineSource .| CL.map Got) >> yield Done
 
 itemAbsoluteError :: (Double, Double) -> Double
 itemAbsoluteError (exp, out) = abs (exp-out)

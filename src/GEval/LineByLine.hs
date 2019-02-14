@@ -420,9 +420,9 @@ gevalLineByLineSource :: Metric -> Maybe Selector -> (Text -> Text) -> SourceSpe
 gevalLineByLineSource metric mSelector preprocess inputSource expectedSource outSource =
   (getZipSource $ (,)
        <$> ZipSource (CL.sourceList [1..])
-       <*> (ZipSource $ recordSource context parserSpec)) .| CL.mapM (checkStepM evaluateLine) .| CL.catMaybes
-  where parserSpec = (ParserSpecWithInput (Right . id) (Right . id) (Right . id))
-        context = (WithInput inputLineSource expectedLineSource outputLineSource)
+       <*> (ZipSource $ threeLineSource context)) .| CL.mapM (checkStepM evaluateLine) .| CL.catMaybes
+  where context = (WithInput inputLineSource expectedLineSource outputLineSource)
+        -- preparing sources, `id` means that no preprocessing is done (to avoid double preprocessing)
         inputLineSource = fileAsLineSource inputSource mSelector id
         expectedLineSource = fileAsLineSource expectedSource mSelector id
         outputLineSource = fileAsLineSource outSource mSelector id
