@@ -375,7 +375,7 @@ main = hspec $ do
       runGEvalTest "charmatch-complex-compressed" `shouldReturnAlmost` 0.1923076923076923
   describe "handling jsonl format" $ do
     it "simple test" $
-      runGEvalTestExtraOptions ["-e", "expected.jsonl" ] "jsonl-simple" `shouldReturnAlmost` 0.5
+      runGEvalTestExtraOptions ["-e", "expected.jsonl" ] "jsonl-simple" `shouldReturnAlmost` 0.571428571428
   describe "line by line mode" $ do
     let sampleChallenge =
           GEvalSpecification

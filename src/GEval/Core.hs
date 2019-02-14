@@ -783,14 +783,17 @@ gevalCore' TokenAccuracy _ = gevalCoreWithoutInput intoTokens
            | otherwise = (h, t + 1)
          hitsAndTotalsAgg = CC.foldl (\(h1, t1) (h2, t2) -> (h1 + h2, t1 + t2)) (0, 0)
 
-gevalCore' (MultiLabelFMeasure beta) _ = gevalCoreWithoutInputOnItemTargets (liftOp intoWords)
-                                                                            (liftOp getWords)
+-- only MultiLabel-F1 handled for JSONs for the time being...
+gevalCore' (MultiLabelFMeasure beta) _ = gevalCoreWithoutInputOnItemTargets (Right . intoWords)
+                                                                            (Right . getWords)
                                                                             (getCounts (==))
                                                                             countAgg
                                                                             (fMeasureOnCounts beta)
     where
-      getWords = Right . (Prelude.map unpack) . selectByStandardThreshold . parseIntoProbList
-      intoWords = Right . (Prelude.map unpack) . Data.Text.words
+      getWords (RawItemTarget t) = Prelude.map unpack $ selectByStandardThreshold $ parseIntoProbList t
+      getWords (PartiallyParsedItemTarget ts) = Prelude.map unpack ts
+      intoWords (RawItemTarget t) = Prelude.map unpack $ Data.Text.words t
+      intoWords (PartiallyParsedItemTarget ts) = Prelude.map unpack ts
 
 gevalCore' MultiLabelLogLoss _ = gevalCoreWithoutInput intoWords
                                                        (Right . parseIntoProbList)
