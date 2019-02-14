@@ -86,7 +86,7 @@ main = hspec $ do
       runGEvalTest "mae-simple" `shouldReturnAlmost` 1.5
   describe "SMAPE" $ do
     it "simple test" $
-      runGEvalTest "smape-simple" `shouldReturnAlmost` 54.2222222222222222
+      runGEvalTest "smape-simple" `shouldReturnAlmost` 45.1851851851852
   describe "Spearman's rank correlation coefficient" $ do
     it "simple test" $ do
       runGEvalTest "spearman-simple" `shouldReturnAlmost` (- 0.5735)

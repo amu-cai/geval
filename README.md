@@ -40,31 +40,38 @@ order to run `geval` you need to either add `$HOME/.local/bin` to
 
 If you see a message like this:
 
-   Configuring lzma-0.0.0.3...
-   clang: warning: argument unused during compilation: '-nopie' [-Wunused-command-line-argument]
-   Cabal-simple_mPHDZzAJ_2.0.1.0_ghc-8.2.2: Missing dependency on a foreign
-   library:
-   * Missing (or bad) header file: lzma.h
-   This problem can usually be solved by installing the system package that
-   provides this library (you may need the "-dev" version). If the library is
-   already installed but in a non-standard location then you can use the flags
-   --extra-include-dirs= and --extra-lib-dirs= to specify where it is.
-   If the header file does exist, it may contain errors that are caught by the C
-   compiler at the preprocessing stage. In this case you can re-run configure
-   with the verbosity flag -v3 to see the error messages.
+    Configuring lzma-0.0.0.3...
+    clang: warning: argument unused during compilation: '-nopie' [-Wunused-command-line-argument]
+    Cabal-simple_mPHDZzAJ_2.0.1.0_ghc-8.2.2: Missing dependency on a foreign
+    library:
+    * Missing (or bad) header file: lzma.h
+    This problem can usually be solved by installing the system package that
+    provides this library (you may need the "-dev" version). If the library is
+    already installed but in a non-standard location then you can use the flags
+    --extra-include-dirs= and --extra-lib-dirs= to specify where it is.
+    If the header file does exist, it may contain errors that are caught by the C
+    compiler at the preprocessing stage. In this case you can re-run configure
+    with the verbosity flag -v3 to see the error messages.
 
-It means that you need to install lzma library on your operating
+it means that you need to install lzma library on your operating
 system. The same might go for pkg-config. On macOS (it's more likely
 to happen on macOS, as these packages are usually installed out of box on Linux), you need to run:
 
-   brew install xz
-   brew install pkg-config
+    brew install xz
+    brew install pkg-config
 
 ### Plan B — just download the GEval binary
 
 (Assuming you have a standard 64-bit Linux.)
 
     wget https://gonito.net/get/bin/geval
+    chmod u+x geval
+    ./geval --help
+
+If this binary does not work on your Linux (likely to happen on Arch Linux), try another one:
+
+    wget https://gonito.net/get/bin/geval-alt
+    mv geval-alt geval
     chmod u+x geval
     ./geval --help
 
