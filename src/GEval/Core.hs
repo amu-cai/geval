@@ -783,11 +783,11 @@ gevalCore' TokenAccuracy _ = gevalCoreWithoutInput intoTokens
            | otherwise = (h, t + 1)
          hitsAndTotalsAgg = CC.foldl (\(h1, t1) (h2, t2) -> (h1 + h2, t1 + t2)) (0, 0)
 
-gevalCore' (MultiLabelFMeasure beta) _ = gevalCoreWithoutInput intoWords
-                                                               getWords
-                                                               (getCounts (==))
-                                                               countAgg
-                                                               (fMeasureOnCounts beta)
+gevalCore' (MultiLabelFMeasure beta) _ = gevalCoreWithoutInputOnItemTargets (liftOp intoWords)
+                                                                            (liftOp getWords)
+                                                                            (getCounts (==))
+                                                                            countAgg
+                                                                            (fMeasureOnCounts beta)
     where
       getWords = Right . (Prelude.map unpack) . selectByStandardThreshold . parseIntoProbList
       intoWords = Right . (Prelude.map unpack) . Data.Text.words
@@ -838,10 +838,27 @@ gevalCoreWithoutInput :: (MonadUnliftIO m, MonadThrow m, MonadIO m)
                       -> LineSource (ResourceT m)  -- ^ source to read the output
                       -> m (MetricValue)           -- ^ metric values for the output against the expected output
 gevalCoreWithoutInput expParser outParser itemStep aggregator finalStep expectedLineStream outLineStream =
-  gevalCoreGeneralized (ParserSpecWithoutInput (liftOp expParser) (liftOp outParser)) (trans itemStep) aggregator finalStep (WithoutInput expectedLineStream outLineStream)
+  gevalCoreWithoutInputOnItemTargets (liftOp expParser) (liftOp outParser) itemStep aggregator finalStep expectedLineStream outLineStream
+
+gevalCoreWithoutInputOnItemTargets :: (MonadUnliftIO m, MonadThrow m, MonadIO m)
+                      => (ItemTarget -> Either String a) -- ^ parser for values in the expected output
+                      -> (ItemTarget -> Either String b) -- ^ parser for values in the actual output
+                      -> ((a, b) -> c)             -- ^ function which combines parsed values into a single value
+                                                   -- (will be launched for each item, e.g. an error/cost function
+                                                   -- could be calculated here)
+                      -> (ConduitT c Void (ResourceT m) d)  -- ^ a Conduit which aggregates all the combined values into
+                                                   -- a "total" value
+                      -> (d -> Double)             -- ^ function to transform the "total" value into the final score
+                      -> LineSource (ResourceT m)  -- ^ source to read the expected output
+                      -> LineSource (ResourceT m)  -- ^ source to read the output
+                      -> m (MetricValue)           -- ^ metric values for the output against the expected output
+gevalCoreWithoutInputOnItemTargets expParser outParser itemStep aggregator finalStep expectedLineStream outLineStream =
+  gevalCoreGeneralized (ParserSpecWithoutInput expParser outParser) (trans itemStep) aggregator finalStep (WithoutInput expectedLineStream outLineStream)
  where
    trans :: ((a, b) -> c) -> ParsedRecord (WithoutInput m a b) -> c
    trans step (ParsedRecordWithoutInput x y) = step (x, y)
+
+
 
 gevalCore''' :: (MonadUnliftIO m, MonadThrow m, MonadIO m) => ParserSpec (WithoutInput m a b) -> ((Word32, (a, b)) -> c) -> (ConduitT c Void (ResourceT m) d) -> (d -> Double) -> WithoutInput m a b -> m (MetricValue)
 gevalCore''' parserSpec itemStep aggregator finalStep context =
