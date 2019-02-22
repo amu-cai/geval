@@ -14,6 +14,8 @@ module GEval.Core
       Metric(..),
       MetricOrdering(..),
       getMetricOrdering,
+      isBetter,
+      isBetterOrEqual,
       GEvalSpecialCommand(..),
       GEvalSpecification(..),
       ResultOrdering(..),
@@ -230,6 +232,14 @@ getMetricOrdering (MultiLabelFMeasure _) = TheHigherTheBetter
 getMetricOrdering MultiLabelLogLoss = TheLowerTheBetter
 getMetricOrdering MultiLabelLikelihood = TheHigherTheBetter
 
+isBetterOrEqual :: Metric -> MetricValue -> MetricValue -> Bool
+isBetterOrEqual metric valA valB = not (isBetter metric valB valA)
+
+isBetter :: Metric -> MetricValue -> MetricValue -> Bool
+isBetter metric valA valB = isBetter' metricOrdering valA valB
+  where isBetter' TheHigherTheBetter valA valB = valA > valB
+        isBetter' TheLowerTheBetter valA valB = valA < valB
+        metricOrdering = getMetricOrdering metric
 
 isInputNeeded :: Metric -> Bool
 isInputNeeded CharMatch = True
