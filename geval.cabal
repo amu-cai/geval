@@ -41,6 +41,8 @@ library
                      , Text.WordShape
                      , Data.Statistics.Kendall
                      , GEval.Selector
+                     , Data.Statistics.Loess
+                     , Data.Statistics.Calibration
                      , Paths_geval
   build-depends:       base >= 4.7 && < 5
                      , cond
@@ -85,6 +87,8 @@ library
                      , vector-algorithms
                      , aeson
                      , aeson-pretty
+                     , numeric-tools
+                     , integration
   default-language:    Haskell2010
 
 executable geval

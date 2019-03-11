@@ -54,6 +54,10 @@ import qualified Data.Conduit.Combinators as CC
 import Statistics.Distribution (cumulative)
 import Statistics.Distribution.Normal (normalDistr)
 import Data.Statistics.Kendall (kendall, kendallZ)
+import qualified Data.Vector.Unboxed as DVU
+import qualified Statistics.Matrix.Types as SMT
+import Data.Statistics.Loess (loess)
+import Data.Statistics.Calibration (calibration)
 
 informationRetrievalBookExample :: [(String, Int)]
 informationRetrievalBookExample = [("o", 2), ("o", 2), ("d", 2), ("x", 3), ("d", 3),
@@ -564,7 +568,29 @@ main = hspec $ do
       kendallZ (V.fromList $ Prelude.zip [12, 2, 1, 12, 2] [1, 4, 7, 1, 0]) `shouldBeAlmost` (-1.0742)
     it "p-value" $ do
       (2 * (cumulative (normalDistr 0.0 1.0) $ kendallZ (V.fromList $ Prelude.zip [12, 2, 1, 12, 2] [1, 4, 7, 1, 0]))) `shouldBeAlmost` 0.2827
-
+  describe "Loess" $ do
+    it "simple" $ do
+      loess (DVU.fromList [0.2, 0.6, 1.0])
+            (DVU.fromList [-0.6, 0.2, 1.0])
+            0.4 `shouldBeAlmost` (-0.2)
+  describe "Calibration" $ do
+    it "empty list" $ do
+      calibration [] [] `shouldBeAlmost` 1.0
+    it "one element" $ do
+      calibration [True] [1.0] `shouldBeAlmost` 1.0
+      calibration [False] [0.0] `shouldBeAlmost` 1.0
+      calibration [True] [0.0] `shouldBeAlmost` 0.0
+      calibration [False] [1.0] `shouldBeAlmost` 0.0
+      calibration [True] [0.7] `shouldBeAlmost` 0.7
+      calibration [True] [0.3] `shouldBeAlmost` 0.3
+      calibration [False] [0.7] `shouldBeAlmost` 0.3
+      calibration [False] [0.3] `shouldBeAlmost` 0.7
+    it "perfect calibration" $ do
+      calibration [True, True, False] [0.5, 1.0, 0.5] `shouldBeAlmost` 1.0
+    it "totally wrong" $ do
+      calibration [True, False] [0.0, 1.0] `shouldBeAlmost` 0.0
+      calibration [True, False, False, True, False] [0.0, 1.0, 1.0, 0.5, 0.5] `shouldBeAlmost` 0.0
+      calibration [False, True, True, True, True, False, False, True, False] [0.25, 0.25, 0.0, 0.25, 0.25, 1.0, 1.0, 0.5, 0.5] `shouldBeAlmost` 0.0
 
 checkConduitPure conduit inList expList = do
   let outList = runConduitPure $ CC.yieldMany inList .| conduit .| CC.sinkList
