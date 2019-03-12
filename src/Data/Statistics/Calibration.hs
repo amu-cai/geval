@@ -2,7 +2,6 @@ module Data.Statistics.Calibration
    (calibration, softCalibration) where
 
 import Data.Statistics.Loess(loess)
-import Numeric.Tools.Integration
 import Numeric.Integration.TanhSinh
 import Data.List(minimum, maximum)
 import qualified Data.Vector.Unboxed as DVU

@@ -87,7 +87,6 @@ library
                      , vector-algorithms
                      , aeson
                      , aeson-pretty
-                     , numeric-tools
                      , integration
   default-language:    Haskell2010
 

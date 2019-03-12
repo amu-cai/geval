@@ -100,6 +100,8 @@ import qualified Data.Vector.Generic as VG
 
 import Statistics.Correlation
 
+import Data.Statistics.Calibration(softCalibration)
+
 import Data.Proxy
 
 import Data.Word
@@ -115,7 +117,7 @@ data Metric = RMSE | MSE | Pearson | Spearman | BLEU | GLEU | WER | Accuracy | C
               | LogLossHashed Word32 | CharMatch | MAP | LogLoss | Likelihood
               | BIOF1 | BIOF1Labels | TokenAccuracy | LikelihoodHashed Word32 | MAE | SMAPE | MultiLabelFMeasure Double
               | MultiLabelLogLoss | MultiLabelLikelihood
-              | SoftFMeasure Double
+              | SoftFMeasure Double | ProbabilisticSoftFMeasure Double
               deriving (Eq)
 
 instance Show Metric where
@@ -131,6 +133,7 @@ instance Show Metric where
   show (FMeasure beta) = "F" ++ (show beta)
   show (MacroFMeasure beta) = "Macro-F" ++ (show beta)
   show (SoftFMeasure beta) = "Soft-F" ++ (show beta)
+  show (ProbabilisticSoftFMeasure beta) = "Probabilistic-Soft-F" ++ (show beta)
   show NMI = "NMI"
   show (LogLossHashed nbOfBits) = "LogLossHashed" ++ (if
                                                        nbOfBits == defaultLogLossHashedSize
@@ -180,6 +183,9 @@ instance Read Metric where
   readsPrec p ('S':'o':'f':'t':'-':'F':theRest) = case readsPrec p theRest of
     [(beta, theRest)] -> [(SoftFMeasure beta, theRest)]
     _ -> []
+  readsPrec p ('P':'r':'o':'b':'a':'b':'i':'l':'i':'s':'t':'i':'c':'-':'S':'o':'f':'t':'-':'F':theRest) = case readsPrec p theRest of
+    [(beta, theRest)] -> [(ProbabilisticSoftFMeasure beta, theRest)]
+    _ -> []
   readsPrec p ('L':'o':'g':'L':'o':'s':'s':'H':'a':'s':'h':'e':'d':theRest) = case readsPrec p theRest of
     [(nbOfBits, theRest)] -> [(LogLossHashed nbOfBits, theRest)]
     _ -> [(LogLossHashed defaultLogLossHashedSize, theRest)]
@@ -216,6 +222,7 @@ getMetricOrdering ClippEU  = TheHigherTheBetter
 getMetricOrdering (FMeasure _) = TheHigherTheBetter
 getMetricOrdering (MacroFMeasure _) = TheHigherTheBetter
 getMetricOrdering (SoftFMeasure _) = TheHigherTheBetter
+getMetricOrdering (ProbabilisticSoftFMeasure _) = TheHigherTheBetter
 getMetricOrdering NMI = TheHigherTheBetter
 getMetricOrdering (LogLossHashed _) = TheLowerTheBetter
 getMetricOrdering (LikelihoodHashed _) = TheHigherTheBetter
@@ -721,13 +728,26 @@ gevalCore' (MacroFMeasure beta) _ = gevalCoreWithoutInput (Right . Just . strip)
                                $ M.keys expectedMap) / (fromIntegral $ Prelude.length $ M.keys expectedMap)
 
 gevalCore' (SoftFMeasure beta) _ = gevalCoreWithoutInput parseAnnotations
-                                                         parseAnnotations
+                                                         parseObtainedAnnotations
                                                          getSoftCounts
                                                          countAgg
                                                          (fMeasureOnCounts beta)
                       where getSoftCounts (expected, got) = (weightedMaxMatch matchScore expected got,
                                                              Prelude.length expected,
                                                              Prelude.length got)
+
+gevalCore' (ProbabilisticSoftFMeasure beta) _ = gevalCoreWithoutInput parseAnnotations
+                                                                      parseObtainedAnnotations
+                                                                      getProbabilisticSoftCounts
+                                                                      probabilisticSoftAgg
+                                                                      (fMeasureOnProbabilisticCounts beta)
+  where probabilisticSoftAgg :: Monad m => ConduitM ([Double], [Double], Double, Int) o m ([Double], [Double], Double, Int)
+        probabilisticSoftAgg = CC.foldl probabilisticSoftFolder ([], [], fromInteger 0, 0)
+        probabilisticSoftFolder (r1, p1, g1, e1) (r2, p2, g2, e2) = (r1 ++ r2, p1 ++ p2, g1 + g2, e1 + e2)
+        fMeasureOnProbabilisticCounts :: Double -> ([Double], [Double], Double, Int) -> Double
+        fMeasureOnProbabilisticCounts beta (results, probs, got, nbExpected) = weightedHarmonicMean beta calibrationMeasure recall
+           where calibrationMeasure = softCalibration results probs
+                 recall = got /. nbExpected
 
 gevalCore' ClippEU _ = gevalCoreWithoutInput parseClippingSpecs parseClippings matchStep clippeuAgg finalStep
   where

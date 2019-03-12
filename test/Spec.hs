@@ -248,6 +248,11 @@ main = hspec $ do
       runGEvalTest "soft-f1-simple" `shouldReturnAlmost` 0.33333333333333
     it "perfect test" $ do
       runGEvalTest "soft-f1-perfect" `shouldReturnAlmost` 1.0
+  describe "Probabilistic-Soft-F1" $ do
+    it "simple test" $ do
+      runGEvalTest "probabilistic-soft-f1-simple" `shouldReturnAlmost` 0.33333333333333
+    it "simple test with perfect calibration" $ do
+      runGEvalTest "probabilistic-soft-f1-calibrated" `shouldReturnAlmost` 0.88888888888
   describe "test edit-distance library" $ do
     it "for handling UTF8" $ do
       levenshteinDistance defaultEditCosts "źdźbło" "źd好bło" `shouldBe` 1
@@ -301,16 +306,16 @@ main = hspec $ do
   describe "Annotation format" $ do
     it "just parse" $ do
       parseAnnotations "foo:3,7-10 baz:4-6" `shouldBe` Right [Annotation "foo" (IS.fromList [3,7,8,9,10]),
-                                                               Annotation "baz" (IS.fromList [4,5,6])]
+                                                              Annotation "baz" (IS.fromList [4,5,6])]
     it "empty" $ do
       parseAnnotations "" `shouldBe` Right []
     it "empty (just spaces)" $ do
       parseAnnotations "   " `shouldBe` Right []
     it "match score" $ do
-      matchScore (Annotation "x" (IS.fromList [3..6])) (Annotation "y" (IS.fromList [3..6])) `shouldBeAlmost` 0.0
-      matchScore (Annotation "x" (IS.fromList [3..6])) (Annotation "x" (IS.fromList [3..6])) `shouldBeAlmost` 1.0
-      matchScore (Annotation "x" (IS.fromList [123..140])) (Annotation "x" (IS.fromList [125..130])) `shouldBeAlmost` 0.33333
-      matchScore (Annotation "x" (IS.fromList [3..4])) (Annotation "x" (IS.fromList [2..13])) `shouldBeAlmost` 0.1666666
+      matchScore (Annotation "x" (IS.fromList [3..6])) (ObtainedAnnotation (Annotation "y" (IS.fromList [3..6])) 1.0) `shouldBeAlmost` 0.0
+      matchScore (Annotation "x" (IS.fromList [3..6])) (ObtainedAnnotation (Annotation "x" (IS.fromList [3..6])) 1.0) `shouldBeAlmost` 1.0
+      matchScore (Annotation "x" (IS.fromList [123..140])) (ObtainedAnnotation (Annotation "x" (IS.fromList [125..130])) 1.0) `shouldBeAlmost` 0.33333
+      matchScore (Annotation "x" (IS.fromList [3..4])) (ObtainedAnnotation (Annotation "x" (IS.fromList [2..13])) 1.0) `shouldBeAlmost` 0.1666666
   describe "BIO format" $ do
     it "just parse" $ do
       let (Right r) = parseOnly (bioSequenceParser <* endOfInput) "O B-city/NEW_YORK I-city B-city/KALISZ I-city O B-name"

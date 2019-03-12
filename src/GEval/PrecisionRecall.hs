@@ -2,10 +2,10 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 
 module GEval.PrecisionRecall(calculateMAPForOneResult,
-                             fMeasure, f1Measure, f2Measure, precision, recall,
+                             weightedHarmonicMean, fMeasure, f1Measure, f2Measure, precision, recall,
                              fMeasureOnCounts, f1MeasureOnCounts, f2MeasureOnCounts, countFolder,
                              precisionAndRecall, precisionAndRecallFromCounts,
-                             maxMatch, maxMatchOnOrdered, getCounts, weightedMaxMatch)
+                             maxMatch, maxMatchOnOrdered, getCounts, weightedMaxMatch, weightedMaxMatching)
        where
 
 import GEval.Common
@@ -41,10 +41,13 @@ fMeasure :: Double          -- ^ beta parameter
          -> [a]             -- ^ the ground truth
          -> [b]             -- ^ what we got
          -> Double          -- ^ f-Measure
-fMeasure beta matchingFun expected got =
-  (1 + betaSquared) * p * r `safeDoubleDiv` (betaSquared * p + r)
+fMeasure beta matchingFun expected got = weightedHarmonicMean beta p r
+  where (p, r) = precisionAndRecall matchingFun expected got
+
+weightedHarmonicMean :: Double -> Double -> Double -> Double
+weightedHarmonicMean beta x y =
+  (1 + betaSquared) * x * y `safeDoubleDiv` (betaSquared * x + y)
   where betaSquared = beta ^ 2
-        (p, r) = precisionAndRecall matchingFun expected got
 
 f2MeasureOnCounts :: ConvertibleToDouble n => (n, Int, Int) -> Double
 f2MeasureOnCounts = fMeasureOnCounts 2.0
@@ -125,11 +128,14 @@ buildGraph matchFun expected got = (b, e, g)
 -- the weight are assumed to be between 0.0 and 1.0
 weightedMaxMatch :: (a -> b -> Double) -> [a] -> [b] -> Double
 weightedMaxMatch matchFun expected got = (fromIntegral $ length matching) - score
-   where (matching, score) = hungarianMethodDouble complementWeightArray
-                             -- unfortunately `hungarianMethodDouble` looks
-                             -- for minimal bipartite matching
-                             -- rather than the maximal one
-         complementWeightArray = DAI.array ((1, 1), (m, n)) weightList
+   where (matching, score) = weightedMaxMatching matchFun expected got
+
+weightedMaxMatching :: (a -> b -> Double) -> [a] -> [b] -> ([(Int, Int)], Double)
+weightedMaxMatching matchFun expected got = hungarianMethodDouble complementWeightArray
+                                            -- unfortunately `hungarianMethodDouble` looks
+                                            -- for minimal bipartite matching
+                                            -- rather than the maximal one
+  where  complementWeightArray = DAI.array ((1, 1), (m, n)) weightList
          m = length expected
          n = length got
          weightList = [((i, j), 1.0 - (matchFun x y)) | (i, x) <- zip [1..m] expected,
