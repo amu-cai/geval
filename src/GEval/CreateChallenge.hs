@@ -110,11 +110,19 @@ GEval sample challenge — guess the language of a first name
 This is a sample/toy classification challenge for Gonito framework with Macro-F-measure as the metric.
 |] ++ (commonReadmeMDContents testName)
 
+
 readmeMDContents (SoftFMeasure _) testName = [i|
 GEval sample challenge — mark numbers
 =====================================
 
 This is a sample/toy classification challenge for Gonito framework with Soft-F-measure as the metric.
+|] ++ (commonReadmeMDContents testName)
+
+readmeMDContents (ProbabilisticSoftFMeasure _) testName = [i|
+GEval sample challenge — mark numbers
+=====================================
+
+This is a sample/toy classification challenge for Gonito framework with Probabilistic-Soft-F-measure as the metric.
 |] ++ (commonReadmeMDContents testName)
 
 readmeMDContents NMI testName = [i|
@@ -378,6 +386,7 @@ pl	Kazimierz
 en	Matthew
 en	Richard
 |]
+trainContents (ProbabilisticSoftFMeasure b) = trainContents (SoftFMeasure b)
 trainContents (SoftFMeasure _) = [hereLit|indigits:8	I have 3 daughters
 indigits:1-2 indigits:9-12	12 July 1812
 inwords:11-13	I can see two dogs
@@ -450,6 +459,7 @@ devInContents (MacroFMeasure _) = [hereLit|Władysław
 Steven
 Helmut
 |]
+devInContents (ProbabilisticSoftFMeasure b) = devInContents (SoftFMeasure b)
 devInContents (SoftFMeasure _) = [hereLit|I have two kids
 7 April 2003
 |]
@@ -504,6 +514,7 @@ devExpectedContents (MacroFMeasure _) = [hereLit|pl
 en
 de
 |]
+devExpectedContents (ProbabilisticSoftFMeasure b) = devExpectedContents (SoftFMeasure b)
 devExpectedContents (SoftFMeasure _) = [hereLit|inwords:8-10
 indigits:1 indigits:9-12
 |]
@@ -562,6 +573,7 @@ testInContents (MacroFMeasure _) = [hereLit|Arkadiusz
 Heinrich
 Henry
 |]
+testInContents (ProbabilisticSoftFMeasure b) = testInContents (SoftFMeasure b)
 testInContents (SoftFMeasure _) = [hereLit|Nothing
 Four sides
 |]
@@ -622,6 +634,7 @@ testExpectedContents (MacroFMeasure _) = [hereLit|pl
 de
 en
 |]
+testExpectedContents (ProbabilisticSoftFMeasure b) = testExpectedContents (SoftFMeasure b)
 testExpectedContents (SoftFMeasure _) = [hereLit|
 inwords:1-4
 |]
