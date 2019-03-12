@@ -1,3 +1,7 @@
+## 1.17.0.0
+
+* Add Probabilistic-Soft-F-score
+
 ## 1.16.0.0
 
 * Handle JSONL files (only for MultiLabel-F-score)
