@@ -431,7 +431,7 @@ gevalLineByLineSource metric mSelector preprocess inputSource expectedSource out
           s <- liftIO $ gevalCoreOnSingleLines metric preprocess (getDataDecoder inputLineSource) (LineInFile inputSource lineNo inp)
                                                                 (getDataDecoder expectedLineSource) (LineInFile expectedSource lineNo exp)
                                                                 (getDataDecoder outputLineSource) (LineInFile outSource lineNo out)
-          return $ LineRecord inp exp out lineNo s
+          return $ LineRecord inp exp out lineNo (getMetricValue s)
 
 justTokenize :: Maybe Tokenizer -> IO ()
 justTokenize Nothing = error "a tokenizer must be specified with --tokenizer option"

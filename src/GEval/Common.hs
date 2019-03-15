@@ -8,6 +8,16 @@ import Data.Attoparsec.Text
 
 type MetricValue = Double
 
+data GraphSeries = GraphSeries [(Double, Double)]
+
+data MetricOutput = MetricOutput MetricValue (Maybe GraphSeries)
+
+getMetricValue :: MetricOutput -> MetricValue
+getMetricValue (MetricOutput v _) = v
+
+getGraphSeries :: MetricOutput -> Maybe GraphSeries
+getGraphSeries (MetricOutput _ gs) = gs
+
 -- some operations can be "hard" (on ints) or "soft" (on doubles),
 -- introduce a typeclass so that we could generalise easily
 class ConvertibleToDouble n where

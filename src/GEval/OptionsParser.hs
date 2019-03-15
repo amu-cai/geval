@@ -9,8 +9,13 @@ module GEval.OptionsParser
         precisionArgParser
         ) where
 
+import Debug.Trace
+
 import Paths_geval (version)
 import Data.Version (showVersion)
+
+import Graphics.Rendering.Chart.Easy
+import Graphics.Rendering.Chart.Backend.Cairo
 
 import Options.Applicative
 import qualified System.Directory as D
@@ -96,6 +101,10 @@ optionsParser = GEvalOptions
                    <> help "When in line-by-line or diff mode, show only items with a given feature"))
    <*> specParser
    <*> blackBoxDebuggingOptionsParser
+   <*> optional (strOption
+                 ( long "plot-graph"
+                   <> metavar "FILE-PATH"
+                   <> help "Plot an extra graph, applicable only for Probabilistic-Soft-F-score (LOESS function for calibration)"))
 
 precisionArgParser :: Parser Int
 precisionArgParser = option auto
@@ -277,40 +286,79 @@ runGEval'' opts = runGEval''' (geoSpecialCommand opts)
                               (geoFilter opts)
                               (geoSpec opts)
                               (geoBlackBoxDebugginsOptions opts)
+                              (geoGraphFile opts)
 
 runGEval''' :: Maybe GEvalSpecialCommand
               -> ResultOrdering
               -> Maybe String
               -> GEvalSpecification
               -> BlackBoxDebuggingOptions
+              -> Maybe FilePath
               -> IO (Maybe [(SourceSpec, [MetricValue])])
-runGEval''' Nothing _ _ spec _ = do
-  vals <- geval spec
+runGEval''' Nothing _ _ spec _ mGraphFile = do
+  vals' <- geval spec
+  let vals = map (\(s, val) -> (s, map getMetricValue val)) vals'
+  case mGraphFile of
+    Just graphFile -> do
+      let graphsData = groupByMetric (gesMetrics spec) vals'
+      mapM_ (\(ix, d) -> (plotGraph (getGraphFilename ix graphFile) d)) $ zip [0..] graphsData
+    Nothing -> return ()
   return $ Just vals
-runGEval''' (Just Init) _ _ spec _ = do
+runGEval''' (Just Init) _ _ spec _ _ = do
   initChallenge spec
   return Nothing
-runGEval''' (Just PrintVersion) _ _ _ _ = do
+runGEval''' (Just PrintVersion) _ _ _ _ _ = do
   putStrLn ("geval " ++ showVersion version)
   return Nothing
-runGEval''' (Just LineByLine) ordering featureFilter spec bbdo = do
+runGEval''' (Just LineByLine) ordering featureFilter spec bbdo _ = do
   runLineByLine ordering featureFilter spec bbdo
   return Nothing
-runGEval''' (Just WorstFeatures) ordering _ spec bbdo = do
+runGEval''' (Just WorstFeatures) ordering _ spec bbdo _ = do
   runWorstFeatures ordering spec bbdo
   return Nothing
-runGEval''' (Just (Diff otherOut)) ordering featureFilter spec bbdo = do
+runGEval''' (Just (Diff otherOut)) ordering featureFilter spec bbdo _ = do
   runDiff ordering featureFilter otherOut spec bbdo
   return Nothing
-runGEval''' (Just (MostWorseningFeatures otherOut)) ordering _ spec bbdo = do
+runGEval''' (Just (MostWorseningFeatures otherOut)) ordering _ spec bbdo _ = do
   runMostWorseningFeatures ordering otherOut spec bbdo
   return Nothing
-runGEval''' (Just JustTokenize) _ _ spec _ = do
+runGEval''' (Just JustTokenize) _ _ spec _ _ = do
   justTokenize (gesTokenizer spec)
   return Nothing
-runGEval''' (Just Submit) _ _ spec _ = do
+runGEval''' (Just Submit) _ _ spec _ _ = do
   submit (gesGonitoHost spec) (gesToken spec) (gesGonitoGitAnnexRemote spec)
   return Nothing
+
+getGraphFilename :: Int -> FilePath -> FilePath
+getGraphFilename 0 fp = fp
+getGraphFilename ix fp = ((dropExtension fp) ++ "-" ++ (show ix)) ++ (takeExtension fp)
+
+groupByMetric :: [Metric]
+                -> [(SourceSpec, [MetricOutput])]
+                -> [(Metric, [(SourceSpec, GraphSeries)])]
+groupByMetric metrics results = filter (\(_, ss) -> not (null ss))
+                                $ map extractMetric
+                                $ zip [0..] metrics
+  where extractMetric (ix, metric) =
+            (metric, map (\(s, Just g) -> (s, g))
+                     $ filter (\(s, mg) -> isJust mg)
+                     $ map (\(s, out) -> (s, getGraphSeries out))
+                     $ map (\(s, outs) -> (s, outs !! ix)) results)
+
+
+plotGraph :: FilePath -> (Metric, [(SourceSpec, GraphSeries)]) -> IO ()
+plotGraph graphFile (metric@(ProbabilisticSoftFMeasure _), seriesSpecs) = do
+  toFile def graphFile $ do
+    layoutlr_title .= "GEval Graph / Loess / " ++ (show metric)
+    let perfectSeries = (FilePathSpec "Perfect",
+                         GraphSeries [(0.0, 0.0), (1.0, 1.0)])
+    mapM_ plotOneSeries $ (perfectSeries : seriesSpecs)
+  return ()
+  where
+    plotOneSeries :: (SourceSpec, GraphSeries) -> EC (LayoutLR Double Double Double) ()
+    plotOneSeries (sspec, GraphSeries series) = plotLeft (line (recoverPath sspec) [series])
+plotGraph _ _ = error "No graph for this metric!"
+
 
 initChallenge :: GEvalSpecification -> IO ()
 initChallenge spec = case gesExpectedDirectory spec of

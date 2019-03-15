@@ -88,6 +88,8 @@ library
                      , aeson
                      , aeson-pretty
                      , integration
+                     , Chart
+                     , Chart-cairo
   default-language:    Haskell2010
 
 executable geval

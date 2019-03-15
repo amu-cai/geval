@@ -66,7 +66,7 @@ import Data.Maybe
 import Data.Either (rights)
 import Data.Tuple
 import qualified Data.List.Split as DLS
-import Data.List (sortBy, isSuffixOf)
+import Data.List (sortBy, isSuffixOf, minimum, maximum)
 import Text.NaturalComp
 
 import Control.Monad.IO.Class
@@ -98,9 +98,12 @@ import qualified Data.HashMap.Strict as M
 import qualified Data.Vector as V
 import qualified Data.Vector.Generic as VG
 
+import qualified Data.Vector.Unboxed as DVU
+
 import Statistics.Correlation
 
 import Data.Statistics.Calibration(softCalibration)
+import Data.Statistics.Loess(loess)
 
 import Data.Proxy
 
@@ -288,7 +291,8 @@ data GEvalSpecification = GEvalSpecification
                             gesTokenizer :: Maybe Tokenizer,
                             gesGonitoHost :: Maybe String,
                             gesToken :: Maybe String,
-                            gesGonitoGitAnnexRemote :: Maybe String }
+                            gesGonitoGitAnnexRemote :: Maybe String}
+
 
 gesMainMetric :: GEvalSpecification -> Metric
 gesMainMetric spec = case gesMetrics spec of
@@ -316,7 +320,8 @@ data GEvalOptions = GEvalOptions
                       geoResultOrdering :: ResultOrdering,
                       geoFilter :: Maybe String,
                       geoSpec :: GEvalSpecification,
-                      geoBlackBoxDebugginsOptions :: BlackBoxDebuggingOptions }
+                      geoBlackBoxDebugginsOptions :: BlackBoxDebuggingOptions,
+                      geoGraphFile :: Maybe FilePath }
 
 data GEvalException = NoExpectedFile FilePath
                       | NoOutFile FilePath
@@ -388,13 +393,16 @@ extensionsHandled = ["tsv", "jsonl"]
 
 data LineSource m = LineSource (ConduitT () Text m ()) (Text -> ItemTarget) (Text -> Text) SourceSpec Word32
 
-geval :: GEvalSpecification -> IO [(SourceSpec, [MetricValue])]
+geval :: GEvalSpecification -> IO [(SourceSpec, [MetricOutput])]
 geval gevalSpec = do
   (inputSource, expectedSource, outSources) <- checkAndGetFiles False gevalSpec
   results <- Prelude.mapM (gevalOnSingleOut gevalSpec inputSource expectedSource) outSources
   return $ sortBy (\a b ->  (show $ fst a) `naturalComp` (show $ fst b)) results
 
-gevalOnSingleOut :: GEvalSpecification -> SourceSpec -> SourceSpec -> SourceSpec -> IO (SourceSpec, [MetricValue])
+noGraph :: d -> Maybe GraphSeries
+noGraph = const Nothing
+
+gevalOnSingleOut :: GEvalSpecification -> SourceSpec -> SourceSpec -> SourceSpec -> IO (SourceSpec, [MetricOutput])
 gevalOnSingleOut gevalSpec inputSource expectedSource outSource = do
   vals <- Prelude.mapM (\metric -> gevalCore metric mSelector preprocess inputSource expectedSource outSource) metrics
   return (outSource, vals)
@@ -530,7 +538,7 @@ getDataFormatFromFilePath path =
 
 dataDecoder fmt mSelector = CC.map (select fmt mSelector)
 
-gevalCoreOnSingleLines :: Metric -> (Text -> Text) -> (Text -> ItemTarget) -> LineInFile -> (Text -> ItemTarget) -> LineInFile -> (Text -> ItemTarget) -> LineInFile -> IO (MetricValue)
+gevalCoreOnSingleLines :: Metric -> (Text -> Text) -> (Text -> ItemTarget) -> LineInFile -> (Text -> ItemTarget) -> LineInFile -> (Text -> ItemTarget) -> LineInFile -> IO (MetricOutput)
 gevalCoreOnSingleLines metric preprocess inpDecoder inpLine expDecoder expLine outDecoder outLine =
   gevalCoreOnSources metric (singleLineAsLineSource inpLine inpDecoder preprocess)
                             (singleLineAsLineSource expLine expDecoder outputPreprocess)
@@ -553,7 +561,7 @@ gevalCore :: Metric           -- ^ evaluation metric
           -> SourceSpec       -- ^ source specification for the input values
           -> SourceSpec       -- ^ source specification for the expected output
           -> SourceSpec       -- ^ source specification for the output
-          -> IO (MetricValue) -- ^ metric value for the output against the expected output
+          -> IO (MetricOutput) -- ^ metric value for the output against the expected output
 gevalCore metric mSelector preprocess inputSource expectedSource outSource = do
   whenM (isEmptyFileSource outSource) $ throwM $ EmptyOutput
   gevalCoreOnSources metric
@@ -585,22 +593,22 @@ gevalCoreOnSources :: (MonadIO m, MonadThrow m, MonadUnliftIO m) =>
                      -> LineSource (ResourceT m)  -- ^ source of the input values
                      -> LineSource (ResourceT m)  -- ^ source to read the expected output
                      -> LineSource (ResourceT m)  -- ^ source to read the output
-                     -> m (MetricValue)           -- ^ metric values for the output against the expected output
+                     -> m (MetricOutput)           -- ^ metric values for the output against the expected output
 gevalCoreOnSources RMSE inputLineSource expectedLineSource outLineSource = do
-  mse <- gevalCoreOnSources MSE inputLineSource expectedLineSource outLineSource
-  return $ mse ** 0.5
+  MetricOutput mse g <- gevalCoreOnSources MSE inputLineSource expectedLineSource outLineSource
+  return $ MetricOutput (mse ** 0.5) g
 
 gevalCoreOnSources Likelihood inputLineSource expectedLineSource outLineSource = do
-  logLoss <- gevalCoreOnSources LogLoss inputLineSource expectedLineSource outLineSource
-  return $ logLossToLikehood logLoss
+  MetricOutput logLoss g <- gevalCoreOnSources LogLoss inputLineSource expectedLineSource outLineSource
+  return $ MetricOutput (logLossToLikehood logLoss) g
 
 gevalCoreOnSources (LikelihoodHashed b) inputLineSource expectedLineSource outLineSource = do
-  logLoss <- gevalCoreOnSources (LogLossHashed b) inputLineSource expectedLineSource outLineSource
-  return $ logLossToLikehood logLoss
+  MetricOutput logLoss g <- gevalCoreOnSources (LogLossHashed b) inputLineSource expectedLineSource outLineSource
+  return $ MetricOutput (logLossToLikehood logLoss) g
 
 gevalCoreOnSources MultiLabelLikelihood inputLineSource expectedLineSource outLineSource = do
-  logLoss <- gevalCoreOnSources MultiLabelLogLoss inputLineSource expectedLineSource outLineSource
-  return $ logLossToLikehood logLoss
+  MetricOutput logLoss g <- gevalCoreOnSources MultiLabelLogLoss inputLineSource expectedLineSource outLineSource
+  return $ MetricOutput (logLossToLikehood logLoss) g
 
 gevalCoreOnSources metric inputLineSource expectedLineSource outLineSource = do
   gevalCore' metric inputLineSource expectedLineSource outLineSource
@@ -620,24 +628,24 @@ gevalCore' :: (MonadIO m, MonadThrow m, MonadUnliftIO m) =>
            -> LineSource (ResourceT m)  -- ^ source of the input values
            -> LineSource (ResourceT m)  -- ^ source to read the expected output
            -> LineSource (ResourceT m)  -- ^ source to read the output
-           -> m (MetricValue)           -- ^ metric values for the output against the expected output
-gevalCore' MSE _ = gevalCoreWithoutInput outParser outParser itemSquaredError averageC id
+           -> m (MetricOutput)           -- ^ metric values for the output against the expected output
+gevalCore' MSE _ = gevalCoreWithoutInput outParser outParser itemSquaredError averageC id noGraph
   where outParser = getValue . TR.double
 
-gevalCore' MAE _ = gevalCoreWithoutInput outParser outParser itemAbsoluteError averageC id
+gevalCore' MAE _ = gevalCoreWithoutInput outParser outParser itemAbsoluteError averageC id noGraph
   where outParser = getValue . TR.double
 
-gevalCore' SMAPE _ = gevalCoreWithoutInput outParser outParser smape averageC (* 100.0)
+gevalCore' SMAPE _ = gevalCoreWithoutInput outParser outParser smape averageC (* 100.0) noGraph
   where outParser = getValue . TR.double
         smape (exp, out) = (abs (exp-out)) `safeDoubleDiv` ((abs exp) + (abs out))
 
 gevalCore' Pearson _ = gevalCoreByCorrelationMeasure pearson
 gevalCore' Spearman _ = gevalCoreByCorrelationMeasure spearman
 
-gevalCore' LogLoss _ = gevalCoreWithoutInput outParser outParser itemLogLossError averageC id
+gevalCore' LogLoss _ = gevalCoreWithoutInput outParser outParser itemLogLossError averageC id noGraph
   where outParser = getValue . TR.double
 
-gevalCore' BLEU _ = gevalCoreWithoutInput (Right . Prelude.map Prelude.words . DLS.splitOn "\t" . unpack) (Right . Prelude.words . unpack) bleuCombine bleuAgg bleuFinal
+gevalCore' BLEU _ = gevalCoreWithoutInput (Right . Prelude.map Prelude.words . DLS.splitOn "\t" . unpack) (Right . Prelude.words . unpack) bleuCombine bleuAgg bleuFinal noGraph
   where bleuFinal (p1, p2, p3, p4, rl, l1, l2, l3, l4) = ((p1 /. l1) * (p2 /. l2) * (p3 /. l3) * (p4 /. l4)) ** 0.25 * (brevityPenalty l1 rl)
         bleuCombine (refs, sen) = bleuStep refs sen
         bleuAgg = CC.foldl bleuFuse (0, 0, 0, 0, 0,  0, 0, 0, 0)
@@ -647,15 +655,15 @@ gevalCore' BLEU _ = gevalCoreWithoutInput (Right . Prelude.map Prelude.words . D
           | c == 0 && r > 0 = 0.0
           | otherwise = exp (1.0 - (r /. c))
 
-gevalCore' GLEU _ = gevalCoreWithoutInput (Right . Prelude.map Prelude.words . DLS.splitOn "\t" . unpack) (Right . Prelude.words . unpack) gleuCombine gleuAgg gleuFinal
+gevalCore' GLEU _ = gevalCoreWithoutInput (Right . Prelude.map Prelude.words . DLS.splitOn "\t" . unpack) (Right . Prelude.words . unpack) gleuCombine gleuAgg gleuFinal noGraph
   where gleuFinal (m, t) = m /. t
         gleuCombine (refs, sen) = gleuStep refs sen
         gleuAgg = CC.foldl gleuFuse (0, 0)
         gleuFuse (a1, a2) (b1, b2) = (a1+b1, a2+b2)
 
-gevalCore' WER _ = gevalCoreWithoutInput (Right . Prelude.words . unpack) (Right . Prelude.words . unpack) (uncurry werStep) averageC id
+gevalCore' WER _ = gevalCoreWithoutInput (Right . Prelude.words . unpack) (Right . Prelude.words . unpack) (uncurry werStep) averageC id noGraph
 
-gevalCore' Accuracy _ = gevalCoreWithoutInput (Right . strip) (Right . strip) hitOrMiss averageC id
+gevalCore' Accuracy _ = gevalCoreWithoutInput (Right . strip) (Right . strip) hitOrMiss averageC id noGraph
                       where hitOrMiss (exp, got) =
                               -- first try to parse what we got as a probability distribution
                               -- (like the one used for Likelikehood/LogLossHashed metric)
@@ -680,7 +688,7 @@ gevalCore' Accuracy _ = gevalCoreWithoutInput (Right . strip) (Right . strip) hi
                             tryReadingAsFloat :: Text -> Maybe Float
                             tryReadingAsFloat = readMaybe . unpack
 
-gevalCore' (FMeasure beta) _ = gevalCoreWithoutInput outParser outParser getCount countAgg (fMeasureOnCounts beta)
+gevalCore' (FMeasure beta) _ = gevalCoreWithoutInput outParser outParser getCount countAgg (fMeasureOnCounts beta) noGraph
   where outParser = detected <=< (getValue . TR.double)
         expParser = expected <=< (getValue . TR.decimal)
         expected 1 = Right True
@@ -698,7 +706,7 @@ gevalCore' (FMeasure beta) _ = gevalCoreWithoutInput outParser outParser getCoun
         getCount (False, True)  = (0, 0, 1)
         getCount (False, False) = (0, 0, 0)
 
-gevalCore' (MacroFMeasure beta) _ = gevalCoreWithoutInput (Right . Just . strip) (Right . predicted . strip) getClassesInvolved gatherClassC macroAverageOnCounts
+gevalCore' (MacroFMeasure beta) _ = gevalCoreWithoutInput (Right . Just . strip) (Right . predicted . strip) getClassesInvolved gatherClassC macroAverageOnCounts noGraph
                       where predicted got =
                               -- first try to parse what we got as a probability distribution
                               -- (like the one used for Likelikehood/LogLossHashed metric)
@@ -732,6 +740,7 @@ gevalCore' (SoftFMeasure beta) _ = gevalCoreWithoutInput parseAnnotations
                                                          getSoftCounts
                                                          countAgg
                                                          (fMeasureOnCounts beta)
+                                                         noGraph
                       where getSoftCounts (expected, got) = (weightedMaxMatch matchScore expected got,
                                                              Prelude.length expected,
                                                              Prelude.length got)
@@ -741,15 +750,22 @@ gevalCore' (ProbabilisticSoftFMeasure beta) _ = gevalCoreWithoutInput parseAnnot
                                                                       getProbabilisticSoftCounts
                                                                       probabilisticSoftAgg
                                                                       (fMeasureOnProbabilisticCounts beta)
+                                                                      loessGraph
   where probabilisticSoftAgg :: Monad m => ConduitM ([Double], [Double], Double, Int) o m ([Double], [Double], Double, Int)
         probabilisticSoftAgg = CC.foldl probabilisticSoftFolder ([], [], fromInteger 0, 0)
         probabilisticSoftFolder (r1, p1, g1, e1) (r2, p2, g2, e2) = (r1 ++ r2, p1 ++ p2, g1 + g2, e1 + e2)
+        loessGraph :: ([Double], [Double], Double, Int) -> Maybe GraphSeries
+        loessGraph (results, probs, _, _) = Just $ GraphSeries $ Prelude.map (\x -> (x, loess results' probs' x)) $ Prelude.filter (\p -> p >= lowest && p <= highest) $ Prelude.map (\d -> 0.01 * (fromIntegral d)) [1..99]
+           where results' = DVU.fromList results
+                 probs' = DVU.fromList probs
+                 lowest = Data.List.minimum probs
+                 highest = Data.List.maximum probs
         fMeasureOnProbabilisticCounts :: Double -> ([Double], [Double], Double, Int) -> Double
         fMeasureOnProbabilisticCounts beta (results, probs, got, nbExpected) = weightedHarmonicMean beta calibrationMeasure recall
            where calibrationMeasure = softCalibration results probs
                  recall = got /. nbExpected
 
-gevalCore' ClippEU _ = gevalCoreWithoutInput parseClippingSpecs parseClippings matchStep clippeuAgg finalStep
+gevalCore' ClippEU _ = gevalCoreWithoutInput parseClippingSpecs parseClippings matchStep clippeuAgg finalStep noGraph
   where
     parseClippings = controlledParse lineClippingsParser
     parseClippingSpecs = controlledParse lineClippingSpecsParser
@@ -759,18 +775,19 @@ gevalCore' ClippEU _ = gevalCoreWithoutInput parseClippingSpecs parseClippings m
     clippeuAgg = CC.foldl countFolder (0, 0, 0)
     finalStep counts = f2MeasureOnCounts counts
 
-gevalCore' NMI _ = gevalCoreWithoutInput (Right . id) (Right . id) id (CC.foldl updateConfusionMatrix M.empty) normalizedMutualInformationFromConfusionMatrix
+gevalCore' NMI _ = gevalCoreWithoutInput (Right . id) (Right . id) id (CC.foldl updateConfusionMatrix M.empty) normalizedMutualInformationFromConfusionMatrix noGraph
 
 gevalCore' MAP _ = gevalCoreWithoutInput (Right . DLS.splitOn "\t" . unpack)
                                          (Right . DLS.splitOn "\t" . unpack)
                                          (\(e,g) -> calculateMAPForOneResult e g)
                                          averageC
                                          id
+                                         noGraph
 
 gevalCore' (LogLossHashed nbOfBits) _ = helper nbOfBits
   -- for LogLossHashed we "salt" each hash with the line number
   where helper nbOfBits expectedLineSource outLineSource =
-          gevalCore''' (ParserSpecWithoutInput (liftOp (Right . id)) (liftOp tentativeParser)) (\(lineNo, (t,d)) -> calculateLogLoss nbOfBits lineNo t (parseDistributionWrapper nbOfBits lineNo d)) averageC negate (WithoutInput expectedLineSource outLineSource)
+          gevalCore''' (ParserSpecWithoutInput (liftOp (Right . id)) (liftOp tentativeParser)) (\(lineNo, (t,d)) -> calculateLogLoss nbOfBits lineNo t (parseDistributionWrapper nbOfBits lineNo d)) averageC negate noGraph (WithoutInput expectedLineSource outLineSource)
         -- Unfortunately, we're parsing the distribution twice. We need to
         -- tentatively parse the distribution when the line number is unknown
         -- (so we just set it to 1)
@@ -782,14 +799,14 @@ gevalCore' (LogLossHashed nbOfBits) _ = helper nbOfBits
 gevalCore' CharMatch inputLineSource = helper inputLineSource
  where
    helper inputLineSource expectedLineSource outputLineSource = do
-     gevalCoreGeneralized (ParserSpecWithInput justUnpack justUnpack justUnpack) step countAgg (fMeasureOnCounts charMatchBeta) (WithInput inputLineSource expectedLineSource outputLineSource)
+     gevalCoreGeneralized (ParserSpecWithInput justUnpack justUnpack justUnpack) step countAgg (fMeasureOnCounts charMatchBeta) noGraph (WithInput inputLineSource expectedLineSource outputLineSource)
    step (ParsedRecordWithInput inp exp out) = getCharMatchCount inp exp out
    justUnpack = liftOp (Right . unpack)
 
 
-gevalCore' BIOF1 _ = gevalCoreWithoutInput parseBioSequenceIntoEntities parseBioSequenceIntoEntities (uncurry gatherCountsForBIO) countAgg f1MeasureOnCounts
+gevalCore' BIOF1 _ = gevalCoreWithoutInput parseBioSequenceIntoEntities parseBioSequenceIntoEntities (uncurry gatherCountsForBIO) countAgg f1MeasureOnCounts noGraph
 
-gevalCore' BIOF1Labels _ = gevalCoreWithoutInput parseBioSequenceIntoEntitiesWithoutNormalization parseBioSequenceIntoEntitiesWithoutNormalization (uncurry gatherCountsForBIO) countAgg f1MeasureOnCounts
+gevalCore' BIOF1Labels _ = gevalCoreWithoutInput parseBioSequenceIntoEntitiesWithoutNormalization parseBioSequenceIntoEntitiesWithoutNormalization (uncurry gatherCountsForBIO) countAgg f1MeasureOnCounts noGraph
    where parseBioSequenceIntoEntitiesWithoutNormalization s = do
            entities <- parseBioSequenceIntoEntities s
            return $ Prelude.map eraseNormalisation entities
@@ -799,6 +816,7 @@ gevalCore' TokenAccuracy _ = gevalCoreWithoutInput intoTokens
                                                    countHitsAndTotals
                                                    hitsAndTotalsAgg
                                                    (\(hits, total) -> hits /. total)
+                                                   noGraph
    where intoTokens = Right . Data.Text.words
          countHitsAndTotals :: ([Text], [Text]) -> (Int, Int)
          countHitsAndTotals (es, os) =
@@ -820,6 +838,7 @@ gevalCore' (MultiLabelFMeasure beta) _ = gevalCoreWithoutInputOnItemTargets (Rig
                                                                             (getCounts (==))
                                                                             countAgg
                                                                             (fMeasureOnCounts beta)
+                                                                            noGraph
     where
       getWords (RawItemTarget t) = Prelude.map unpack $ selectByStandardThreshold $ parseIntoProbList t
       getWords (PartiallyParsedItemTarget ts) = Prelude.map unpack ts
@@ -831,6 +850,7 @@ gevalCore' MultiLabelLogLoss _ = gevalCoreWithoutInput intoWords
                                                        (uncurry countLogLossOnProbList)
                                                        averageC
                                                        id
+                                                       noGraph
     where
       intoWords = Right . Data.Text.words
 
@@ -841,9 +861,9 @@ gevalCoreByCorrelationMeasure :: (MonadUnliftIO m, MonadThrow m, MonadIO m) =>
                                 (V.Vector (Double, Double) -> Double) -> -- ^ correlation function
                                 LineSource (ResourceT m) ->  -- ^ source to read the expected output
                                 LineSource (ResourceT m) ->  -- ^ source to read the output
-                                m (MetricValue)             -- ^ metric values for the output against the expected output
+                                m (MetricOutput)             -- ^ metric values for the output against the expected output
 gevalCoreByCorrelationMeasure correlationFunction =
-  gevalCoreWithoutInput outParser outParser id correlationC finalStep
+  gevalCoreWithoutInput outParser outParser id correlationC finalStep noGraph
   where outParser = getValue . TR.double
         correlationC = CC.foldl (flip (:)) []
         finalStep pairs = correlationFunction $ V.fromList pairs
@@ -868,11 +888,12 @@ gevalCoreWithoutInput :: (MonadUnliftIO m, MonadThrow m, MonadIO m)
                       -> (ConduitT c Void (ResourceT m) d)  -- ^ a Conduit which aggregates all the combined values into
                                                    -- a "total" value
                       -> (d -> Double)             -- ^ function to transform the "total" value into the final score
+                      -> (d -> Maybe GraphSeries)
                       -> LineSource (ResourceT m)  -- ^ source to read the expected output
                       -> LineSource (ResourceT m)  -- ^ source to read the output
-                      -> m (MetricValue)           -- ^ metric values for the output against the expected output
-gevalCoreWithoutInput expParser outParser itemStep aggregator finalStep expectedLineStream outLineStream =
-  gevalCoreWithoutInputOnItemTargets (liftOp expParser) (liftOp outParser) itemStep aggregator finalStep expectedLineStream outLineStream
+                      -> m (MetricOutput)           -- ^ metric values for the output against the expected output
+gevalCoreWithoutInput expParser outParser itemStep aggregator finalStep generateGraph expectedLineStream outLineStream =
+  gevalCoreWithoutInputOnItemTargets (liftOp expParser) (liftOp outParser) itemStep aggregator finalStep generateGraph expectedLineStream outLineStream
 
 gevalCoreWithoutInputOnItemTargets :: (MonadUnliftIO m, MonadThrow m, MonadIO m)
                       => (ItemTarget -> Either String a) -- ^ parser for values in the expected output
@@ -883,20 +904,21 @@ gevalCoreWithoutInputOnItemTargets :: (MonadUnliftIO m, MonadThrow m, MonadIO m)
                       -> (ConduitT c Void (ResourceT m) d)  -- ^ a Conduit which aggregates all the combined values into
                                                    -- a "total" value
                       -> (d -> Double)             -- ^ function to transform the "total" value into the final score
+                      -> (d -> Maybe GraphSeries)
                       -> LineSource (ResourceT m)  -- ^ source to read the expected output
                       -> LineSource (ResourceT m)  -- ^ source to read the output
-                      -> m (MetricValue)           -- ^ metric values for the output against the expected output
-gevalCoreWithoutInputOnItemTargets expParser outParser itemStep aggregator finalStep expectedLineStream outLineStream =
-  gevalCoreGeneralized (ParserSpecWithoutInput expParser outParser) (trans itemStep) aggregator finalStep (WithoutInput expectedLineStream outLineStream)
+                      -> m (MetricOutput)           -- ^ metric values for the output against the expected output
+gevalCoreWithoutInputOnItemTargets expParser outParser itemStep aggregator finalStep generateGraph expectedLineStream outLineStream =
+  gevalCoreGeneralized (ParserSpecWithoutInput expParser outParser) (trans itemStep) aggregator finalStep generateGraph (WithoutInput expectedLineStream outLineStream)
  where
    trans :: ((a, b) -> c) -> ParsedRecord (WithoutInput m a b) -> c
    trans step (ParsedRecordWithoutInput x y) = step (x, y)
 
 
 
-gevalCore''' :: (MonadUnliftIO m, MonadThrow m, MonadIO m) => ParserSpec (WithoutInput m a b) -> ((Word32, (a, b)) -> c) -> (ConduitT c Void (ResourceT m) d) -> (d -> Double) -> WithoutInput m a b -> m (MetricValue)
-gevalCore''' parserSpec itemStep aggregator finalStep context =
-  gevalCoreGeneralized' parserSpec (trans itemStep) aggregator finalStep context
+gevalCore''' :: (MonadUnliftIO m, MonadThrow m, MonadIO m) => ParserSpec (WithoutInput m a b) -> ((Word32, (a, b)) -> c) -> (ConduitT c Void (ResourceT m) d) -> (d -> Double) -> (d -> Maybe GraphSeries) -> WithoutInput m a b -> m (MetricOutput)
+gevalCore''' parserSpec itemStep aggregator finalStep generateGraph context =
+  gevalCoreGeneralized' parserSpec (trans itemStep) aggregator finalStep generateGraph context
  where
    trans :: ((Word32, (a, b)) -> c) -> (Word32, ParsedRecord (WithoutInput m a b)) -> c
    trans step (n, ParsedRecordWithoutInput x y) = step (n, (x, y))
@@ -911,18 +933,19 @@ gevalCoreGeneralized :: (EvaluationContext ctxt m, MonadUnliftIO m, MonadThrow m
                                                              -- some "local" score calculated for each line (item)
                         -> (ConduitT c Void (ResourceT m) d) -- ^ a Conduit to aggregate score into a "total"
                         -> (d -> Double)                     -- ^ function to transform the "total" value into the final score
+                        -> (d -> Maybe GraphSeries)
                         -> ctxt                              -- ^ "context", i.e. 2 or 3 sources needed to operate
-                        -> m (MetricValue)
-gevalCoreGeneralized parserSpec itemStep aggregator finalStep context =
-  gevalCoreGeneralized' parserSpec (skipLineNumber itemStep) aggregator finalStep context
+                        -> m MetricOutput
+gevalCoreGeneralized parserSpec itemStep aggregator finalStep generateGraph context =
+  gevalCoreGeneralized' parserSpec (skipLineNumber itemStep) aggregator finalStep generateGraph context
 
-gevalCoreGeneralized' :: forall m ctxt c d . (EvaluationContext ctxt m, MonadUnliftIO m, MonadThrow m, MonadIO m) => ParserSpec ctxt -> ((Word32, ParsedRecord ctxt) -> c) -> (ConduitT c Void (ResourceT m) d) -> (d -> Double) -> ctxt -> m (MetricValue)
-gevalCoreGeneralized' parserSpec itemStep aggregator finalStep context = do
+gevalCoreGeneralized' :: forall m ctxt c d . (EvaluationContext ctxt m, MonadUnliftIO m, MonadThrow m, MonadIO m) => ParserSpec ctxt -> ((Word32, ParsedRecord ctxt) -> c) -> (ConduitT c Void (ResourceT m) d) -> (d -> Double) -> (d -> Maybe GraphSeries) -> ctxt -> m (MetricOutput)
+gevalCoreGeneralized' parserSpec itemStep aggregator finalStep generateGraph context = do
    v <- runResourceT $ runConduit $
      (((getZipSource $ (,)
        <$> ZipSource (CL.sourceList [(getFirstLineNo (Proxy :: Proxy m) context)..])
        <*> (ZipSource $ recordSource context parserSpec)) .| CL.map (checkStep (Proxy :: Proxy m) itemStep)) .| CL.catMaybes .| aggregator)
-   return $ finalStep v
+   return $ MetricOutput (finalStep v) (generateGraph v)
 
 -- | A type family to handle all the evaluation "context".
 --

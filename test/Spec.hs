@@ -81,7 +81,7 @@ main :: IO ()
 main = hspec $ do
   describe "root mean square error" $ do
     it "simple test" $ do
-      [(_, (val:_))] <-  geval $ defaultGEvalSpecification {gesExpectedDirectory=Just "test/rmse-simple/rmse-simple", gesOutDirectory="test/rmse-simple/rmse-simple-solution"}
+      [(_, ((MetricOutput val _):_))] <-  geval $ defaultGEvalSpecification {gesExpectedDirectory=Just "test/rmse-simple/rmse-simple", gesOutDirectory="test/rmse-simple/rmse-simple-solution"}
       val `shouldBeAlmost` 0.64549722436790
   describe "mean square error" $ do
     it "simple test with arguments" $
@@ -297,12 +297,13 @@ main = hspec $ do
       runGEvalTest "multilabel-likelihood-simple" `shouldReturnAlmost` 0.115829218528827
   describe "evaluating single lines" $ do
     it "RMSE" $ do
-      gevalCoreOnSingleLines RMSE id RawItemTarget
-                                     (LineInFile (FilePathSpec "stub1") 1 "blabla")
-                                     RawItemTarget
-                                     (LineInFile (FilePathSpec "stub2") 1 "3.4")
-                                     RawItemTarget
-                                     (LineInFile (FilePathSpec "stub3") 1 "2.6") `shouldReturnAlmost` 0.8
+      (MetricOutput v _) <- gevalCoreOnSingleLines RMSE id RawItemTarget
+                                                          (LineInFile (FilePathSpec "stub1") 1 "blabla")
+                                                          RawItemTarget
+                                                          (LineInFile (FilePathSpec "stub2") 1 "3.4")
+                                                          RawItemTarget
+                                                          (LineInFile (FilePathSpec "stub3") 1 "2.6")
+      v `shouldBeAlmost` 0.8
   describe "Annotation format" $ do
     it "just parse" $ do
       parseAnnotations "foo:3,7-10 baz:4-6" `shouldBe` Right [Annotation "foo" (IS.fromList [3,7,8,9,10]),
