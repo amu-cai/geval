@@ -349,7 +349,7 @@ groupByMetric metrics results = filter (\(_, ss) -> not (null ss))
 plotGraph :: FilePath -> (Metric, [(SourceSpec, GraphSeries)]) -> IO ()
 plotGraph graphFile (metric@(ProbabilisticSoftFMeasure _), seriesSpecs) = do
   toFile def graphFile $ do
-    layoutlr_title .= "GEval Graph / Loess / " ++ (show metric)
+    layoutlr_title .= "GEval Graph / Calibration / Loess / " ++ (show metric)
     let perfectSeries = (FilePathSpec "Perfect",
                          GraphSeries [(0.0, 0.0), (1.0, 1.0)])
     mapM_ plotOneSeries $ (perfectSeries : seriesSpecs)
