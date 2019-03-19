@@ -7,7 +7,7 @@ import Data.Vector.Unboxed((!), zipWith, length, (++), map)
 import Statistics.Matrix(transpose)
 
 lambda :: Double
-lambda = 1.0
+lambda = 2.0
 
 triCube :: Double -> Double
 triCube d = (1.0 - (abs d) ** 3) ** 3
