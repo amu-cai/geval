@@ -1,9 +1,9 @@
 module Data.Statistics.Calibration
    (calibration, softCalibration) where
 
-import Data.Statistics.Loess(loess)
+import Data.Statistics.Loess (clippedLoess)
 import Numeric.Integration.TanhSinh
-import Data.List(minimum, maximum)
+import Data.List (minimum, maximum)
 import qualified Data.Vector.Unboxed as DVU
 
 minBand :: Double
@@ -34,7 +34,7 @@ softCalibration [] _ = error "too few booleans in calibration"
 softCalibration _ [] = error "too few probabilities in calibration"
 softCalibration results probs
   | band probs < minBand = handleNarrowBand results probs
-  | otherwise = 1.0 - (min 1.0 (2.0 * (integrate (lowest, highest) (\x -> abs ((loess (DVU.fromList probs) (DVU.fromList results) x) - x))) / (highest - lowest)))
+  | otherwise = 1.0 - (min 1.0 (2.0 * (integrate (lowest, highest) (\x -> abs ((clippedLoess (DVU.fromList probs) (DVU.fromList results) x) - x))) / (highest - lowest)))
   where lowest = (minimum probs) + epsilon -- integrating loess gets crazy at edges
         highest = (maximum probs) - epsilon
         epsilon = 0.0001

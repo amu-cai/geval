@@ -102,8 +102,8 @@ import qualified Data.Vector.Unboxed as DVU
 
 import Statistics.Correlation
 
-import Data.Statistics.Calibration(softCalibration)
-import Data.Statistics.Loess(loess)
+import Data.Statistics.Calibration (softCalibration)
+import Data.Statistics.Loess (clippedLoess)
 
 import Data.Proxy
 
@@ -755,7 +755,7 @@ gevalCore' (ProbabilisticSoftFMeasure beta) _ = gevalCoreWithoutInput parseAnnot
         probabilisticSoftAgg = CC.foldl probabilisticSoftFolder ([], [], fromInteger 0, 0)
         probabilisticSoftFolder (r1, p1, g1, e1) (r2, p2, g2, e2) = (r1 ++ r2, p1 ++ p2, g1 + g2, e1 + e2)
         loessGraph :: ([Double], [Double], Double, Int) -> Maybe GraphSeries
-        loessGraph (results, probs, _, _) = Just $ GraphSeries $ Prelude.map (\x -> (x, loess probs' results' x)) $ Prelude.filter (\p -> p > lowest && p < highest) $ Prelude.map (\d -> 0.01 * (fromIntegral d)) [1..99]
+        loessGraph (results, probs, _, _) = Just $ GraphSeries $ Prelude.map (\x -> (x, clippedLoess probs' results' x)) $ Prelude.filter (\p -> p > lowest && p < highest) $ Prelude.map (\d -> 0.01 * (fromIntegral d)) [1..99]
            where results' = DVU.fromList results
                  probs' = DVU.fromList probs
                  lowest = Data.List.minimum probs

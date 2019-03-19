@@ -9,8 +9,6 @@ module GEval.OptionsParser
         precisionArgParser
         ) where
 
-import Debug.Trace
-
 import Paths_geval (version)
 import Data.Version (showVersion)
 
