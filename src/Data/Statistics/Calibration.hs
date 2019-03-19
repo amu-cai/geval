@@ -35,8 +35,9 @@ softCalibration _ [] = error "too few probabilities in calibration"
 softCalibration results probs
   | band probs < minBand = handleNarrowBand results probs
   | otherwise = 1.0 - (min 1.0 (2.0 * (integrate (lowest, highest) (\x -> abs ((loess (DVU.fromList probs) (DVU.fromList results) x) - x))) / (highest - lowest)))
-  where lowest = minimum probs
-        highest = maximum probs
+  where lowest = (minimum probs) + epsilon -- integrating loess gets crazy at edges
+        highest = (maximum probs) - epsilon
+        epsilon = 0.0001
 
 handleNarrowBand :: [Double] -> [Double] -> Double
 handleNarrowBand results probs = 1.0 - deviation
