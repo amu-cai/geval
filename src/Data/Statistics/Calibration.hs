@@ -34,7 +34,7 @@ softCalibration [] _ = error "too few booleans in calibration"
 softCalibration _ [] = error "too few probabilities in calibration"
 softCalibration results probs
   | band probs < minBand = handleNarrowBand results probs
-  | otherwise = 1.0 - (min 1.0 (2.0 * (highest - lowest) * (integrate (lowest, highest) (\x -> abs ((loess (DVU.fromList probs) (DVU.fromList results) x) - x)))))
+  | otherwise = 1.0 - (min 1.0 (2.0 * (integrate (lowest, highest) (\x -> abs ((loess (DVU.fromList probs) (DVU.fromList results) x) - x))) / (highest - lowest)))
   where lowest = minimum probs
         highest = maximum probs
 
