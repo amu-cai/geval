@@ -148,15 +148,21 @@ extractSimpleFactors mTokenizer bbdo t = Data.List.concat $ (Prelude.map (Prelud
                         else [])
         bigramFactors atoms = Prelude.map (\(a, b) -> BigramFactor a b) $ bigrams atoms
         numericalFactor t = [NumericalFactor (readMaybe $ unpack t) (Data.Text.length t)]
+
+
+extractFactorsFromField :: (Maybe Tokenizer) -> BlackBoxDebuggingOptions -> FeatureNamespace -> Text -> [PeggedFactor]
+extractFactorsFromField mTokenizer bbdo namespace record =
+  Prelude.map (\af -> PeggedFactor namespace af)
+  $ extractSimpleFactors mTokenizer bbdo record
+
 extractFactors :: (Maybe Tokenizer) -> BlackBoxDebuggingOptions -> Text -> Text -> [PeggedFactor]
 extractFactors mTokenizer bbdo namespace record =
-  Prelude.map (\af -> PeggedFactor (FeatureNamespace namespace) af)
-  $ extractSimpleFactors mTokenizer bbdo record
+  extractFactorsFromField mTokenizer bbdo (FeatureNamespace namespace) record
 
 extractFactorsFromTabbed :: (Maybe Tokenizer) -> BlackBoxDebuggingOptions -> Text -> Text -> [PeggedFactor]
 extractFactorsFromTabbed mTokenizer bbdo namespace record =
   Data.List.concat
-  $ Prelude.map (\(n, t) -> Prelude.map (\af -> PeggedFactor (FeatureTabbedNamespace namespace n) af) $ extractSimpleFactors mTokenizer bbdo t)
+  $ Prelude.map (\(n, t) -> extractFactorsFromField mTokenizer bbdo (FeatureTabbedNamespace namespace n) t)
   $ Prelude.zip [1..] (splitOn "\t" record)
 
 addCartesianFactors :: BlackBoxDebuggingOptions -> [LineWithPeggedFactors] -> [LineWithFactors]
