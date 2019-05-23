@@ -17,18 +17,31 @@ module GEval.FeatureExtractor
    ExistentialFactor(..),
    AtomicFactor(..),
    FeatureNamespace(..),
+   References(..),
+   ReferencesData(..),
    filterExistentialFactors)
   where
 
 import Data.Text
 import Data.List
 import Data.Monoid ((<>))
-import Data.Maybe (catMaybes)
+import Data.Maybe (catMaybes, fromMaybe)
 import Text.Tokenizer
 import Text.WordShape
 import GEval.BlackBoxDebugging
 import GEval.Common
 import Text.Read (readMaybe)
+
+import Control.Error.Util (hush)
+
+import Data.Attoparsec.Text
+import Data.Attoparsec.Combinator
+import Control.Applicative
+
+import qualified Data.HashMap.Strict as H
+
+import GEval.Annotation
+import qualified Data.IntSet as IS
 
 data Feature = UnaryFeature PeggedExistentialFactor
                | CartesianFeature PeggedExistentialFactor PeggedExistentialFactor
@@ -124,6 +137,38 @@ instance Show FeatureNamespace where
   show (FeatureNamespace namespace) = unpack namespace
   show (FeatureTabbedNamespace namespace column) = ((unpack namespace) ++ "<" ++ (show column) ++ ">")
 
+data References = References (H.HashMap Integer Text)
+
+data ReferencesData = ReferencesData {
+  referencesDataReferences :: References,
+  referencesDataCurrentId :: Maybe Integer }
+
+data ReferencePointer = ReferencePointer Integer IS.IntSet
+
+getReferenced :: References -> ReferencePointer -> Maybe Text
+getReferenced (References references) (ReferencePointer refId indexSet) = case H.lookup refId references of
+  Just t -> Just (getFrag t indexSet)
+  Nothing -> Nothing
+
+getDirectOrReferenced :: Maybe References -> Text -> Text
+getDirectOrReferenced Nothing record = record
+getDirectOrReferenced (Just references) record = case parseReferencePointer record of
+  Just pointer -> fromMaybe record (getReferenced references pointer)
+  Nothing -> record
+
+getFrag :: Text -> IS.IntSet -> Text
+getFrag t indexSet = pack $ Data.List.map (\ix -> index t ix) $ IS.toAscList indexSet
+
+parseReferencePointer :: Text -> Maybe ReferencePointer
+parseReferencePointer t = hush $ parseOnly (referencePointerParser <* endOfInput) t
+
+referencePointerParser :: Parser ReferencePointer
+referencePointerParser = do
+  refId <- decimal
+  string " "
+  indexSet <- intSetParser
+  return $ ReferencePointer refId indexSet
+
 tokenizeForFactors :: (Maybe Tokenizer) -> Text -> [Text]
 tokenizeForFactors Nothing t = Data.List.filter (not . Data.Text.null) $ split splitPred t
    where splitPred c = c == ' ' || c == '\t' || c == ':'
@@ -150,19 +195,19 @@ extractSimpleFactors mTokenizer bbdo t = Data.List.concat $ (Prelude.map (Prelud
         numericalFactor t = [NumericalFactor (readMaybe $ unpack t) (Data.Text.length t)]
 
 
-extractFactorsFromField :: (Maybe Tokenizer) -> BlackBoxDebuggingOptions -> FeatureNamespace -> Text -> [PeggedFactor]
-extractFactorsFromField mTokenizer bbdo namespace record =
+extractFactorsFromField :: (Maybe Tokenizer) -> BlackBoxDebuggingOptions -> Maybe ReferencesData -> FeatureNamespace -> Text -> [PeggedFactor]
+extractFactorsFromField mTokenizer bbdo mReferenceData namespace record =
   Prelude.map (\af -> PeggedFactor namespace af)
-  $ extractSimpleFactors mTokenizer bbdo record
+  $ extractSimpleFactors mTokenizer bbdo (getDirectOrReferenced (referencesDataReferences <$> mReferenceData) record)
 
-extractFactors :: (Maybe Tokenizer) -> BlackBoxDebuggingOptions -> Text -> Text -> [PeggedFactor]
-extractFactors mTokenizer bbdo namespace record =
-  extractFactorsFromField mTokenizer bbdo (FeatureNamespace namespace) record
 
-extractFactorsFromTabbed :: (Maybe Tokenizer) -> BlackBoxDebuggingOptions -> Text -> Text -> [PeggedFactor]
-extractFactorsFromTabbed mTokenizer bbdo namespace record =
+extractFactors :: (Maybe Tokenizer) -> BlackBoxDebuggingOptions -> Maybe ReferencesData -> Text -> Text -> [PeggedFactor]
+extractFactors mTokenizer bbdo mReferencesData namespace record = extractFactorsFromField mTokenizer bbdo mReferencesData (FeatureNamespace namespace) record
+
+extractFactorsFromTabbed :: (Maybe Tokenizer) -> BlackBoxDebuggingOptions -> Maybe ReferencesData -> Text -> Text -> [PeggedFactor]
+extractFactorsFromTabbed mTokenizer bbdo mReferencesData namespace record =
   Data.List.concat
-  $ Prelude.map (\(n, t) -> extractFactorsFromField mTokenizer bbdo (FeatureTabbedNamespace namespace n) t)
+  $ Prelude.map (\(n, t) -> extractFactorsFromField mTokenizer bbdo mReferencesData (FeatureTabbedNamespace namespace n) t)
   $ Prelude.zip [1..] (splitOn "\t" record)
 
 addCartesianFactors :: BlackBoxDebuggingOptions -> [LineWithPeggedFactors] -> [LineWithFactors]

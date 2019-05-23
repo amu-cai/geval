@@ -61,16 +61,33 @@ import Statistics.Distribution (cumulative)
 import Statistics.Distribution.Normal (normalDistr)
 import Data.Statistics.Kendall (kendallZ)
 
+import Data.Conduit.Binary (sourceFile)
+
+import qualified Data.HashMap.Strict as H
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
 
 data LineRecord = LineRecord Text Text Text Word32 MetricValue
                   deriving (Eq, Show)
 
+readReferences :: FilePath -> IO References
+readReferences referencesFilePath = do
+  h <- runResourceT $ runConduit $ (sourceFile referencesFilePath
+                                   .| CC.decodeUtf8Lenient
+                                   .| CT.lines
+                                   .| CC.map parseReferenceEntry
+                                   .| CC.foldl (\h (refId, t) -> H.insert refId t h) H.empty)
+  return $ References h
+
+parseReferenceEntry :: Text -> (Integer, Text)
+parseReferenceEntry line = (read $ unpack refId, t)
+  where [refId, t] = splitOn "\t" line
+
+
 runLineByLine :: ResultOrdering -> Maybe String -> GEvalSpecification -> BlackBoxDebuggingOptions -> IO ()
 runLineByLine ordering featureFilter spec bbdo = runLineByLineGeneralized ordering spec consum
-   where consum :: ConduitT LineRecord Void (ResourceT IO) ()
-         consum = (runFeatureFilter featureFilter spec bbdo .| CL.map (encodeUtf8 . formatOutput) .| CC.unlinesAscii .| CC.stdout)
+   where consum :: Maybe References -> ConduitT LineRecord Void (ResourceT IO) ()
+         consum = (\mReferences -> (runFeatureFilter featureFilter spec bbdo mReferences .| CL.map (encodeUtf8 . formatOutput) .| CC.unlinesAscii .| CC.stdout))
          formatOutput (LineRecord inp exp out _ score) = Data.Text.intercalate "\t" [
            formatScore score,
            escapeTabs inp,
@@ -79,25 +96,25 @@ runLineByLine ordering featureFilter spec bbdo = runLineByLineGeneralized orderi
          formatScore :: MetricValue -> Text
          formatScore = Data.Text.pack . printf "%f"
 
-runFeatureFilter :: (Monad m, FeatureSource s) => Maybe String -> GEvalSpecification -> BlackBoxDebuggingOptions -> ConduitT s s m ()
-runFeatureFilter Nothing _ _ = doNothing
-runFeatureFilter (Just feature) spec bbdo = CC.map (\l -> (fakeRank, l))
-                                            .| featureExtractor mTokenizer bbdo
-                                            .| CC.filter (checkFeature feature)
-                                            .| CC.map fst
+runFeatureFilter :: (Monad m, FeatureSource s) => Maybe String -> GEvalSpecification -> BlackBoxDebuggingOptions -> Maybe References -> ConduitT s s m ()
+runFeatureFilter Nothing _ _ _ = doNothing
+runFeatureFilter (Just feature) spec bbdo mReferences = CC.map (\l -> (fakeRank, l))
+                                                        .| featureExtractor mTokenizer bbdo mReferences
+                                                        .| CC.filter (checkFeature feature)
+                                                        .| CC.map fst
   where mTokenizer = gesTokenizer spec
         fakeRank = 0.0
         checkFeature feature (_, LineWithFactors _ _ fs) = feature `elem` (Prelude.map show fs)
 
 runWorstFeatures :: ResultOrdering -> GEvalSpecification -> BlackBoxDebuggingOptions -> IO ()
-runWorstFeatures ordering spec bbdo = runLineByLineGeneralized ordering' spec (worstFeaturesPipeline False spec bbdo)
+runWorstFeatures ordering spec bbdo = runLineByLineGeneralized ordering' spec (\mReferences -> worstFeaturesPipeline False spec bbdo mReferences)
   where ordering' = forceSomeOrdering ordering
 
 
 
-worstFeaturesPipeline :: Bool -> GEvalSpecification -> BlackBoxDebuggingOptions -> ConduitT LineRecord Void (ResourceT IO) ()
-worstFeaturesPipeline reversed spec bbdo = rank (lessByMetric reversed $ gesMainMetric spec)
-                                      .| evalStateC 0 (extractFeaturesAndPValues spec bbdo)
+worstFeaturesPipeline :: Bool -> GEvalSpecification -> BlackBoxDebuggingOptions -> Maybe References -> ConduitT LineRecord Void (ResourceT IO) ()
+worstFeaturesPipeline reversed spec bbdo mReferences = rank (lessByMetric reversed $ gesMainMetric spec)
+                                      .| evalStateC 0 (extractFeaturesAndPValues spec bbdo mReferences)
                                       .| CC.filter (\(FeatureWithPValue _ p _ _) -> not $ isNaN p) -- NaN values would poison sorting
                                       .| gobbleAndDo (sortBy featureOrder)
                                       .| filtreCartesian (bbdoCartesian bbdo)
@@ -120,10 +137,10 @@ forceSomeOrdering :: ResultOrdering -> ResultOrdering
 forceSomeOrdering FirstTheBest = FirstTheBest
 forceSomeOrdering _ = FirstTheWorst
 
-extractFeaturesAndPValues :: Monad m => GEvalSpecification -> BlackBoxDebuggingOptions -> ConduitT (Double, LineRecord) FeatureWithPValue (StateT Integer m) ()
-extractFeaturesAndPValues spec bbdo =
+extractFeaturesAndPValues :: Monad m => GEvalSpecification -> BlackBoxDebuggingOptions -> Maybe References -> ConduitT (Double, LineRecord) FeatureWithPValue (StateT Integer m) ()
+extractFeaturesAndPValues spec bbdo mReferences =
   totalCounter
-  .| rankedFeatureExtractor spec bbdo
+  .| rankedFeatureExtractor spec bbdo mReferences
   .| uScoresCounter (bbdoMinFrequency bbdo)
 
 
@@ -143,11 +160,11 @@ formatFeatureWithPValue (FeatureWithPValue f p avg c) =
                               (pack $ printf "%0.8f" avg),
                               (pack $ printf "%0.20f" p)]
 
-rankedFeatureExtractor :: Monad m => GEvalSpecification -> BlackBoxDebuggingOptions -> ConduitT (Double, LineRecord) RankedFactor m ()
-rankedFeatureExtractor spec bbdo = featureExtractor mTokenizer bbdo
-                                   .| CC.map snd
-                                   .| CC.map unwrapFeatures
-                                   .| CC.concat
+rankedFeatureExtractor :: Monad m => GEvalSpecification -> BlackBoxDebuggingOptions -> Maybe References -> ConduitT (Double, LineRecord) RankedFactor m ()
+rankedFeatureExtractor spec bbdo mReferences = featureExtractor mTokenizer bbdo mReferences
+                                               .| CC.map snd
+                                               .| CC.map unwrapFeatures
+                                               .| CC.concat
   where mTokenizer = gesTokenizer spec
         unwrapFeatures (LineWithFactors rank score fs) = Prelude.map (\f -> RankedFactor f rank score) fs
 
@@ -163,11 +180,11 @@ instance FeatureSource (LineRecord, LineRecord) where
   getScore (LineRecord _ _ _ _ scoreA, LineRecord _ _ _ _ scoreB) = scoreB - scoreA
   mainLineRecord (_, l) = l
 
-featureExtractor :: (Monad m, FeatureSource s) => Maybe Tokenizer -> BlackBoxDebuggingOptions -> ConduitT (Double, s) (s, LineWithFactors) m ()
-featureExtractor mTokenizer bbdo = CC.map extract
-                                   .| finalFeatures (bbdoCartesian bbdo) (fromMaybe (bbdoMinFrequency bbdo) (bbdoMinCartesianFrequency bbdo))
+featureExtractor :: (Monad m, FeatureSource s) => Maybe Tokenizer -> BlackBoxDebuggingOptions -> Maybe References -> ConduitT (Double, s) (s, LineWithFactors) m ()
+featureExtractor mTokenizer bbdo mReferences = CC.map extract
+                                              .| finalFeatures (bbdoCartesian bbdo) (fromMaybe (bbdoMinFrequency bbdo) (bbdoMinCartesianFrequency bbdo))
   where extract (rank, line) =
-          (line, LineWithPeggedFactors rank (getScore line) $ getFeatures mTokenizer bbdo (mainLineRecord line))
+          (line, LineWithPeggedFactors rank (getScore line) $ getFeatures mTokenizer bbdo mReferences (mainLineRecord line))
 
 finalFeatures :: Monad m => Bool -> Integer -> ConduitT (a, LineWithPeggedFactors) (a, LineWithFactors) m ()
 finalFeatures False _ = CC.map (\(l, p) -> (l, peggedToUnaryLine p))
@@ -199,12 +216,17 @@ filtreCartesian True = CC.concatMapAccum step S.empty
 peggedToUnaryLine :: LineWithPeggedFactors -> LineWithFactors
 peggedToUnaryLine (LineWithPeggedFactors rank score fs) = LineWithFactors rank score (Prelude.map UnaryFactor fs)
 
-getFeatures :: Maybe Tokenizer -> BlackBoxDebuggingOptions -> LineRecord -> [PeggedFactor]
-getFeatures mTokenizer bbdo (LineRecord inLine expLine outLine _ _) =
+getFeatures :: Maybe Tokenizer -> BlackBoxDebuggingOptions -> Maybe References -> LineRecord -> [PeggedFactor]
+getFeatures mTokenizer bbdo mReferences (LineRecord inLine expLine outLine _ _) =
   Data.List.concat [
-     extractFactors mTokenizer bbdo "exp" expLine,
-     extractFactorsFromTabbed mTokenizer bbdo "in" inLine,
-     extractFactors mTokenizer bbdo "out" outLine]
+     extractFactors mTokenizer bbdo mReferencesData "exp" expLine,
+     extractFactorsFromTabbed mTokenizer bbdo mReferencesData "in" inLine,
+     extractFactors mTokenizer bbdo mReferencesData "out" outLine]
+  where mReferencesData = case mReferences of
+          Just references -> Just $ ReferencesData {
+            referencesDataReferences = references,
+            referencesDataCurrentId = Nothing }
+          Nothing -> Nothing
 
 data FeatureAggregate = ExistentialFactorAggregate Double MetricValue Integer
                         | NumericalValueAggregate [Double] [MetricValue] [Int] [MetricValue]
@@ -327,10 +349,15 @@ lessByMetric reversed metric = lessByMetric' reversed (getMetricOrdering metric)
           (\(LineRecord _ _ _ _ scoreA) (LineRecord _ _ _ _ scoreB) ->
               scoreA < scoreB)
 
-runLineByLineGeneralized :: ResultOrdering -> GEvalSpecification -> ConduitT LineRecord Void (ResourceT IO) a -> IO a
+runLineByLineGeneralized :: ResultOrdering -> GEvalSpecification -> (Maybe References -> ConduitT LineRecord Void (ResourceT IO) a) -> IO a
 runLineByLineGeneralized ordering spec consum = do
+  mReferences <- case gesReferences spec of
+    Just referencesFp -> do
+      references <- readReferences referencesFp
+      return $ Just references
+    Nothing -> return Nothing
   (inputFilePath, expectedFilePath, outFilePath) <- checkAndGetFilesSingleOut True spec
-  gevalLineByLineCore metric mSelector preprocess inputFilePath expectedFilePath outFilePath (sorter ordering .| consum)
+  gevalLineByLineCore metric mSelector preprocess inputFilePath expectedFilePath outFilePath (sorter ordering .| consum mReferences)
   where metric = gesMainMetric spec
         mSelector = gesSelector spec
         preprocess = gesPreprocess spec
@@ -340,6 +367,7 @@ runLineByLineGeneralized ordering spec consum = do
         sortOrder FirstTheBest TheLowerTheBetter = compareScores
         sortOrder _ _ = flip compareScores
         compareScores (LineRecord _ _ _ _ s1) (LineRecord _ _ _ _ s2) = s1 `compare` s2
+        mReferences = Nothing
 
 gobbleAndDo :: Monad m => ([a] -> [b]) -> ConduitT a b m ()
 gobbleAndDo fun = do
@@ -348,12 +376,12 @@ gobbleAndDo fun = do
 
 runDiff :: ResultOrdering -> Maybe String -> FilePath -> GEvalSpecification -> BlackBoxDebuggingOptions -> IO ()
 runDiff ordering featureFilter otherOut spec bbdo = runDiffGeneralized ordering otherOut spec consum
-  where consum :: ConduitT (LineRecord, LineRecord) Void (ResourceT IO) ()
-        consum = CL.filter shouldBeShown
-                 .| runFeatureFilter featureFilter spec bbdo
-                 .| CL.map (encodeUtf8 . formatOutput)
-                 .| CC.unlinesAscii
-                 .| CC.stdout
+  where consum :: Maybe References -> ConduitT (LineRecord, LineRecord) Void (ResourceT IO) ()
+        consum = \mReferences -> CL.filter shouldBeShown
+                                .| runFeatureFilter featureFilter spec bbdo mReferences
+                                .| CL.map (encodeUtf8 . formatOutput)
+                                .| CC.unlinesAscii
+                                .| CC.stdout
         shouldBeShown (LineRecord _ _ outA _ scoreA, LineRecord _ _ outB _ scoreB) =
           outA /= outB && scoreA /= scoreB
         formatOutput (LineRecord inp exp outA _ scoreA, LineRecord _ _ outB _ scoreB) = Data.Text.intercalate "\t" [
@@ -366,21 +394,22 @@ runDiff ordering featureFilter otherOut spec bbdo = runDiffGeneralized ordering 
         formatScoreDiff = Data.Text.pack . printf "%f"
 
 runMostWorseningFeatures :: ResultOrdering -> FilePath -> GEvalSpecification -> BlackBoxDebuggingOptions -> IO ()
-runMostWorseningFeatures ordering otherOut spec bbdo = runDiffGeneralized ordering' otherOut spec consum
+runMostWorseningFeatures ordering otherOut spec bbdo  = runDiffGeneralized ordering' otherOut spec consum
   where ordering' = forceSomeOrdering ordering
         reversed = case ordering of
           KeepTheOriginalOrder -> False
           FirstTheWorst -> False
           FirstTheBest -> True
-        consum :: ConduitT (LineRecord, LineRecord) Void (ResourceT IO) ()
-        consum = CC.map prepareFakeLineRecord
-                 .| (worstFeaturesPipeline reversed spec bbdo)
+        consum :: Maybe References -> ConduitT (LineRecord, LineRecord) Void (ResourceT IO) ()
+        consum = \mReferences -> CC.map prepareFakeLineRecord
+                                .| (worstFeaturesPipeline reversed spec bbdo mReferences)
         prepareFakeLineRecord :: (LineRecord, LineRecord) -> LineRecord
         prepareFakeLineRecord (LineRecord _ _ _ _ scorePrev, LineRecord inp exp out c score) =
           LineRecord inp exp out c (score - scorePrev)
+        mReferences = Nothing
 
 
-runDiffGeneralized :: ResultOrdering -> FilePath -> GEvalSpecification -> ConduitT (LineRecord, LineRecord) Void (ResourceT IO) a -> IO a
+runDiffGeneralized :: ResultOrdering -> FilePath -> GEvalSpecification -> (Maybe References -> ConduitT (LineRecord, LineRecord) Void (ResourceT IO) a) -> IO a
 runDiffGeneralized ordering otherOut spec consum = do
   (inputSource, expectedSource, outSource) <- checkAndGetFilesSingleOut True spec
   ooss <- getSmartSourceSpec ((gesOutDirectory spec) </> (gesTestName spec)) "out.tsv" otherOut
@@ -394,7 +423,7 @@ runDiffGeneralized ordering otherOut spec consum = do
       runResourceT $ runConduit $
         ((getZipSource $ (,)
           <$> ZipSource sourceA
-          <*> ZipSource sourceB) .| sorter ordering .| consum)
+          <*> ZipSource sourceB) .| sorter ordering .| consum mReferences)
   where metric = gesMainMetric spec
         preprocess = gesPreprocess spec
         mSelector = gesSelector spec
@@ -406,6 +435,7 @@ runDiffGeneralized ordering otherOut spec consum = do
         compareScores ((LineRecord _ _ _ _ o1), (LineRecord _ _ _ _ n1))
                       ((LineRecord _ _ _ _ o2), (LineRecord _ _ _ _ n2))
           = (n1 - o1) `compare` (n2 - o2)
+        mReferences = Nothing
 
 
 escapeTabs :: Text -> Text

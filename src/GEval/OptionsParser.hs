@@ -177,6 +177,12 @@ specParser = GEvalSpecification
           <> help "Submit ONLY: Specification of a git-annex remote."
         )
       )
+  <*> ( optional . strOption $
+        ( long "references"
+          <> metavar "FILE"
+          <> help "External text file referenced"
+        )
+      )
 
 defaultMinFrequency :: Integer
 defaultMinFrequency = 1

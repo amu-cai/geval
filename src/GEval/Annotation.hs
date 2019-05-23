@@ -3,7 +3,7 @@
 module GEval.Annotation
        (parseAnnotations, Annotation(..),
         parseObtainedAnnotations, ObtainedAnnotation(..),
-        matchScore, getProbabilisticSoftCounts)
+        matchScore, getProbabilisticSoftCounts, intSetParser)
        where
 
 import qualified Data.IntSet as IS

@@ -401,15 +401,16 @@ main = hspec $ do
             gesTokenizer = Nothing,
             gesGonitoHost = Nothing,
             gesToken = Nothing,
-            gesGonitoGitAnnexRemote = Nothing}
+            gesGonitoGitAnnexRemote = Nothing,
+            gesReferences = Nothing }
     it "simple test" $ do
-      results <- runLineByLineGeneralized KeepTheOriginalOrder sampleChallenge Data.Conduit.List.consume
+      results <- runLineByLineGeneralized KeepTheOriginalOrder sampleChallenge (const Data.Conduit.List.consume)
       Prelude.map (\(LineRecord inp _ _ _ _) -> inp) results `shouldBe` ["foo",
                                                                         "bar",
                                                                         "baz",
                                                                         "baq"]
     it "test sorting" $ do
-      results <- runLineByLineGeneralized FirstTheWorst sampleChallenge Data.Conduit.List.consume
+      results <- runLineByLineGeneralized FirstTheWorst sampleChallenge (const Data.Conduit.List.consume)
       Prelude.head (Prelude.map (\(LineRecord inp _ _ _ _) -> inp) results) `shouldBe` "baq"
   describe "handle --alt-metric option" $ do
     it "accuracy instead of likelihood" $ do
@@ -546,7 +547,7 @@ main = hspec $ do
          bbdoCartesian = False,
          bbdoMinCartesianFrequency = Nothing,
          bbdoConsiderNumericalFeatures = True }
-      (sort $ extractFactorsFromTabbed Nothing bbdo "in" "I like this\t34.3\ttests") `shouldBe` [
+      (sort $ extractFactorsFromTabbed Nothing bbdo Nothing "in" "I like this\t34.3\ttests") `shouldBe` [
          PeggedFactor (FeatureTabbedNamespace "in" 1)
                       (SimpleExistentialFactor (SimpleAtomicFactor (TextFactor "I"))),
          PeggedFactor (FeatureTabbedNamespace "in" 1)
