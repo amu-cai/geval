@@ -698,3 +698,9 @@ Filip Graliński
 ## Contributors
 
 Piotr Halama
+Karol Kaczmarek
+
+## Copyright
+
+2015-2019 Filip Graliński
+2019 Applica.ai

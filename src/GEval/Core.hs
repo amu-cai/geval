@@ -4,6 +4,7 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE PackageImports #-}
 
 
 module GEval.Core
@@ -44,7 +45,9 @@ module GEval.Core
       gesPreprocess,
       getDataDecoder,
       threeLineSource,
-      extensionsHandled
+      extensionsHandled,
+      isEmptyFile,
+      somethingWrongWithFilesMessage
     ) where
 
 import Data.Conduit
@@ -109,7 +112,7 @@ import Data.Proxy
 
 import Data.Word
 
-import System.FilePath.Glob
+import "Glob" System.FilePath.Glob
 
 defaultLogLossHashedSize :: Word32
 defaultLogLossHashedSize = 10
@@ -313,6 +316,7 @@ data GEvalSpecialCommand = Init
                            | LineByLine | WorstFeatures
                            | Diff FilePath | MostWorseningFeatures FilePath
                            | PrintVersion | JustTokenize | Submit
+                           | Validate
 
 data ResultOrdering = KeepTheOriginalOrder | FirstTheWorst | FirstTheBest
 

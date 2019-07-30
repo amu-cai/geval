@@ -32,6 +32,7 @@ import GEval.LineByLine
 import GEval.Submit (submit)
 import GEval.BlackBoxDebugging
 import GEval.Selector
+import GEval.Validation
 
 import Data.Conduit.SmartSource
 
@@ -81,6 +82,10 @@ optionsParser = GEvalOptions
                     ( long "submit"
                       <> short 'S'
                       <> help "Submit current solution for evaluation to an external Gonito instance specified with --gonito-host option. Optionally, specify --token."))
+                <|>
+                (flag' Validate
+                    ( long "validate"
+                      <> help "Validate challenge, it searches for potential errors in the given challenge path, like missing columns, files or format data."))
                 )
 
    <*> ((flag' FirstTheWorst
@@ -332,6 +337,9 @@ runGEval''' (Just JustTokenize) _ _ spec _ _ = do
 runGEval''' (Just Submit) _ _ spec _ _ = do
   submit (gesGonitoHost spec) (gesToken spec) (gesGonitoGitAnnexRemote spec)
   return Nothing
+runGEval''' (Just Validate) _ _ spec _ _ = do
+  validateChallenge spec
+  return Nothing
 
 getGraphFilename :: Int -> FilePath -> FilePath
 getGraphFilename 0 fp = fp
@@ -376,5 +384,19 @@ Run:
 to create a directory CHALLENGE representing a Gonito challenge.
 
 (Note that `--out-directory` option is not taken into account with `--init` option.)
+|]
+  exitFailure
+
+
+validateChallenge :: GEvalSpecification -> IO ()
+validateChallenge spec = case gesExpectedDirectory spec of
+  Nothing -> showValidateInstructions
+  Just expectedDirectory -> validationChallenge expectedDirectory spec
+
+showValidateInstructions = do
+  putStrLn [here|
+Run:
+    geval --validate --expected-directory CHALLENGE
+to validate a directory CHALLENGE representing a Gonito challenge.
 |]
   exitFailure

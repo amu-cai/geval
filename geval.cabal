@@ -30,6 +30,7 @@ library
                      , GEval.ParseParams
                      , GEval.ProbList
                      , GEval.Submit
+                     , GEval.Validation
                      , Data.Conduit.AutoDecompress
                      , Data.Conduit.SmartSource
                      , Data.Conduit.Rank
@@ -91,6 +92,7 @@ library
                      , Chart
                      , Chart-cairo
                      , errors
+                     , filemanip
   default-language:    Haskell2010
 
 executable geval
