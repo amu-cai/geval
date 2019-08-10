@@ -16,7 +16,8 @@ cabal-version:       >=1.10
 library
   hs-source-dirs:      src
   exposed-modules:     GEval.Core
-                       GEval.CreateChallenge
+                     , GEval.Metric
+                     , GEval.CreateChallenge
                      , GEval.OptionsParser
                      , GEval.BLEU
                      , GEval.ClippEU

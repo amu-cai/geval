@@ -4,7 +4,8 @@ module GEval.Validation
     ( validationChallenge
     ) where
 
-import GEval.Core
+import GEval.Metric
+import GEval.Core (GEvalSpecification(..), GEvalException(..), somethingWrongWithFilesMessage, isEmptyFile)
 import qualified System.Directory as D
 
 import System.FilePath.Find as SFF

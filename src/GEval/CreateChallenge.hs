@@ -4,7 +4,8 @@ module GEval.CreateChallenge
        (createChallenge)
        where
 
-import GEval.Core
+import GEval.Metric
+import GEval.Core (GEvalSpecification(..), GEvalException(..), configFileName, gesMainMetric, defaultTestName)
 import GEval.Submit (tokenFileName)
 import qualified System.Directory as D
 import Control.Conditional (whenM)

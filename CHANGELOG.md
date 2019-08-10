@@ -1,3 +1,7 @@
+## 1.18.0.0
+
+* Add --validate option
+
 ## 1.17.0.0
 
 * Add Probabilistic-Soft-F-score
