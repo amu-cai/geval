@@ -7,7 +7,9 @@ module GEval.Metric
    getMetricOrdering,
    listOfAvailableMetrics,
    bestPossibleValue,
-   perfectOutLineFromExpectedLine)
+   perfectOutLineFromExpectedLine,
+   fixedNumberOfColumnsInExpected,
+   fixedNumberOfColumnsInInput)
   where
 
 import Data.Word
@@ -194,6 +196,17 @@ bestPossibleValue :: Metric -> MetricValue
 bestPossibleValue metric = case getMetricOrdering metric of
   TheLowerTheBetter -> 0.0
   TheHigherTheBetter -> 1.0
+
+fixedNumberOfColumnsInExpected :: Metric -> Bool
+fixedNumberOfColumnsInExpected MAP = False
+fixedNumberOfColumnsInExpected BLEU = False
+fixedNumberOfColumnsInExpected GLEU = False
+fixedNumberOfColumnsInExpected _ = True
+
+fixedNumberOfColumnsInInput :: Metric -> Bool
+fixedNumberOfColumnsInInput (SoftFMeasure _) = False
+fixedNumberOfColumnsInInput (ProbabilisticSoftFMeasure _) = False
+fixedNumberOfColumnsInInput _ = True
 
 perfectOutLineFromExpectedLine :: Metric -> Text -> Text
 perfectOutLineFromExpectedLine (LogLossHashed _) t = t <> ":1.0"

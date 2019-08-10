@@ -23,7 +23,7 @@ import qualified Data.Conduit.Text as CT
 import Data.Conduit.Binary (sourceFile, sinkFile)
 import Data.Conduit.AutoDecompress (autoDecompress)
 import Data.Conduit.SmartSource (compressedFilesHandled)
-import Data.List (intercalate)
+import Data.List (intercalate, nub)
 import qualified Data.Text as T
 
 import System.IO.Temp
@@ -34,12 +34,15 @@ data ValidationException = NoChallengeDirectory FilePath
                          | NoReadmeFile FilePath
                          | NoGitignoreFile FilePath
                          | EmptyFile FilePath
+                         | VaryingNumberOfLines
                          | NoTestDirectories
                          | TooManyInputFiles [FilePath]
                          | TooManyExpectedFiles [FilePath]
+                         | TooManyTrainFiles [FilePath]
                          | OutputFileDetected [FilePath]
                          | CharacterCRDetected FilePath
                          | SpaceSuffixDetect FilePath
+                         | VaryingNumberOfColumns FilePath
                          | BestPossibleValueNotObtainedWithExpectedData MetricValue MetricValue
 
 instance Exception ValidationException
@@ -51,12 +54,15 @@ instance Show ValidationException where
   show (NoReadmeFile filePath) = somethingWrongWithFilesMessage "No README.md file" filePath
   show (NoGitignoreFile filePath) = somethingWrongWithFilesMessage "No .gitignore file" filePath
   show (EmptyFile filePath) = somethingWrongWithFilesMessage "Empty file" filePath
+  show VaryingNumberOfLines = "The number of lines in input and expected file is not the same"
   show NoTestDirectories = "No directories with test data, expected `dev-0` and/or `test-A` directory"
   show (TooManyInputFiles filePaths) = somethingWrongWithFilesMessage "Too many input files" $ intercalate "`, `" filePaths
   show (TooManyExpectedFiles filePaths) = somethingWrongWithFilesMessage "Too many expected files" $ intercalate "`, `" filePaths
+  show (TooManyTrainFiles filePaths) = somethingWrongWithFilesMessage "Too many train files" $ intercalate "`, `" filePaths
   show (OutputFileDetected filePaths) = somethingWrongWithFilesMessage "Output file/s detected" $ intercalate "`, `" filePaths
   show (CharacterCRDetected filePaths) = somethingWrongWithFilesMessage "Found CR (Carriage Return, 0x0D) character" filePaths
   show (SpaceSuffixDetect filePaths) = somethingWrongWithFilesMessage "Found space at the end of line" filePaths
+  show (VaryingNumberOfColumns filePaths) = somethingWrongWithFilesMessage "The file contains varying number of columns" filePaths
   show (BestPossibleValueNotObtainedWithExpectedData expected got) = "The best possible value was not obtained with the expected data, expected: " ++ (show expected) ++ " , obtained: " ++ (show got)
 
 validationChallenge :: FilePath -> GEvalSpecification -> IO ()
@@ -69,7 +75,8 @@ validationChallenge challengeDirectory spec = do
   checkCorrectFile gitignoreFile
   checkCorrectFile readmeFile
   testDirectories <- findTestDirs challengeDirectory
-  checkTestDirectories testDirectories
+  checkTestDirectories mainMetric testDirectories
+  checkTrainDirectory mainMetric challengeDirectory
 
   mapM_ (runOnTest spec) testDirectories
 
@@ -77,7 +84,7 @@ validationChallenge challengeDirectory spec = do
     configFile = challengeDirectory </> "config.txt"
     gitignoreFile = challengeDirectory </> ".gitignore"
     readmeFile = challengeDirectory </> "README.md"
-
+    mainMetric = head $ gesMetrics spec
 
 checkCorrectFile :: FilePath -> IO ()
 checkCorrectFile filePath = do
@@ -94,6 +101,19 @@ getFileLines file = runResourceT $ runConduit (sourceFile file
                                                .| CT.lines
                                                .| CC.map T.unpack
                                                .| CL.consume)
+
+countLines :: FilePath -> IO Int
+countLines file = do
+  lines <- getFileLines file
+  return $ length lines
+
+numberOfColumns :: FilePath -> IO [Int]
+numberOfColumns file = runResourceT $ runConduit (sourceFile file
+                                                  .| autoDecompress
+                                                  .| CC.decodeUtf8
+                                                  .| CT.lines
+                                                  .| CC.map (\t -> length $ T.splitOn "\t" t)
+                                                  .| CL.consume)
 
 createPerfectOutputFromExpected :: Metric -> FilePath -> FilePath -> IO ()
 createPerfectOutputFromExpected metric expectedFile outFile = do
@@ -116,6 +136,9 @@ findInputFiles = SFF.find never $ fileFilter defaultInputFile
 findOutputFiles :: FilePath -> IO [FilePath]
 findOutputFiles = SFF.find never $ fileFilter "out*.tsv"
 
+findTrainFiles :: FilePath -> IO [FilePath]
+findTrainFiles = SFF.find never $ fileFilter "train.tsv"
+
 findExpectedFiles :: FilePath -> IO [FilePath]
 findExpectedFiles = SFF.find never $ fileFilter defaultExpectedFile
 
@@ -131,27 +154,52 @@ fileFilter fileName = (SFF.fileType ==? RegularFile) &&? (SFF.fileName ~~? fileN
     exts = Prelude.concat [ "(", intercalate "|" compressedFilesHandled, ")" ]
 
 
-checkTestDirectories :: [FilePath] -> IO ()
-checkTestDirectories [] = throwM NoTestDirectories
-checkTestDirectories directories = mapM_ checkTestDirectory directories
+checkTestDirectories :: Metric -> [FilePath] -> IO ()
+checkTestDirectories _ [] = throwM NoTestDirectories
+checkTestDirectories metric directories = mapM_ (checkTestDirectory metric) directories
 
-checkTestDirectory :: FilePath -> IO ()
-checkTestDirectory directoryPath = do
+checkTestDirectory :: Metric -> FilePath -> IO ()
+checkTestDirectory metric directoryPath = do
   inputFiles <- findInputFiles directoryPath
   when (null inputFiles) $ throw $ NoInputFile inputFile
   when (length inputFiles > 1) $ throw $ TooManyInputFiles inputFiles
   checkCorrectFile $ head inputFiles
+  when (fixedNumberOfColumnsInInput metric) $ checkColumns $ head inputFiles
 
   expectedFiles <- findExpectedFiles directoryPath
   when (null expectedFiles) $ throw $ NoExpectedFile expectedFile
   when (length expectedFiles > 1) $ throw $ TooManyExpectedFiles expectedFiles
   checkCorrectFile $ head expectedFiles
+  when (fixedNumberOfColumnsInExpected metric) $ checkColumns $ head expectedFiles
+
+  inputLines <- countLines $ head inputFiles
+  expectedLines <- countLines $ head expectedFiles
+
+  when (inputLines /= expectedLines) $ throw $ VaryingNumberOfLines
 
   outputFiles <- findOutputFiles directoryPath
   unless (null outputFiles) $ throw $ OutputFileDetected outputFiles
   where
     inputFile = directoryPath </> defaultInputFile
     expectedFile = directoryPath </> defaultExpectedFile
+
+checkTrainDirectory :: Metric -> FilePath -> IO ()
+checkTrainDirectory metric challengeDirectory = do
+  let trainDirectory = challengeDirectory </> "train"
+  whenM (doesDirectoryExist trainDirectory) $ do
+    trainFiles <- findTrainFiles trainDirectory
+    when (null trainFiles) $ throw $ NoInputFile "train.tsv"
+    when (length trainFiles > 1) $ throw $ TooManyTrainFiles trainFiles
+    let [trainFile] = trainFiles
+    checkCorrectFile trainFile
+    when (fixedNumberOfColumnsInInput metric && fixedNumberOfColumnsInExpected metric) $ do
+      checkColumns trainFile
+
+checkColumns :: FilePath -> IO ()
+checkColumns filePath = do
+  columns <- numberOfColumns filePath
+  let uniqueColumns = nub columns
+  when (length uniqueColumns > 1) $ throw $ VaryingNumberOfColumns filePath
 
 runOnTest :: GEvalSpecification -> FilePath -> IO ()
 runOnTest spec testPath = do
