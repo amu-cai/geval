@@ -5,11 +5,13 @@ module GEval.Validation
     ) where
 
 import GEval.Metric
-import GEval.Core (GEvalSpecification(..), GEvalException(..), somethingWrongWithFilesMessage, isEmptyFile)
+import GEval.Core (GEvalSpecification(..), GEvalException(..), somethingWrongWithFilesMessage, isEmptyFile, geval, defaultInputFile, defaultExpectedFile, defaultOutFile)
+import GEval.Common
 import qualified System.Directory as D
 
 import System.FilePath.Find as SFF
 import System.FilePath
+import System.Directory
 import Control.Exception
 import Control.Monad.Trans.Resource
 import Control.Monad.IO.Class
@@ -18,11 +20,13 @@ import Data.Conduit
 import qualified Data.Conduit.List as CL
 import qualified Data.Conduit.Combinators as CC
 import qualified Data.Conduit.Text as CT
-import Data.Conduit.Binary (sourceFile)
+import Data.Conduit.Binary (sourceFile, sinkFile)
 import Data.Conduit.AutoDecompress (autoDecompress)
 import Data.Conduit.SmartSource (compressedFilesHandled)
 import Data.List (intercalate)
 import qualified Data.Text as T
+
+import System.IO.Temp
 
 data ValidationException = NoChallengeDirectory FilePath
                          | NoFoundFile FilePath
@@ -36,6 +40,7 @@ data ValidationException = NoChallengeDirectory FilePath
                          | OutputFileDetected [FilePath]
                          | CharacterCRDetected FilePath
                          | SpaceSuffixDetect FilePath
+                         | BestPossibleValueNotObtainedWithExpectedData MetricValue MetricValue
 
 instance Exception ValidationException
 
@@ -52,7 +57,7 @@ instance Show ValidationException where
   show (OutputFileDetected filePaths) = somethingWrongWithFilesMessage "Output file/s detected" $ intercalate "`, `" filePaths
   show (CharacterCRDetected filePaths) = somethingWrongWithFilesMessage "Found CR (Carriage Return, 0x0D) character" filePaths
   show (SpaceSuffixDetect filePaths) = somethingWrongWithFilesMessage "Found space at the end of line" filePaths
-
+  show (BestPossibleValueNotObtainedWithExpectedData expected got) = "The best possible value was not obtained with the expected data, expected: " ++ (show expected) ++ " , obtained: " ++ (show got)
 
 validationChallenge :: FilePath -> GEvalSpecification -> IO ()
 validationChallenge challengeDirectory spec = do
@@ -65,6 +70,9 @@ validationChallenge challengeDirectory spec = do
   checkCorrectFile readmeFile
   testDirectories <- findTestDirs challengeDirectory
   checkTestDirectories testDirectories
+
+  mapM_ (runOnTest spec) testDirectories
+
   where
     configFile = challengeDirectory </> "config.txt"
     gitignoreFile = challengeDirectory </> ".gitignore"
@@ -82,23 +90,34 @@ checkCorrectFile filePath = do
 getFileLines :: FilePath -> IO [String]
 getFileLines file = runResourceT $ runConduit (sourceFile file
                                                .| autoDecompress
-                                               .| CC.decodeUtf8Lenient
+                                               .| CC.decodeUtf8
                                                .| CT.lines
                                                .| CC.map T.unpack
                                                .| CL.consume)
+
+createPerfectOutputFromExpected :: Metric -> FilePath -> FilePath -> IO ()
+createPerfectOutputFromExpected metric expectedFile outFile = do
+  runResourceT $ runConduit $ (sourceFile expectedFile
+                                .| autoDecompress
+                                .| CC.decodeUtf8
+                                .| CT.lines
+                                .| CC.map (perfectOutLineFromExpectedLine metric)
+                                .| CC.unlines
+                                .| CC.encodeUtf8
+                                .| sinkFile outFile)
 
 
 findTestDirs :: FilePath -> IO [FilePath]
 findTestDirs = SFF.find never testDirFilter
 
 findInputFiles :: FilePath -> IO [FilePath]
-findInputFiles = SFF.find never $ fileFilter "in.tsv"
+findInputFiles = SFF.find never $ fileFilter defaultInputFile
 
 findOutputFiles :: FilePath -> IO [FilePath]
 findOutputFiles = SFF.find never $ fileFilter "out*.tsv"
 
 findExpectedFiles :: FilePath -> IO [FilePath]
-findExpectedFiles = SFF.find never $ fileFilter "expected.tsv"
+findExpectedFiles = SFF.find never $ fileFilter defaultExpectedFile
 
 never :: FindClause Bool
 never = depth ==? 0
@@ -131,5 +150,28 @@ checkTestDirectory directoryPath = do
   outputFiles <- findOutputFiles directoryPath
   unless (null outputFiles) $ throw $ OutputFileDetected outputFiles
   where
-    inputFile = directoryPath </> "in.tsv"
-    expectedFile = directoryPath </> "expected.tsv"
+    inputFile = directoryPath </> defaultInputFile
+    expectedFile = directoryPath </> defaultExpectedFile
+
+runOnTest :: GEvalSpecification -> FilePath -> IO ()
+runOnTest spec testPath = do
+  [expectedFile] <- findExpectedFiles testPath
+  let testName = takeFileName testPath
+  let modifiedSpec = spec {
+        gesExpectedDirectory = Just (takeDirectory testPath),
+        gesTestName = testName
+        }
+
+  (flip mapM_) (gesMetrics spec) $ \metric -> do
+    withSystemTempDirectory "geval-validation" $ \tmpDir -> do
+      let tmpOutDir = tmpDir </> testName
+      let tmpOutFile = tmpOutDir </> defaultOutFile
+      createDirectory tmpOutDir
+      let specificSpec = modifiedSpec {
+            gesMetrics = [metric],
+            gesOutDirectory = tmpDir }
+      createPerfectOutputFromExpected metric expectedFile tmpOutFile
+      [(_, [MetricOutput value _])] <- geval specificSpec
+      let bestValue = bestPossibleValue metric
+      unless (bestValue =~ value) $ throw $ BestPossibleValueNotObtainedWithExpectedData bestValue value
+      return ()

@@ -295,7 +295,7 @@ checkAndGetFilesSingleOut forceInput gevalSpec = do
 
 checkAndGetFiles :: Bool -> GEvalSpecification -> IO (SourceSpec, SourceSpec, [SourceSpec])
 checkAndGetFiles forceInput gevalSpec = do
-  ess <- getSmartSourceSpec expectedTestDirectory "expected.tsv" expectedFile
+  ess <- getSmartSourceSpec expectedTestDirectory defaultExpectedFile expectedFile
   case ess of
     Left NoSpecGiven -> throwM $ NoExpectedFile expectedFile
     Left (NoFile fp) -> throwM $ NoExpectedFile fp
@@ -380,7 +380,7 @@ getOutFile gevalSpec out = outDirectory </> testName </> out
 getInputSourceIfNeeded :: Bool -> [Metric] -> FilePath -> FilePath -> IO SourceSpec
 getInputSourceIfNeeded forced metrics directory inputFilePath
    | forced || (Prelude.any isInputNeeded metrics) = do
-       iss <- getSmartSourceSpec directory "in.tsv" inputFilePath
+       iss <- getSmartSourceSpec directory defaultInputFile inputFilePath
        case iss of
          Left NoSpecGiven -> throwM $ NoInputFile inputFilePath
          Left (NoFile fp) -> throwM $ NoInputFile fp

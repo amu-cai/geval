@@ -70,3 +70,9 @@ bigrams :: [a] -> [(a, a)]
 bigrams [] = []
 bigrams [_] = []
 bigrams u = zip u $ tail u
+
+class AEq a where
+    (=~) :: a -> a -> Bool
+
+instance AEq Double where
+    x =~ y = abs ( x - y ) < (1.0e-4 :: Double)

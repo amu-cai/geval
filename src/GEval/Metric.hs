@@ -1,12 +1,22 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 module GEval.Metric
   (Metric(..),
    MetricOrdering(..),
    defaultLogLossHashedSize,
    getMetricOrdering,
-   listOfAvailableMetrics)
+   listOfAvailableMetrics,
+   bestPossibleValue,
+   perfectOutLineFromExpectedLine)
   where
 
 import Data.Word
+import Data.Text
+import Data.Monoid ((<>))
+
+import GEval.Common
+import GEval.ClippEU
+import Data.Attoparsec.Text (parseOnly)
 
 -- here metrics and their basic properties are listed,
 -- the evaluation procedures are defined in GEval.Core
@@ -179,6 +189,31 @@ getMetricOrdering SMAPE = TheLowerTheBetter
 getMetricOrdering (MultiLabelFMeasure _) = TheHigherTheBetter
 getMetricOrdering MultiLabelLogLoss = TheLowerTheBetter
 getMetricOrdering MultiLabelLikelihood = TheHigherTheBetter
+
+bestPossibleValue :: Metric -> MetricValue
+bestPossibleValue metric = case getMetricOrdering metric of
+  TheLowerTheBetter -> 0.0
+  TheHigherTheBetter -> 1.0
+
+perfectOutLineFromExpectedLine :: Metric -> Text -> Text
+perfectOutLineFromExpectedLine (LogLossHashed _) t = t <> ":1.0"
+perfectOutLineFromExpectedLine (LikelihoodHashed _) t = t <> ":1.0"
+perfectOutLineFromExpectedLine BLEU t = getFirstColumn t
+perfectOutLineFromExpectedLine GLEU t = getFirstColumn t
+perfectOutLineFromExpectedLine ClippEU t = cleanMarginFromClippEU t
+perfectOutLineFromExpectedLine _ t = t
+
+getFirstColumn :: Text -> Text
+getFirstColumn t = case splitOn "\t" t of
+  [] -> ""
+  (h:_) -> h
+
+cleanMarginFromClippEU :: Text -> Text
+cleanMarginFromClippEU t = Data.Text.unwords outs
+  where outs = Prelude.map toOut specs
+        (Right specs) = parseOnly lineClippingSpecsParser t
+        toOut (ClippingSpec (PageNumber pageNumber) (Rectangle (Point x0 y0) (Point x1 y1)) _) =
+          pack ((show pageNumber) ++ "/" ++ (show x0) ++ "," ++ (show y0) ++ "," ++ (show x1) ++ "," ++ (show y1))
 
 defaultLogLossHashedSize :: Word32
 defaultLogLossHashedSize = 10

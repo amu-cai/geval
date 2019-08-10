@@ -509,7 +509,7 @@ main = hspec $ do
           withSystemTempDirectory "geval-validation-test" $ \tempDir -> do
             let spec = defaultGEvalSpecification {
                   gesExpectedDirectory = Just tempDir,
-                  gesMetrics = [BLEU],
+                  gesMetrics = [metric],
                   gesPrecision = Just 4 }
             createChallenge True tempDir spec
             validationChallenge tempDir spec
@@ -659,12 +659,6 @@ extractMetric testName = do
   return $ case result of
    Left _ -> Nothing
    Right opts -> Just $ gesMainMetric $ geoSpec opts
-
-class AEq a where
-    (=~) :: a -> a -> Bool
-
-instance AEq Double where
-    x =~ y = abs ( x - y ) < (1.0e-4 :: Double)
 
 (@=~?) :: (Show a, AEq a) => a -> a -> HU.Assertion
 (@=~?) actual expected = expected =~ actual HU.@? assertionMsg

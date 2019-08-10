@@ -313,6 +313,35 @@ given at all, probability 0.0 is assumed. (But note that returning
 in an infinite manner).
 |] ++ (commonReadmeMDContents testName)
 
+readmeMDContents ClippEU testName = [i|
+Sample challenge for clipping rectangles
+========================================
+
+The metric is ClippEU, i.e. F2-score (F-measure with preference for recall).
+
+Reference format
+----------------
+
+(For expected.tsv files.)
+
+Each line describes expected clippings to be found in a corresponding PDF/DjVu file. Each expected clipping is specified as P/X0,Y0,X1,Y1/M, where:
+
+    P — DjVu page number (starting from 1)
+    X0, Y0, X1, Y1 — clipping coordinates (in pixels)
+    M — margin of error for each direction (in pixels)
+
+Output format
+-------------
+
+(for out.tsv files.)
+
+Similar to the reference format, each line describes clippings found in a corresponding PDF/DjVu file. Each clipping should be given as P/X0,Y0,X1,Y1, where:
+
+    P — DjVu page number (starting from 1)
+    X0, Y0, X1, Y1 — clipping coordinates (in pixels)
+
+|] ++ (commonReadmeMDContents testName)
+
 readmeMDContents _ testName = [i|
 GEval sample challenge
 ======================
@@ -435,10 +464,13 @@ Love and hate	LOVE HATE
 I am sad	SADNESS
 I am so sad and hateful	SADNESS HATE
 |]
-trainContents _ = [hereLit|0.06	0.39	0	0.206
-1.00	1.00	1	0.017
-317.8	5.20	67	0.048
-14.6	19.22	27	0.047
+trainContents ClippEU = [hereLit|2/0,0,10,150	foo.djvu
+1/30,40,100,1000	bar.djvu
+|]
+trainContents _ = [hereLit|0.06        0.39    0       0.206
+1.00   1.00    1       0.017
+317.8  5.20    67      0.048
+14.6   19.22   27      0.047
 |]
 
 devInContents :: Metric -> String
@@ -495,6 +527,9 @@ Barbara
 devInContents MultiLabelLikelihood = devInContents MultiLabelLogLoss
 devInContents MultiLabelLogLoss = [hereLit|I am in love
 I am a sad hater
+|]
+devInContents ClippEU = [hereLit|file1.djvu
+file2.djvu
 |]
 devInContents _ = [hereLit|0.72	0	0.007
 9.54	62	0.054
@@ -554,6 +589,9 @@ first-name:1
 devExpectedContents MultiLabelLikelihood = devExpectedContents MultiLabelLogLoss
 devExpectedContents MultiLabelLogLoss = [hereLit|LOVE
 SADNESS LOVE
+|]
+devExpectedContents ClippEU = [hereLit|
+10/10,20,30,100/5 3/0,50,500,500/5
 |]
 devExpectedContents _ = [hereLit|0.82
 95.2
@@ -616,6 +654,9 @@ testInContents MultiLabelLikelihood = testInContents MultiLabelLogLoss
 testInContents MultiLabelLogLoss = [hereLit|I am very sad
 I hate
 |]
+testInContents ClippEU = [hereLit|file3.djvu
+file4.djvu
+|]
 testInContents _ = [hereLit|0.72	0	0.007
 9.54	62	0.054
 |]
@@ -676,6 +717,9 @@ first-name:3
 testExpectedContents MultiLabelLikelihood = testExpectedContents MultiLabelLogLoss
 testExpectedContents MultiLabelLogLoss = [hereLit|SADNESS
 HATE
+|]
+testExpectedContents ClippEU = [hereLit|3/0,0,100,100/10
+1/10,10,1000,1000/10
 |]
 testExpectedContents _ = [hereLit|0.11
 17.2
