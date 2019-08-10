@@ -3,6 +3,7 @@
 
 import Test.Hspec
 
+import GEval.Metric
 import GEval.Core
 import GEval.Common
 import GEval.OptionsParser
@@ -24,6 +25,8 @@ import GEval.Annotation
 import GEval.BlackBoxDebugging
 import GEval.FeatureExtractor
 import GEval.Selector
+import GEval.CreateChallenge
+import GEval.Validation
 
 import Data.Map.Strict
 
@@ -500,6 +503,16 @@ main = hspec $ do
       shapify "PCMCIA" `shouldBe` (WordShape "A+")
       shapify "a" `shouldBe` (WordShape "a")
       shapify "B5" `shouldBe` (WordShape "A9")
+  describe "create challenges and validate them" $ do
+    (flip mapM_) listOfAvailableMetrics $ \metric -> do
+        it (show metric) $ do
+          withSystemTempDirectory "geval-validation-test" $ \tempDir -> do
+            let spec = defaultGEvalSpecification {
+                  gesExpectedDirectory = Just tempDir,
+                  gesMetrics = [BLEU],
+                  gesPrecision = Just 4 }
+            createChallenge True tempDir spec
+            validationChallenge tempDir spec
   describe "submit" $ do
     it "current branch" $ do
       runGitTest "branch-test" (\_ -> getCurrentBranch) `shouldReturn` "develop"
