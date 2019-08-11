@@ -26,6 +26,7 @@ import Data.String.Here
 import Data.Monoid ((<>))
 
 import GEval.Core
+import GEval.EvaluationScheme
 import GEval.Common
 import GEval.CreateChallenge
 import GEval.LineByLine
@@ -232,14 +233,14 @@ sel :: Maybe Metric -> Metric -> Metric
 sel Nothing m = m
 sel (Just m) _ = m
 
-metricReader :: Parser [Metric]
+metricReader :: Parser [EvaluationScheme]
 metricReader = many $ option auto         -- actually `some` should be used instead of `many`, the problem is that
                ( long "metric"            -- --metric might be in the config.txt file...
                  <> short 'm'
                  <> metavar "METRIC"
                  <> help "Metric to be used - RMSE, MSE, MAE, SMAPE, Pearson, Spearman, Accuracy, LogLoss, Likelihood, F-measure (specify as F1, F2, F0.25, etc.), macro F-measure (specify as Macro-F1, Macro-F2, Macro-F0.25, etc.), multi-label F-measure (specify as MultiLabel-F1, MultiLabel-F2, MultiLabel-F0.25, etc.), MultiLabel-Likelihood, MAP, BLEU, GLEU (\"Google GLEU\" not the grammar correction metric), WER, NMI, ClippEU, LogLossHashed, LikelihoodHashed, BIO-F1, BIO-F1-Labels, TokenAccuracy, soft F-measure (specify as Soft-F1, Soft-F2, Soft-F0.25), probabilistic soft F-measure (specify as Probabilistic-Soft-F1, Probabilistic-Soft-F2, Probabilistic-Soft-F0.25) or CharMatch" )
 
-altMetricReader :: Parser (Maybe Metric)
+altMetricReader :: Parser (Maybe EvaluationScheme)
 altMetricReader = optional $ option auto
                ( long "alt-metric"
                  <> short 'a'
@@ -345,9 +346,9 @@ getGraphFilename :: Int -> FilePath -> FilePath
 getGraphFilename 0 fp = fp
 getGraphFilename ix fp = ((dropExtension fp) ++ "-" ++ (show ix)) ++ (takeExtension fp)
 
-groupByMetric :: [Metric]
+groupByMetric :: [EvaluationScheme]
                 -> [(SourceSpec, [MetricOutput])]
-                -> [(Metric, [(SourceSpec, GraphSeries)])]
+                -> [(EvaluationScheme, [(SourceSpec, GraphSeries)])]
 groupByMetric metrics results = filter (\(_, ss) -> not (null ss))
                                 $ map extractMetric
                                 $ zip [0..] metrics
@@ -358,10 +359,10 @@ groupByMetric metrics results = filter (\(_, ss) -> not (null ss))
                      $ map (\(s, outs) -> (s, outs !! ix)) results)
 
 
-plotGraph :: FilePath -> (Metric, [(SourceSpec, GraphSeries)]) -> IO ()
-plotGraph graphFile (metric@(ProbabilisticSoftFMeasure _), seriesSpecs) = do
+plotGraph :: FilePath -> (EvaluationScheme, [(SourceSpec, GraphSeries)]) -> IO ()
+plotGraph graphFile (scheme@(EvaluationScheme (ProbabilisticSoftFMeasure _) _), seriesSpecs) = do
   toFile def graphFile $ do
-    layoutlr_title .= "GEval Graph / Calibration / Loess / " ++ (show metric)
+    layoutlr_title .= "GEval Graph / Calibration / Loess / " ++ (show scheme)
     let perfectSeries = (FilePathSpec "Perfect",
                          GraphSeries [(0.0, 0.0), (1.0, 1.0)])
     mapM_ plotOneSeries $ (perfectSeries : seriesSpecs)

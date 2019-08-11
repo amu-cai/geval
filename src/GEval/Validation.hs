@@ -5,6 +5,7 @@ module GEval.Validation
     ) where
 
 import GEval.Metric
+import GEval.EvaluationScheme
 import GEval.Core (GEvalSpecification(..), GEvalException(..), somethingWrongWithFilesMessage, isEmptyFile, geval, defaultInputFile, defaultExpectedFile, defaultOutFile)
 import GEval.Common
 import qualified System.Directory as D
@@ -84,7 +85,7 @@ validationChallenge challengeDirectory spec = do
     configFile = challengeDirectory </> "config.txt"
     gitignoreFile = challengeDirectory </> ".gitignore"
     readmeFile = challengeDirectory </> "README.md"
-    mainMetric = head $ gesMetrics spec
+    mainMetric = evaluationSchemeMetric $ head $ gesMetrics spec
 
 checkCorrectFile :: FilePath -> IO ()
 checkCorrectFile filePath = do
@@ -210,13 +211,14 @@ runOnTest spec testPath = do
         gesTestName = testName
         }
 
-  (flip mapM_) (gesMetrics spec) $ \metric -> do
+  (flip mapM_) (gesMetrics spec) $ \scheme -> do
     withSystemTempDirectory "geval-validation" $ \tmpDir -> do
+      let metric = evaluationSchemeMetric scheme
       let tmpOutDir = tmpDir </> testName
       let tmpOutFile = tmpOutDir </> defaultOutFile
       createDirectory tmpOutDir
       let specificSpec = modifiedSpec {
-            gesMetrics = [metric],
+            gesMetrics = [scheme],
             gesOutDirectory = tmpDir }
       createPerfectOutputFromExpected metric expectedFile tmpOutFile
       [(_, [MetricOutput value _])] <- geval specificSpec

@@ -49,6 +49,7 @@ module GEval.Core
     ) where
 
 import GEval.Metric
+import GEval.EvaluationScheme
 
 import Data.Conduit
 import Data.Conduit.Combinators as CC
@@ -159,7 +160,7 @@ data GEvalSpecification = GEvalSpecification
                             gesOutFile :: String,
                             gesExpectedFile :: String,
                             gesInputFile :: String,
-                            gesMetrics :: [Metric],
+                            gesMetrics :: [EvaluationScheme],
                             gesPrecision :: Maybe Int,
                             gesTokenizer :: Maybe Tokenizer,
                             gesGonitoHost :: Maybe String,
@@ -170,7 +171,7 @@ data GEvalSpecification = GEvalSpecification
 
 gesMainMetric :: GEvalSpecification -> Metric
 gesMainMetric spec = case gesMetrics spec of
-  (metric:_) -> metric
+  (scheme:_) -> evaluationSchemeMetric scheme
   otherwise -> error "no metric given"
 
 gesPreprocess :: GEvalSpecification -> (Text -> Text)
@@ -248,7 +249,7 @@ defaultGEvalSpecification = GEvalSpecification {
   gesOutFile = defaultOutFile,
   gesExpectedFile = defaultExpectedFile,
   gesInputFile = defaultInputFile,
-  gesMetrics = [defaultMetric],
+  gesMetrics = [EvaluationScheme defaultMetric []],
   gesPrecision = Nothing,
   gesTokenizer = Nothing,
   gesGonitoHost = Nothing,
@@ -280,9 +281,14 @@ noGraph = const Nothing
 
 gevalOnSingleOut :: GEvalSpecification -> SourceSpec -> SourceSpec -> SourceSpec -> IO (SourceSpec, [MetricOutput])
 gevalOnSingleOut gevalSpec inputSource expectedSource outSource = do
-  vals <- Prelude.mapM (\metric -> gevalCore metric mSelector preprocess inputSource expectedSource outSource) metrics
+  vals <- Prelude.mapM (\scheme -> gevalCore (evaluationSchemeMetric scheme)
+                                           mSelector
+                                           (preprocess . applyPreprocessingOperations scheme)
+                                           inputSource
+                                           expectedSource
+                                           outSource) schemes
   return (outSource, vals)
-  where metrics = gesMetrics gevalSpec
+  where schemes = gesMetrics gevalSpec
         preprocess = gesPreprocess gevalSpec
         mSelector = gesSelector gevalSpec
 
@@ -305,7 +311,7 @@ checkAndGetFiles forceInput gevalSpec = do
        throwM $ NoExpectedDirectory d
     Right expectedSource -> do
        -- in most cases inputSource is NoSource (unless needed by a metric or in the line-by-line mode)
-       inputSource <- getInputSourceIfNeeded forceInput metrics expectedTestDirectory inputFile
+       inputSource <- getInputSourceIfNeeded forceInput (Prelude.map evaluationSchemeMetric schemes) expectedTestDirectory inputFile
 
        mMultipleOuts <- checkMultipleOuts gevalSpec
        osss <- case mMultipleOuts of
@@ -330,7 +336,7 @@ checkAndGetFiles forceInput gevalSpec = do
           outFile = gesOutFile gevalSpec
           expectedFile = gesExpectedFile gevalSpec
           inputFile = gesInputFile gevalSpec
-          metrics = gesMetrics gevalSpec
+          schemes = gesMetrics gevalSpec
 
 checkSingleOut :: FilePath -> FilePath -> IO (Either SmartSourceError SourceSpec)
 checkSingleOut outTestDirectory outFile

@@ -5,6 +5,7 @@ module GEval.CreateChallenge
        where
 
 import GEval.Metric
+import GEval.EvaluationScheme
 import GEval.Core (GEvalSpecification(..), GEvalException(..), configFileName, gesMainMetric, defaultTestName)
 import GEval.Submit (tokenFileName)
 import qualified System.Directory as D
@@ -370,8 +371,8 @@ Directory structure
 |]
 
 
-configContents :: [Metric] -> Maybe Int -> String -> String
-configContents metrics precision testName = unwords (Prelude.map (\metric -> ("--metric " ++ (show metric))) metrics) ++
+configContents :: [EvaluationScheme] -> Maybe Int -> String -> String
+configContents schemes precision testName = unwords (Prelude.map (\scheme -> ("--metric " ++ (show scheme))) schemes) ++
                                  (if testName /= defaultTestName
                                      then
                                         " --test-name " ++ testName

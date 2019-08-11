@@ -6,6 +6,7 @@ import Test.Hspec
 import GEval.Metric
 import GEval.Core
 import GEval.Common
+import GEval.EvaluationScheme
 import GEval.OptionsParser
 import GEval.BLEU
 import GEval.ClippEU
@@ -298,6 +299,9 @@ main = hspec $ do
   describe "MultiLabel-Likelihood" $ do
     it "simple" $ do
       runGEvalTest "multilabel-likelihood-simple" `shouldReturnAlmost` 0.115829218528827
+  describe "Preprocessing operations" $ do
+    it "F1 with preprocessing" $ do
+      runGEvalTest "f1-with-preprocessing" `shouldReturnAlmost` 0.57142857142857
   describe "evaluating single lines" $ do
     it "RMSE" $ do
       (MetricOutput v _) <- gevalCoreOnSingleLines RMSE id RawItemTarget
@@ -399,7 +403,7 @@ main = hspec $ do
             gesOutFile = "out.tsv",
             gesExpectedFile = "expected.tsv",
             gesInputFile = "in.tsv",
-            gesMetrics = [Likelihood],
+            gesMetrics = [EvaluationScheme Likelihood []],
             gesPrecision = Nothing,
             gesTokenizer = Nothing,
             gesGonitoHost = Nothing,
@@ -509,7 +513,7 @@ main = hspec $ do
           withSystemTempDirectory "geval-validation-test" $ \tempDir -> do
             let spec = defaultGEvalSpecification {
                   gesExpectedDirectory = Just tempDir,
-                  gesMetrics = [metric],
+                  gesMetrics = [EvaluationScheme metric []],
                   gesPrecision = Just 4 }
             createChallenge True tempDir spec
             validationChallenge tempDir spec

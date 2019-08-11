@@ -1,6 +1,7 @@
 module Main where
 
 import GEval.Core
+import GEval.EvaluationScheme
 import GEval.Common
 import GEval.OptionsParser
 import GEval.ParseParams
@@ -56,12 +57,12 @@ showTable opts multipleResults = do
   mapM_ (\entry -> putStrLn $ formatTableEntry opts paramNames entry) $ zip multipleResults params
   where metrics = gesMetrics $ geoSpec opts
 
-getHeader :: [T.Text] -> [Metric] -> Maybe String
+getHeader :: [T.Text] -> [EvaluationScheme] -> Maybe String
 getHeader [] [singleMetric] = Nothing
 getHeader [] [] = error "no metric given"
-getHeader [] metrics = Just $ intercalate "\t" ("File name" : Prelude.map show metrics)
-getHeader params metrics = Just $ intercalate "\t" (Prelude.map T.unpack params
-                                                    ++ Prelude.map show metrics)
+getHeader [] schemes = Just $ intercalate "\t" ("File name" : Prelude.map evaluationSchemeName schemes)
+getHeader params schemes = Just $ intercalate "\t" (Prelude.map T.unpack params
+                                                    ++ Prelude.map evaluationSchemeName schemes)
 
 formatTableEntry :: GEvalOptions -> [T.Text] -> ((SourceSpec, [MetricValue]), OutputFileParsed) -> String
 formatTableEntry opts paramNames ((sourceSpec, metrics), ofParsed) = intercalate "\t" ((initialColumns paramNames sourceSpec ofParsed) ++ vals)
@@ -84,8 +85,8 @@ formatSourceSpec :: SourceSpec -> String
 formatSourceSpec (FilePathSpec fp) = dropExtensions $ takeFileName fp
 formatSourceSpec spec = show spec
 
-formatTheMetricAndResult :: Maybe Int -> (Metric, MetricValue) -> String
-formatTheMetricAndResult mPrecision (metric, val) = (show metric) ++ "\t" ++ (formatTheResult mPrecision val)
+formatTheMetricAndResult :: Maybe Int -> (EvaluationScheme, MetricValue) -> String
+formatTheMetricAndResult mPrecision (scheme, val) = (evaluationSchemeName scheme) ++ "\t" ++ (formatTheResult mPrecision val)
 
 
 formatTheResult :: Maybe Int -> MetricValue -> String

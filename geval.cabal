@@ -1,5 +1,5 @@
 name:                geval
-version:             1.18.2.0
+version:             1.19.0.0
 synopsis:            Machine learning evaluation tools
 description:         Please see README.md
 homepage:            http://github.com/name/project
@@ -17,6 +17,7 @@ library
   hs-source-dirs:      src
   exposed-modules:     GEval.Core
                      , GEval.Metric
+                     , GEval.EvaluationScheme
                      , GEval.CreateChallenge
                      , GEval.OptionsParser
                      , GEval.BLEU
@@ -81,6 +82,7 @@ library
                      , containers
                      , statistics
                      , pcre-heavy
+                     , pcre-light
                      , process
                      , uri-encode
                      , MissingH
@@ -95,6 +97,7 @@ library
                      , errors
                      , filemanip
                      , temporary
+                     , utf8-string
   default-language:    Haskell2010
 
 executable geval
