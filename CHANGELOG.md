@@ -1,4 +1,9 @@
 
+## 1.19.0.0
+
+* Fully static build
+* Add preprocessing options for metrics
+
 ## 1.18.2.0
 
 * During validation, check the number of columns

@@ -62,18 +62,13 @@ to happen on macOS, as these packages are usually installed out of box on Linux)
 
 ### Plan B — just download the GEval binary
 
-(Assuming you have a standard 64-bit Linux.)
+(Assuming you have a 64-bit Linux.)
 
     wget https://gonito.net/get/bin/geval
     chmod u+x geval
     ./geval --help
 
-If this binary does not work on your Linux (likely to happen on Arch Linux), try another one:
-
-    wget https://gonito.net/get/bin/geval-alt
-    mv geval-alt geval
-    chmod u+x geval
-    ./geval --help
+This is a fully static binary, it should work on any 64-bit Linux.
 
 ## Quick tour
 
