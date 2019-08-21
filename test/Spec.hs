@@ -4,6 +4,7 @@
 import Test.Hspec
 
 import GEval.Metric
+import GEval.MetricsMeta (listOfAvailableEvaluationSchemes, isEvaluationSchemeDescribed, expectedScore, outContents)
 import GEval.Core
 import GEval.Common
 import GEval.EvaluationScheme
@@ -32,6 +33,8 @@ import GEval.Validation
 import Data.Map.Strict
 
 import Data.Conduit.List (consume)
+
+import System.FilePath
 
 import System.Directory
 import System.Process
@@ -508,15 +511,27 @@ main = hspec $ do
       shapify "a" `shouldBe` (WordShape "a")
       shapify "B5" `shouldBe` (WordShape "A9")
   describe "create challenges and validate them" $ do
-    (flip mapM_) listOfAvailableMetrics $ \metric -> do
-        it (show metric) $ do
+    (flip mapM_) listOfAvailableEvaluationSchemes $ \scheme -> do
+        it (show scheme) $ do
           withSystemTempDirectory "geval-validation-test" $ \tempDir -> do
             let spec = defaultGEvalSpecification {
                   gesExpectedDirectory = Just tempDir,
-                  gesMetrics = [EvaluationScheme metric []],
+                  gesMetrics = [scheme],
                   gesPrecision = Just 4 }
             createChallenge True tempDir spec
             validationChallenge tempDir spec
+  describe "test sample outputs" $ do
+    (flip mapM_ ) (Prelude.filter isEvaluationSchemeDescribed listOfAvailableEvaluationSchemes) $ \scheme@(EvaluationScheme metric _) -> do
+      it (show scheme) $ do
+        withSystemTempDirectory "geval-sample-output-test" $ \tempDir -> do
+          let spec = defaultGEvalSpecification {
+                gesExpectedDirectory = Just tempDir,
+                gesMetrics = [scheme] }
+          createChallenge True tempDir spec
+          let outFile = tempDir </> "test-A" </> "out.tsv"
+          writeFile outFile (outContents metric)
+          obtainedScore <- (runGEval ["--expected-directory", tempDir, "--out-directory", tempDir]) >>= extractVal
+          obtainedScore `shouldBe` (expectedScore scheme)
   describe "submit" $ do
     it "current branch" $ do
       runGitTest "branch-test" (\_ -> getCurrentBranch) `shouldReturn` "develop"

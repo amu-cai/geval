@@ -1,5 +1,5 @@
 module GEval.EvaluationScheme
-  (EvaluationScheme(..), evaluationSchemeMetric, applyPreprocessingOperations, evaluationSchemeName)
+  (EvaluationScheme(..), evaluationSchemeMetric, applyPreprocessingOperations, evaluationSchemeName, PreprocessingOperation(..))
   where
 
 import GEval.Metric

@@ -187,7 +187,7 @@ data GEvalSpecialCommand = Init
                            | LineByLine | WorstFeatures
                            | Diff FilePath | MostWorseningFeatures FilePath
                            | PrintVersion | JustTokenize | Submit
-                           | Validate
+                           | Validate | ListMetrics
 
 data ResultOrdering = KeepTheOriginalOrder | FirstTheWorst | FirstTheBest
 

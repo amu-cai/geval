@@ -17,6 +17,7 @@ library
   hs-source-dirs:      src
   exposed-modules:     GEval.Core
                      , GEval.Metric
+                     , GEval.MetricsMeta
                      , GEval.EvaluationScheme
                      , GEval.CreateChallenge
                      , GEval.OptionsParser
@@ -137,6 +138,7 @@ test-suite geval-test
                      , silently
                      , vector
                      , statistics
+                     , filepath
   ghc-options:         -threaded -rtsopts -with-rtsopts=-N
   default-language:    Haskell2010
 

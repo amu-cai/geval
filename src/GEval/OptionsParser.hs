@@ -27,6 +27,7 @@ import Data.Monoid ((<>))
 
 import GEval.Core
 import GEval.EvaluationScheme
+import GEval.MetricsMeta (extraInfo, listOfAvailableEvaluationSchemes, allMetricsDescription)
 import GEval.Common
 import GEval.CreateChallenge
 import GEval.LineByLine
@@ -34,6 +35,8 @@ import GEval.Submit (submit)
 import GEval.BlackBoxDebugging
 import GEval.Selector
 import GEval.Validation
+
+import Data.List (intercalate)
 
 import Data.Conduit.SmartSource
 
@@ -87,6 +90,10 @@ optionsParser = GEvalOptions
                 (flag' Validate
                     ( long "validate"
                       <> help "Validate challenge, it searches for potential errors in the given challenge path, like missing columns, files or format data."))
+                <|>
+                (flag' ListMetrics
+                    ( long "list-metrics"
+                      <> help "List all metrics with their descriptions"))
                 )
 
    <*> ((flag' FirstTheWorst
@@ -233,12 +240,21 @@ sel :: Maybe Metric -> Metric -> Metric
 sel Nothing m = m
 sel (Just m) _ = m
 
+
+
 metricReader :: Parser [EvaluationScheme]
 metricReader = many $ option auto         -- actually `some` should be used instead of `many`, the problem is that
                ( long "metric"            -- --metric might be in the config.txt file...
                  <> short 'm'
                  <> metavar "METRIC"
-                 <> help "Metric to be used - RMSE, MSE, MAE, SMAPE, Pearson, Spearman, Accuracy, LogLoss, Likelihood, F-measure (specify as F1, F2, F0.25, etc.), macro F-measure (specify as Macro-F1, Macro-F2, Macro-F0.25, etc.), multi-label F-measure (specify as MultiLabel-F1, MultiLabel-F2, MultiLabel-F0.25, etc.), MultiLabel-Likelihood, MAP, BLEU, GLEU (\"Google GLEU\" not the grammar correction metric), WER, NMI, ClippEU, LogLossHashed, LikelihoodHashed, BIO-F1, BIO-F1-Labels, TokenAccuracy, soft F-measure (specify as Soft-F1, Soft-F2, Soft-F0.25), probabilistic soft F-measure (specify as Probabilistic-Soft-F1, Probabilistic-Soft-F2, Probabilistic-Soft-F0.25) or CharMatch" )
+                 <> help ("Metric to be used, e.g.:" ++ intercalate ", " (map
+                                                                          (\s -> (show s) ++ (case extraInfo s of
+                                                                                               Just eI -> " (" ++ eI ++ ")"
+                                                                                               Nothing -> ""))
+                                                                          listOfAvailableEvaluationSchemes)))
+
+
+--                   RMSE, MSE, MAE, SMAPE, Pearson, Spearman, Accuracy, LogLoss, Likelihood, F-measure (specify as F1, F2, F0.25, etc.), macro F-measure (specify as Macro-F1, Macro-F2, Macro-F0.25, etc.), multi-label F-measure (specify as MultiLabel-F1, MultiLabel-F2, MultiLabel-F0.25, etc.), MultiLabel-Likelihood, MAP, BLEU, GLEU (\"Google GLEU\" not the grammar correction metric), WER, NMI, ClippEU, LogLossHashed, LikelihoodHashed, BIO-F1, BIO-F1-Labels, TokenAccuracy, soft F-measure (specify as Soft-F1, Soft-F2, Soft-F0.25), probabilistic soft F-measure (specify as Probabilistic-Soft-F1, Probabilistic-Soft-F2, Probabilistic-Soft-F0.25) or CharMatch" )
 
 altMetricReader :: Parser (Maybe EvaluationScheme)
 altMetricReader = optional $ option auto
@@ -341,6 +357,9 @@ runGEval''' (Just Submit) _ _ spec _ _ = do
 runGEval''' (Just Validate) _ _ spec _ _ = do
   validateChallenge spec
   return Nothing
+runGEval''' (Just ListMetrics) _ _ _ _ _ = do
+  listMetrics
+  return Nothing
 
 getGraphFilename :: Int -> FilePath -> FilePath
 getGraphFilename 0 fp = fp
@@ -401,3 +420,6 @@ Run:
 to validate a directory CHALLENGE representing a Gonito challenge.
 |]
   exitFailure
+
+listMetrics :: IO ()
+listMetrics = putStrLn allMetricsDescription

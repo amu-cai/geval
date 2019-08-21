@@ -1,7 +1,8 @@
 {-# LANGUAGE QuasiQuotes #-}
 
 module GEval.CreateChallenge
-       (createChallenge)
+       (createChallenge,
+        testExpectedContents)
        where
 
 import GEval.Metric

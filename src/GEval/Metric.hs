@@ -5,7 +5,6 @@ module GEval.Metric
    MetricOrdering(..),
    defaultLogLossHashedSize,
    getMetricOrdering,
-   listOfAvailableMetrics,
    bestPossibleValue,
    perfectOutLineFromExpectedLine,
    fixedNumberOfColumnsInExpected,
@@ -31,47 +30,6 @@ data Metric = RMSE | MSE | Pearson | Spearman | BLEU | GLEU | WER | Accuracy | C
               | MultiLabelLogLoss | MultiLabelLikelihood
               | SoftFMeasure Double | ProbabilisticSoftFMeasure Double
               deriving (Eq)
-
--- | the list of available metrics, to be shown to the user or to be
--- | used for tests
-listOfAvailableMetrics :: [Metric]
-listOfAvailableMetrics = [RMSE,
-                          MSE,
-                          MAE,
-                          SMAPE,
-                          Pearson,
-                          Spearman,
-                          Accuracy,
-                          LogLoss,
-                          Likelihood,
-                          FMeasure 1.0,
-                          FMeasure 2.0,
-                          FMeasure 0.25,
-                          MacroFMeasure 1.0,
-                          MacroFMeasure 2.0,
-                          MacroFMeasure 0.25,
-                          MultiLabelFMeasure 1.0,
-                          MultiLabelFMeasure 2.0,
-                          MultiLabelFMeasure 0.25,
-                          MultiLabelLikelihood,
-                          MAP,
-                          BLEU,
-                          GLEU,
-                          WER,
-                          NMI,
-                          ClippEU,
-                          LogLossHashed defaultLogLossHashedSize,
-                          LikelihoodHashed defaultLogLossHashedSize,
-                          BIOF1,
-                          BIOF1Labels,
-                          TokenAccuracy,
-                          SoftFMeasure 1.0,
-                          SoftFMeasure 2.0,
-                          SoftFMeasure 0.25,
-                          ProbabilisticSoftFMeasure 1.0,
-                          ProbabilisticSoftFMeasure 2.0,
-                          ProbabilisticSoftFMeasure 0.25,
-                          CharMatch]
 
 instance Show Metric where
   show RMSE = "RMSE"
