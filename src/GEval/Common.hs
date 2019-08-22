@@ -29,6 +29,9 @@ instance ConvertibleToDouble Double where
 instance ConvertibleToDouble Int where
   toDouble = fromIntegral
 
+instance ConvertibleToDouble Integer where
+  toDouble = fromIntegral
+
 (/.) :: (ConvertibleToDouble f, Integral a) => f -> a -> Double
 x /. 0 = 1.0
 x /. y = (toDouble x) / (fromIntegral y)

@@ -16,7 +16,7 @@ import Data.Text
 import Data.Monoid ((<>))
 
 import GEval.Common
-import GEval.ClippEU
+import GEval.Clippings
 import Data.Attoparsec.Text (parseOnly)
 
 -- here metrics and their basic properties are listed,
@@ -28,7 +28,7 @@ data Metric = RMSE | MSE | Pearson | Spearman | BLEU | GLEU | WER | Accuracy | C
               | LogLossHashed Word32 | CharMatch | MAP | LogLoss | Likelihood
               | BIOF1 | BIOF1Labels | TokenAccuracy | LikelihoodHashed Word32 | MAE | SMAPE | MultiLabelFMeasure Double
               | MultiLabelLogLoss | MultiLabelLikelihood
-              | SoftFMeasure Double | ProbabilisticSoftFMeasure Double
+              | SoftFMeasure Double | ProbabilisticSoftFMeasure Double | Soft2DFMeasure Double
               deriving (Eq)
 
 instance Show Metric where
@@ -45,6 +45,7 @@ instance Show Metric where
   show (MacroFMeasure beta) = "Macro-F" ++ (show beta)
   show (SoftFMeasure beta) = "Soft-F" ++ (show beta)
   show (ProbabilisticSoftFMeasure beta) = "Probabilistic-Soft-F" ++ (show beta)
+  show (Soft2DFMeasure beta) = "Soft2D-F" ++ (show beta)
   show NMI = "NMI"
   show (LogLossHashed nbOfBits) = "LogLossHashed" ++ (if
                                                        nbOfBits == defaultLogLossHashedSize
@@ -91,6 +92,9 @@ instance Read Metric where
   readsPrec p ('M':'u':'l':'t':'i':'L':'a':'b':'e':'l':'-':'F':theRest) = case readsPrec p theRest of
     [(beta, theRest)] -> [(MultiLabelFMeasure beta, theRest)]
     _ -> []
+  readsPrec p ('S':'o':'f':'t':'2':'D':'-':'F':theRest) = case readsPrec p theRest of
+    [(beta, theRest)] -> [(Soft2DFMeasure beta, theRest)]
+    _ -> []
   readsPrec p ('S':'o':'f':'t':'-':'F':theRest) = case readsPrec p theRest of
     [(beta, theRest)] -> [(SoftFMeasure beta, theRest)]
     _ -> []
@@ -134,6 +138,7 @@ getMetricOrdering (FMeasure _) = TheHigherTheBetter
 getMetricOrdering (MacroFMeasure _) = TheHigherTheBetter
 getMetricOrdering (SoftFMeasure _) = TheHigherTheBetter
 getMetricOrdering (ProbabilisticSoftFMeasure _) = TheHigherTheBetter
+getMetricOrdering (Soft2DFMeasure _) = TheHigherTheBetter
 getMetricOrdering NMI = TheHigherTheBetter
 getMetricOrdering (LogLossHashed _) = TheLowerTheBetter
 getMetricOrdering (LikelihoodHashed _) = TheHigherTheBetter
@@ -164,6 +169,7 @@ fixedNumberOfColumnsInExpected _ = True
 fixedNumberOfColumnsInInput :: Metric -> Bool
 fixedNumberOfColumnsInInput (SoftFMeasure _) = False
 fixedNumberOfColumnsInInput (ProbabilisticSoftFMeasure _) = False
+fixedNumberOfColumnsInInput (Soft2DFMeasure _) = False
 fixedNumberOfColumnsInInput _ = True
 
 perfectOutLineFromExpectedLine :: Metric -> Text -> Text

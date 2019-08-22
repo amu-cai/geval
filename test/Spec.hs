@@ -10,7 +10,7 @@ import GEval.Common
 import GEval.EvaluationScheme
 import GEval.OptionsParser
 import GEval.BLEU
-import GEval.ClippEU
+import GEval.Clippings
 import GEval.PrecisionRecall
 import GEval.ClusteringMetrics
 import GEval.BIO
@@ -31,7 +31,6 @@ import GEval.CreateChallenge
 import GEval.Validation
 
 import Data.Map.Strict
-
 import Data.Conduit.List (consume)
 
 import System.FilePath
@@ -227,6 +226,21 @@ main = hspec $ do
       r `shouldBe` [Clipping (PageNumber 2) (Rectangle (Point 0 0) (Point 2 3)),
                     Clipping (PageNumber 10) (Rectangle (Point 20 30) (Point 40 50)),
                     Clipping (PageNumber 18) (Rectangle (Point 0 1) (Point 500 3))]
+    it "parsing labeled rectangles" $ do
+      let (Right r) = parseOnly (lineLabeledClippingsParser <* endOfInput) "2/0,0,2,3 foo:5/10,10,20,20 "
+      r `shouldBe` [LabeledClipping Nothing $ Clipping (PageNumber 2) (Rectangle (Point 0 0) (Point 2 3)),
+                    LabeledClipping (Just "foo") $ Clipping (PageNumber 5) (Rectangle (Point 10 10) (Point 20 20))]
+    it "check partition" $ do
+      partitionClippings (LabeledClipping Nothing (Clipping (PageNumber 5) $ Rectangle (Point 0 0) (Point 100 50)))
+                         (LabeledClipping Nothing (Clipping (PageNumber 5) $ Rectangle (Point 10 20) (Point 200 300)))
+        `shouldBe` Just (Rectangle (Point 10 20) (Point 100 50),
+                         [LabeledClipping Nothing (Clipping (PageNumber 5) $ Rectangle (Point 10 0) (Point 100 19)),
+                          LabeledClipping Nothing (Clipping (PageNumber 5) $ Rectangle (Point 0 0) (Point 9 50))],
+                         [LabeledClipping Nothing (Clipping (PageNumber 5) $ Rectangle (Point 10 51) (Point 100 300)),
+                          LabeledClipping Nothing (Clipping (PageNumber 5) $ Rectangle (Point 101 20) (Point 200 300))])
+      partitionClippings (LabeledClipping (Just "bar") (Clipping (PageNumber 10) (Rectangle (Point 100 100) (Point 200 149))))
+                         (LabeledClipping (Just "bar") (Clipping (PageNumber 10) (Rectangle (Point 100 201) (Point 200 300))))
+        `shouldBe` Nothing
     it "no rectangles" $ do
       let (Right r) = parseOnly (lineClippingsParser <* endOfInput) ""
       r `shouldBe` []
@@ -260,6 +274,9 @@ main = hspec $ do
       runGEvalTest "probabilistic-soft-f1-simple" `shouldReturnAlmost` 0.33333333333333
     it "simple test with perfect calibration" $ do
       runGEvalTest "probabilistic-soft-f1-calibrated" `shouldReturnAlmost` 0.88888888888
+  describe "Soft2D-F1" $ do
+    it "simple test" $ do
+      runGEvalTest "soft2d-f1-simple" `shouldReturnAlmost` 0.30152621462832535
   describe "test edit-distance library" $ do
     it "for handling UTF8" $ do
       levenshteinDistance defaultEditCosts "źdźbło" "źd好bło" `shouldBe` 1
@@ -318,6 +335,9 @@ main = hspec $ do
     it "just parse" $ do
       parseAnnotations "foo:3,7-10 baz:4-6" `shouldBe` Right [Annotation "foo" (IS.fromList [3,7,8,9,10]),
                                                               Annotation "baz" (IS.fromList [4,5,6])]
+    it "just parse 2" $ do
+      parseAnnotations "inwords:1-3 indigits:5" `shouldBe` Right [Annotation "inwords" (IS.fromList [1,2,3]),
+                                                                  Annotation "indigits" (IS.fromList [5])]
     it "empty" $ do
       parseAnnotations "" `shouldBe` Right []
     it "empty (just spaces)" $ do

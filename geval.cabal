@@ -22,7 +22,7 @@ library
                      , GEval.CreateChallenge
                      , GEval.OptionsParser
                      , GEval.BLEU
-                     , GEval.ClippEU
+                     , GEval.Clippings
                      , GEval.PrecisionRecall
                      , GEval.ClusteringMetrics
                      , GEval.Common

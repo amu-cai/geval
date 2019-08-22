@@ -55,13 +55,13 @@ f2MeasureOnCounts = fMeasureOnCounts 2.0
 f1MeasureOnCounts :: ConvertibleToDouble n => (n, Int, Int) -> Double
 f1MeasureOnCounts = fMeasureOnCounts 1.0
 
-fMeasureOnCounts :: ConvertibleToDouble n => Double -> (n, Int, Int) -> Double
+fMeasureOnCounts :: (ConvertibleToDouble n, Integral v) => Double -> (n, v, v) -> Double
 fMeasureOnCounts beta (tp, nbExpected, nbGot) =
   (1 + betaSquared) * p * r `safeDoubleDiv` (betaSquared * p + r)
   where betaSquared = beta ^ 2
         (p, r) = precisionAndRecallFromCounts (tp, nbExpected, nbGot)
 
-countFolder :: Num n => (n, Int, Int) -> (n, Int, Int) -> (n, Int, Int)
+countFolder :: (Num n, Num v) => (n, v, v) -> (n, v, v) -> (n, v, v)
 countFolder (a1, a2, a3) (b1, b2, b3) = (a1+b1, a2+b2, a3+b3)
 
 getCounts :: (a -> b -> Bool) -> ([a], [b]) -> (Int, Int, Int)
@@ -80,7 +80,7 @@ precisionAndRecall matchFun expected got
   = precisionAndRecallFromCounts (tp, length expected, length got)
     where tp = maxMatch matchFun expected got
 
-precisionAndRecallFromCounts :: ConvertibleToDouble n => (n, Int, Int) -> (Double, Double)
+precisionAndRecallFromCounts :: (ConvertibleToDouble n, Integral v) => (n, v, v) -> (Double, Double)
 precisionAndRecallFromCounts (tp, nbExpected, nbGot) =
   (tp /. nbGot, tp /. nbExpected)
 

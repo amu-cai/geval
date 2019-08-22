@@ -84,7 +84,7 @@ import qualified Data.IntSet as IS
 
 import GEval.BLEU
 import GEval.Common
-import GEval.ClippEU
+import GEval.Clippings
 import GEval.PrecisionRecall
 import GEval.ClusteringMetrics
 import GEval.LogLossHashed
@@ -647,6 +647,18 @@ gevalCore' (ProbabilisticSoftFMeasure beta) _ = gevalCoreWithoutInput parseAnnot
            where calibrationMeasure = softCalibration results probs
                  recall = got /. nbExpected
 
+gevalCore' (Soft2DFMeasure beta) _ = gevalCoreWithoutInput parseLabeledClippings
+                                                           parseLabeledClippings
+                                                           get2DCounts
+                                                           countAgg
+                                                           (fMeasureOnCounts beta)
+                                                           noGraph
+                      where
+                        parseLabeledClippings = controlledParse lineLabeledClippingsParser
+                        get2DCounts (expected, got) = (coveredBy expected got,
+                                                       totalArea expected,
+                                                       totalArea got)
+
 gevalCore' ClippEU _ = gevalCoreWithoutInput parseClippingSpecs parseClippings matchStep clippeuAgg finalStep noGraph
   where
     parseClippings = controlledParse lineClippingsParser
@@ -736,8 +748,8 @@ gevalCore' MultiLabelLogLoss _ = gevalCoreWithoutInput intoWords
     where
       intoWords = Right . Data.Text.words
 
-countAgg :: (Num n, Monad m) => ConduitM (n, Int, Int) o m (n, Int, Int)
-countAgg = CC.foldl countFolder (fromInteger 0, 0, 0)
+countAgg :: (Num n, Num v, Monad m) => ConduitM (n, v, v) o m (n, v, v)
+countAgg = CC.foldl countFolder (fromInteger 0, fromInteger 0, fromInteger 0)
 
 gevalCoreByCorrelationMeasure :: (MonadUnliftIO m, MonadThrow m, MonadIO m) =>
                                 (V.Vector (Double, Double) -> Double) -> -- ^ correlation function

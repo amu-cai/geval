@@ -21,6 +21,7 @@ import GEval.PrecisionRecall (weightedHarmonicMean)
 import Text.Regex.PCRE.Heavy
 import Data.Either (fromRight)
 import Data.String.Here
+import Data.Maybe (fromMaybe)
 
 import Data.List (intercalate)
 import Text.Printf
@@ -64,6 +65,9 @@ listOfAvailableMetrics = [RMSE,
                           ProbabilisticSoftFMeasure 1.0,
                           ProbabilisticSoftFMeasure 2.0,
                           ProbabilisticSoftFMeasure 0.25,
+                          Soft2DFMeasure 1.0,
+                          Soft2DFMeasure 2.0,
+                          Soft2DFMeasure 0.25,
                           CharMatch]
 
 extraInfo :: EvaluationScheme -> Maybe String
@@ -120,14 +124,30 @@ formatEvaluationSchemeDescription :: EvaluationScheme -> String
 formatEvaluationSchemeDescription scheme@(EvaluationScheme metric _) = show scheme ++ "\n" ++ description
   where description = if isEvaluationSchemeDescribed scheme
                       then (getEvaluationSchemeDescription scheme)
+                           ++ "\n"
+                           ++ (formatDescription metric)
                            ++ "\nExample\n"
                            ++ (pasteLines "Expected output" "Sample output")
                            ++ concat (map (\(exp, out) -> pasteLines exp out) $ zip (lines $ testExpectedContents metric)
                                                                                    (lines $ outContents metric))
                            ++ "\nMetric value: " ++ (printf "%.4f" $ expectedScore scheme)
+                           ++ (case scoreExplanation scheme of
+                                 Just expl -> "\n(" ++ expl ++ ")"
+                                 Nothing -> "")
                       else noDescription
         noDescription = [hereLit|THE METRIC HAS NO DESCRIPTION YET, PLEASE ADD AN ISSUE TO https://gitlab.com/filipg/geval/issues
 IF YOU WANT TO HAVE IT DESCRIBED|]
+
+formatDescription :: Metric -> String
+formatDescription (SoftFMeasure _) = [hereLit|Each line is a sequence of entities separated by spaces, each entity is of
+the form LABEL:SPAN, where LABEL is any label and SPAN is defined using single integers, intervals or such
+units separated with commas.
+|]
+
+scoreExplanation :: EvaluationScheme -> Maybe String
+scoreExplanation (EvaluationScheme (SoftFMeasure _) [])
+  = Just [hereLit|We have a partial (0.75) success for the entity `inwords:1-4`, hence Recall = 0.75/1 = 0.75,
+Precision = (0 + 0.75 + 0) / 3 = 0.25, so F-score = 0.375|]
 
 pasteLines :: String -> String -> String
 pasteLines a b = printf "%-35s %s\n" a b

@@ -128,6 +128,23 @@ GEval sample challenge — mark numbers
 This is a sample/toy classification challenge for Gonito framework with Probabilistic-Soft-F-measure as the metric.
 |] ++ (commonReadmeMDContents testName)
 
+readmeMDContents (Soft2DFMeasure _) testName = [i|
+Sample challenge for clippings
+==============================
+
+The metric is Soft2D-F-score, i.e. F-score for clipping with partial
+hits (when two rectangles overlaps) taken into account.
+
+Format
+------
+
+Each clipping found in a corresponding PDF/DjVu file. Each clipping should be given as P/X0,Y0,X1,Y1, where:
+
+    P — DjVu page number (starting from 1)
+    X0, Y0, X1, Y1 — clipping coordinates (in pixels)
+
+|] ++ (commonReadmeMDContents testName)
+
 readmeMDContents NMI testName = [i|
 Cluster proverbs
 ================
@@ -466,6 +483,7 @@ Love and hate	LOVE HATE
 I am sad	SADNESS
 I am so sad and hateful	SADNESS HATE
 |]
+trainContents (Soft2DFMeasure _) = trainContents ClippEU
 trainContents ClippEU = [hereLit|2/0,0,10,150	foo.djvu
 1/30,40,100,1000	bar.djvu
 |]
@@ -530,6 +548,7 @@ devInContents MultiLabelLikelihood = devInContents MultiLabelLogLoss
 devInContents MultiLabelLogLoss = [hereLit|I am in love
 I am a sad hater
 |]
+devInContents (Soft2DFMeasure _) = devInContents ClippEU
 devInContents ClippEU = [hereLit|file1.djvu
 file2.djvu
 |]
@@ -591,6 +610,9 @@ first-name:1
 devExpectedContents MultiLabelLikelihood = devExpectedContents MultiLabelLogLoss
 devExpectedContents MultiLabelLogLoss = [hereLit|LOVE
 SADNESS LOVE
+|]
+devExpectedContents (Soft2DFMeasure _) = [hereLit|
+10/10,20,30,100 3/0,50,500,500
 |]
 devExpectedContents ClippEU = [hereLit|
 10/10,20,30,100/5 3/0,50,500,500/5
@@ -656,6 +678,7 @@ testInContents MultiLabelLikelihood = testInContents MultiLabelLogLoss
 testInContents MultiLabelLogLoss = [hereLit|I am very sad
 I hate
 |]
+testInContents (Soft2DFMeasure _) = testInContents ClippEU
 testInContents ClippEU = [hereLit|file3.djvu
 file4.djvu
 |]
@@ -719,6 +742,9 @@ first-name:3
 testExpectedContents MultiLabelLikelihood = testExpectedContents MultiLabelLogLoss
 testExpectedContents MultiLabelLogLoss = [hereLit|SADNESS
 HATE
+|]
+testExpectedContents (Soft2DFMeasure _) = [hereLit|3/0,0,100,100
+1/10,10,1000,1000
 |]
 testExpectedContents ClippEU = [hereLit|3/0,0,100,100/10
 1/10,10,1000,1000/10
