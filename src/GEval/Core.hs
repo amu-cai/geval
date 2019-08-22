@@ -48,6 +48,8 @@ module GEval.Core
       somethingWrongWithFilesMessage
     ) where
 
+import Debug.Trace
+
 import GEval.Metric
 import GEval.EvaluationScheme
 
@@ -649,15 +651,16 @@ gevalCore' (ProbabilisticSoftFMeasure beta) _ = gevalCoreWithoutInput parseAnnot
 
 gevalCore' (Soft2DFMeasure beta) _ = gevalCoreWithoutInput parseLabeledClippings
                                                            parseLabeledClippings
-                                                           get2DCounts
-                                                           countAgg
-                                                           (fMeasureOnCounts beta)
+                                                           count2DFScore
+                                                           averageC
+                                                           id
                                                            noGraph
                       where
                         parseLabeledClippings = controlledParse lineLabeledClippingsParser
-                        get2DCounts (expected, got) = (coveredBy expected got,
-                                                       totalArea expected,
-                                                       totalArea got)
+                        count2DFScore (expected, got) = fMeasureOnCounts beta (tpArea, expArea, gotArea)
+                                                        where tpArea = coveredBy expected got
+                                                              expArea = totalArea expected
+                                                              gotArea = totalArea got
 
 gevalCore' ClippEU _ = gevalCoreWithoutInput parseClippingSpecs parseClippings matchStep clippeuAgg finalStep noGraph
   where

@@ -743,8 +743,8 @@ testExpectedContents MultiLabelLikelihood = testExpectedContents MultiLabelLogLo
 testExpectedContents MultiLabelLogLoss = [hereLit|SADNESS
 HATE
 |]
-testExpectedContents (Soft2DFMeasure _) = [hereLit|3/0,0,100,100
-1/10,10,1000,1000
+testExpectedContents (Soft2DFMeasure _) = [hereLit|foo:3/0,0,100,100
+bar:1/50,50,1000,1000
 |]
 testExpectedContents ClippEU = [hereLit|3/0,0,100,100/10
 1/10,10,1000,1000/10

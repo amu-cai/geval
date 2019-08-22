@@ -276,7 +276,7 @@ main = hspec $ do
       runGEvalTest "probabilistic-soft-f1-calibrated" `shouldReturnAlmost` 0.88888888888
   describe "Soft2D-F1" $ do
     it "simple test" $ do
-      runGEvalTest "soft2d-f1-simple" `shouldReturnAlmost` 0.30152621462832535
+      runGEvalTest "soft2d-f1-simple" `shouldReturnAlmost` 0.218457349437945
   describe "test edit-distance library" $ do
     it "for handling UTF8" $ do
       levenshteinDistance defaultEditCosts "źdźbło" "źd好bło" `shouldBe` 1
@@ -551,7 +551,7 @@ main = hspec $ do
           let outFile = tempDir </> "test-A" </> "out.tsv"
           writeFile outFile (outContents metric)
           obtainedScore <- (runGEval ["--expected-directory", tempDir, "--out-directory", tempDir]) >>= extractVal
-          obtainedScore `shouldBe` (expectedScore scheme)
+          obtainedScore `shouldBeAlmost` (expectedScore scheme)
   describe "submit" $ do
     it "current branch" $ do
       runGitTest "branch-test" (\_ -> getCurrentBranch) `shouldReturn` "develop"
