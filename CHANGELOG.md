@@ -1,4 +1,9 @@
 
+## 1.20.0.0
+
+* Add --list-metrics options
+* Add Soft2D-F1 metric.
+
 ## 1.19.0.0
 
 * Fully static build
