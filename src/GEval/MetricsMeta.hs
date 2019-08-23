@@ -103,7 +103,7 @@ are gathered.
 getMetricDescription (Soft2DFMeasure _) =
   [i|"Soft" F-measure on rectangles, i.e. precision and recall is calculated for areas. For instance,
 if a label `foo` is expected for the rectangle (0, 0)-(100, 200) and this label is returned but with
-the span (50, 100)-(150, 150), it is treated as recall=1/4 and precision=2/5. For each item (line) F-score
+the span (50, 100)-(150, 150), it is treated as recall=1/8 and precision=1/2. For each item (line) F-score
 is evaluated separately and finally averaged.
 |]
 
