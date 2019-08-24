@@ -2,7 +2,7 @@
 
 GEval is a Haskell library and a stand-alone tool for evaluating the
 results of solutions to machine learning challenges as defined on the
-[Gonito](http://gonito.net) platform. Also could be used outside the
+[Gonito](https://gonito.net) platform. Also could be used outside the
 context of Gonito.net challenges, assuming the test data is given in
 simple TSV (tab-separated values) files.
 
@@ -439,7 +439,7 @@ So now you can see that the accuracy is over 78% and the likelihood
 
 ### Directory structure of a Gonito challenge
 
-A definition of a [Gonito](http://gonito.net) challenge should be put in a separate
+A definition of a [Gonito](https://gonito.net) challenge should be put in a separate
 directory. Such a directory should
 have the following structure:
 
@@ -475,7 +475,7 @@ have the following structure:
 
 ### Initiating a Gonito challenge with geval
 
-You can use `geval` to initiate a [Gonito](http://gonito.net) challenge:
+You can use `geval` to initiate a [Gonito](https://gonito.net) challenge:
 
     geval --init --expected-directory my-challenge
 
@@ -488,7 +488,7 @@ be given to generate another type of toy challenge:
 
 ### Preparing a Git repository
 
-[Gonito](http://gonito.net) platform expects a Git repository with a challenge to be
+[Gonito](https://gonito.net) platform expects a Git repository with a challenge to be
 submitted. The suggested way to do this is as follows:
 
 1. Prepare a branch with all the files _without_
@@ -520,7 +520,7 @@ repo (for the toy “planets” challenge) could be created as follows:
 
 ## Taking up a Gonito challenge
 
-Clone the repo with a challenge, as given on the [Gonito](http://gonito.net) web-site, e.g.
+Clone the repo with a challenge, as given on the [Gonito](https://gonito.net) web-site, e.g.
 for the toy “planets” challenge (as generated with `geval --init`):
 
     git clone git://gonito.net/planets
@@ -553,7 +553,7 @@ If you'd like and if you have access to the test set results, you can
 ### Uploading your results to Gonito platform
 
 Uploading is via Git — commit your “out” files and push the commit to
-your own repo. On [Gonito](http://gonito.net) you are encouraged to share your code, so
+your own repo. On [Gonito](https://gonito.net) you are encouraged to share your code, so
 be nice and commit also your source codes.
 
     git remote add mine git@github.com/johnsmith/planets-johnsmith
@@ -699,3 +699,24 @@ Karol Kaczmarek
 
 2015-2019 Filip Graliński
 2019 Applica.ai
+
+## References
+
+Filip Graliński, Anna Wróblewska, Tomasz Stanisławek, Kamil Grabowski, Tomasz Górecki, [_GEval: Tool for Debugging NLP Datasets and Models_](https://www.aclweb.org/anthology/W19-4826/)
+
+    @inproceedings{gralinski-etal-2019-geval,
+        title = "{GE}val: Tool for Debugging {NLP} Datasets and Models",
+        author = "Grali{\'n}ski, Filip  and
+          Wr{\'o}blewska, Anna  and
+          Stanis{\l}awek, Tomasz  and
+          Grabowski, Kamil  and
+          G{\'o}recki, Tomasz",
+        booktitle = "Proceedings of the 2019 ACL Workshop BlackboxNLP: Analyzing and Interpreting Neural Networks for NLP",
+        month = aug,
+        year = "2019",
+        address = "Florence, Italy",
+        publisher = "Association for Computational Linguistics",
+        url = "https://www.aclweb.org/anthology/W19-4826",
+        pages = "254--262",
+        abstract = "This paper presents a simple but general and effective method to debug the output of machine learning (ML) supervised models, including neural networks. The algorithm looks for features that lower the evaluation metric in such a way that it cannot be ascribed to chance (as measured by their p-values). Using this method {--} implemented as MLEval tool {--} you can find: (1) anomalies in test sets, (2) issues in preprocessing, (3) problems in the ML model itself. It can give you an insight into what can be improved in the datasets and/or the model. The same method can be used to compare ML models or different versions of the same model. We present the tool, the theory behind it and use cases for text-based models of various types.",
+    }
