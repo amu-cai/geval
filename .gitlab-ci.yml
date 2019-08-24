@@ -1,11 +1,19 @@
-# recipe for building a fully static binary on GitLabCI
-
-image: nixos/nix
 
 stages:
   - build
 
-build-binary:
+build:
+  image: fpco/stack-build:lts-12.26
   stage: build
+  script:
+    - stack install
+    - stack test
+
+# does not work yet, work in progress
+build-static-binary:on-schedule:
+  image: nixos/nix
+  stage: build
+  only:
+    - schedule
   script:
     - $(nix-build --no-link -A fullBuildScript)
