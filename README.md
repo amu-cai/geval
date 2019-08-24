@@ -688,12 +688,12 @@ Apache License 2.0
 
 ## Authors
 
-Filip Graliński
+* Filip Graliński
 
 ## Contributors
 
-Piotr Halama
-Karol Kaczmarek
+* Piotr Halama
+* Karol Kaczmarek
 
 ## Copyright
 
