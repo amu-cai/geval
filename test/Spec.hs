@@ -276,7 +276,9 @@ main = hspec $ do
       runGEvalTest "probabilistic-soft-f1-calibrated" `shouldReturnAlmost` 0.88888888888
   describe "Soft2D-F1" $ do
     it "simple test" $ do
-      runGEvalTest "soft2d-f1-simple" `shouldReturnAlmost` 0.218457349437945
+      runGEvalTest "soft2d-f1-simple" `shouldReturnAlmost` 0.22053934201995676
+    it "very narrow rectangles" $ do
+      runGEvalTest "soft2d-f1-one-pixel" `shouldReturnAlmost` 0.281992045358382
   describe "test edit-distance library" $ do
     it "for handling UTF8" $ do
       levenshteinDistance defaultEditCosts "źdźbło" "źd好bło" `shouldBe` 1
