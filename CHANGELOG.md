@@ -1,4 +1,9 @@
 
+## 1.20.1.0
+
+* Fix Soft2D-F1 metric
+* Check for invalid rectangles in Soft2D-F1 metric
+
 ## 1.20.0.0
 
 * Add --list-metrics options

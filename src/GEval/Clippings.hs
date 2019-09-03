@@ -104,11 +104,13 @@ rectangleParser = do
   x1 <- decimal
   char ','
   y1 <- decimal
-  return $ Rectangle (Point x0 y0) (Point x1 y1)
+  if x1 < x0 || y1 < y0
+  then fail "wrong coordinates"
+  else return $ Rectangle (Point x0 y0) (Point x1 y1)
 
 rectangleArea :: Rectangle -> Integer
 rectangleArea (Rectangle (Point x0 y0) (Point x1 y1)) =
-  (fromIntegral $ x1 - x0) * (fromIntegral $ y1 - y0)
+  (fromIntegral $ x1 - x0 + 1) * (fromIntegral $ y1 - y0 + 1)
 
 clippingArea :: LabeledClipping -> Integer
 clippingArea (LabeledClipping _ (Clipping _ rect)) = rectangleArea rect

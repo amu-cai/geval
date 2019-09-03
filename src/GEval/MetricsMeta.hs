@@ -121,8 +121,8 @@ expectedScore (EvaluationScheme (SoftFMeasure beta) [])
         recall = 0.75
       in weightedHarmonicMean beta precision recall
 expectedScore (EvaluationScheme (Soft2DFMeasure beta) [])
-  = let precision = 0.21117747440273
-        recall = 0.27423822714681
+  = let precision = 0.211622914314256
+        recall = 0.2749908502976
       in (weightedHarmonicMean beta precision recall) / 2.0
 
 listOfAvailableEvaluationSchemes :: [EvaluationScheme]
