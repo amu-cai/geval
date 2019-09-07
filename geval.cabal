@@ -26,6 +26,7 @@ library
                      , GEval.PrecisionRecall
                      , GEval.ClusteringMetrics
                      , GEval.Common
+                     , GEval.Probability
                      , GEval.LogLossHashed
                      , GEval.CharMatch
                      , GEval.LineByLine
