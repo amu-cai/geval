@@ -115,7 +115,7 @@ optionsParser = GEvalOptions
    <*> optional (strOption
                  ( long "plot-graph"
                    <> metavar "FILE-PATH"
-                   <> help "Plot an extra graph, applicable only for Probabilistic-Soft-F-score (LOESS function for calibration)"))
+                   <> help "Plot an extra graph, applicable only for Probabilistic-MultiLabel/Soft-F-score (LOESS function for calibration)"))
 
 precisionArgParser :: Parser Int
 precisionArgParser = option auto
