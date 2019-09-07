@@ -1,0 +1,4 @@
+foo bar:0.7
+baz:0.2 foo:0.5
+
+foo:0.7 foo:0.8 baq:0.8

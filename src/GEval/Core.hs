@@ -629,25 +629,14 @@ gevalCore' (SoftFMeasure beta) _ = gevalCoreWithoutInput parseAnnotations
                                                              Prelude.length expected,
                                                              Prelude.length got)
 
-gevalCore' (ProbabilisticSoftFMeasure beta) _ = gevalCoreWithoutInput parseAnnotations
-                                                                      parseObtainedAnnotations
-                                                                      getProbabilisticCounts
-                                                                      probabilisticSoftAgg
-                                                                      (fMeasureOnProbabilisticCounts beta)
-                                                                      loessGraph
-  where probabilisticSoftAgg :: Monad m => ConduitM ([Double], [Double], Double, Int) o m ([Double], [Double], Double, Int)
-        probabilisticSoftAgg = CC.foldl probabilisticSoftFolder ([], [], fromInteger 0, 0)
-        probabilisticSoftFolder (r1, p1, g1, e1) (r2, p2, g2, e2) = (r1 ++ r2, p1 ++ p2, g1 + g2, e1 + e2)
-        loessGraph :: ([Double], [Double], Double, Int) -> Maybe GraphSeries
-        loessGraph (results, probs, _, _) = Just $ GraphSeries $ Prelude.map (\x -> (x, clippedLoess probs' results' x)) $ Prelude.filter (\p -> p > lowest && p < highest) $ Prelude.map (\d -> 0.01 * (fromIntegral d)) [1..99]
-           where results' = DVU.fromList results
-                 probs' = DVU.fromList probs
-                 lowest = Data.List.minimum probs
-                 highest = Data.List.maximum probs
-        fMeasureOnProbabilisticCounts :: Double -> ([Double], [Double], Double, Int) -> Double
-        fMeasureOnProbabilisticCounts beta (results, probs, got, nbExpected) = weightedHarmonicMean beta calibrationMeasure recall
-           where calibrationMeasure = softCalibration results probs
-                 recall = got /. nbExpected
+gevalCore' (ProbabilisticMultiLabelFMeasure beta) _ = generalizedProbabilisticFMeasure beta
+                                                                                       intoWords
+                                                                                       (Right . (\(ProbList es) -> es) . parseIntoProbList)
+  where intoWords = Right . Data.Text.words
+
+gevalCore' (ProbabilisticSoftFMeasure beta) _ = generalizedProbabilisticFMeasure beta
+                                                                                 parseAnnotations
+                                                                                 parseObtainedAnnotations
 
 gevalCore' (Soft2DFMeasure beta) _ = gevalCoreWithoutInput parseLabeledClippings
                                                            parseLabeledClippings
@@ -750,6 +739,27 @@ gevalCore' MultiLabelLogLoss _ = gevalCoreWithoutInput intoWords
                                                        noGraph
     where
       intoWords = Right . Data.Text.words
+
+generalizedProbabilisticFMeasure beta parseBareEntities parseEntities = gevalCoreWithoutInput parseBareEntities
+                                                                                              parseEntities
+                                                                                              getProbabilisticCounts
+                                                                                              probabilisticSoftAgg
+                                                                                              (fMeasureOnProbabilisticCounts beta)
+                                                                                              loessGraph
+  where probabilisticSoftAgg :: Monad m => ConduitM ([Double], [Double], Double, Int) o m ([Double], [Double], Double, Int)
+        probabilisticSoftAgg = CC.foldl probabilisticSoftFolder ([], [], fromInteger 0, 0)
+        probabilisticSoftFolder (r1, p1, g1, e1) (r2, p2, g2, e2) = (r1 ++ r2, p1 ++ p2, g1 + g2, e1 + e2)
+        loessGraph :: ([Double], [Double], Double, Int) -> Maybe GraphSeries
+        loessGraph (results, probs, _, _) = Just $ GraphSeries $ Prelude.map (\x -> (x, clippedLoess probs' results' x)) $ Prelude.filter (\p -> p > lowest && p < highest) $ Prelude.map (\d -> 0.01 * (fromIntegral d)) [1..99]
+           where results' = DVU.fromList results
+                 probs' = DVU.fromList probs
+                 lowest = Data.List.minimum probs
+                 highest = Data.List.maximum probs
+        fMeasureOnProbabilisticCounts :: Double -> ([Double], [Double], Double, Int) -> Double
+        fMeasureOnProbabilisticCounts beta (results, probs, got, nbExpected) = weightedHarmonicMean beta calibrationMeasure recall
+           where calibrationMeasure = softCalibration results probs
+                 recall = got /. nbExpected
+
 
 countAgg :: (Num n, Num v, Monad m) => ConduitM (n, v, v) o m (n, v, v)
 countAgg = CC.foldl countFolder (fromInteger 0, fromInteger 0, fromInteger 0)

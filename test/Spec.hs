@@ -264,6 +264,11 @@ main = hspec $ do
       read "F2" `shouldBe` (FMeasure 2.0)
       read "F1" `shouldBe` (FMeasure 1.0)
       read "F0.5" `shouldBe` (FMeasure 0.5)
+  describe "Probabilistic-F1" $ do
+    it "simple test" $ do
+      runGEvalTest "probabilistic-f1-simple" `shouldReturnAlmost` 0.5
+    it "with probs" $ do
+      runGEvalTest "probabilistic-f1-probs" `shouldReturnAlmost` 0.5451223333805993
   describe "Soft-F1" $ do
     it "simple test" $ do
       runGEvalTest "soft-f1-simple" `shouldReturnAlmost` 0.33333333333333

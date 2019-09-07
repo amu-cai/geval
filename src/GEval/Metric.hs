@@ -28,7 +28,7 @@ data Metric = RMSE | MSE | Pearson | Spearman | BLEU | GLEU | WER | Accuracy | C
               | LogLossHashed Word32 | CharMatch | MAP | LogLoss | Likelihood
               | BIOF1 | BIOF1Labels | TokenAccuracy | LikelihoodHashed Word32 | MAE | SMAPE | MultiLabelFMeasure Double
               | MultiLabelLogLoss | MultiLabelLikelihood
-              | SoftFMeasure Double | ProbabilisticSoftFMeasure Double | Soft2DFMeasure Double
+              | SoftFMeasure Double | ProbabilisticMultiLabelFMeasure Double | ProbabilisticSoftFMeasure Double | Soft2DFMeasure Double
               deriving (Eq)
 
 instance Show Metric where
@@ -44,6 +44,7 @@ instance Show Metric where
   show (FMeasure beta) = "F" ++ (show beta)
   show (MacroFMeasure beta) = "Macro-F" ++ (show beta)
   show (SoftFMeasure beta) = "Soft-F" ++ (show beta)
+  show (ProbabilisticMultiLabelFMeasure beta) = "Probabilistic-MultiLabel-F" ++ (show beta)
   show (ProbabilisticSoftFMeasure beta) = "Probabilistic-Soft-F" ++ (show beta)
   show (Soft2DFMeasure beta) = "Soft2D-F" ++ (show beta)
   show NMI = "NMI"
@@ -98,6 +99,9 @@ instance Read Metric where
   readsPrec p ('S':'o':'f':'t':'-':'F':theRest) = case readsPrec p theRest of
     [(beta, theRest)] -> [(SoftFMeasure beta, theRest)]
     _ -> []
+  readsPrec p ('P':'r':'o':'b':'a':'b':'i':'l':'i':'s':'t':'i':'c':'-':'M':'u':'l':'t':'i':'L':'a':'b':'e':'l':'-':'F':theRest) = case readsPrec p theRest of
+    [(beta, theRest)] -> [(ProbabilisticMultiLabelFMeasure beta, theRest)]
+    _ -> []
   readsPrec p ('P':'r':'o':'b':'a':'b':'i':'l':'i':'s':'t':'i':'c':'-':'S':'o':'f':'t':'-':'F':theRest) = case readsPrec p theRest of
     [(beta, theRest)] -> [(ProbabilisticSoftFMeasure beta, theRest)]
     _ -> []
@@ -137,6 +141,7 @@ getMetricOrdering ClippEU  = TheHigherTheBetter
 getMetricOrdering (FMeasure _) = TheHigherTheBetter
 getMetricOrdering (MacroFMeasure _) = TheHigherTheBetter
 getMetricOrdering (SoftFMeasure _) = TheHigherTheBetter
+getMetricOrdering (ProbabilisticMultiLabelFMeasure _) = TheHigherTheBetter
 getMetricOrdering (ProbabilisticSoftFMeasure _) = TheHigherTheBetter
 getMetricOrdering (Soft2DFMeasure _) = TheHigherTheBetter
 getMetricOrdering NMI = TheHigherTheBetter

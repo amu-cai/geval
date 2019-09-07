@@ -2,7 +2,7 @@
 {-# LANGUAGE TypeFamilies #-}
 
 module GEval.ProbList
-       (parseIntoProbList, selectByStandardThreshold, countLogLossOnProbList)
+       (parseIntoProbList, selectByStandardThreshold, countLogLossOnProbList, ProbList(..))
        where
 
 import qualified Data.Text as T
