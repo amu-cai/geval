@@ -5,15 +5,17 @@ module GEval.PrecisionRecall(calculateMAPForOneResult,
                              weightedHarmonicMean, fMeasure, f1Measure, f2Measure, precision, recall,
                              fMeasureOnCounts, f1MeasureOnCounts, f2MeasureOnCounts, countFolder,
                              precisionAndRecall, precisionAndRecallFromCounts,
-                             maxMatch, maxMatchOnOrdered, getCounts, weightedMaxMatch, weightedMaxMatching)
+                             maxMatch, maxMatchOnOrdered, getCounts, weightedMaxMatch, weightedMaxMatching,
+                             getProbabilisticCounts)
        where
 
 import GEval.Common
+import GEval.Probability
 
 import Data.Graph.Inductive
 import Data.Graph.Inductive.Query.MaxFlow
 
-import Data.List (nub, foldl')
+import Data.List (find, foldl', nub)
 
 import Data.Algorithm.Munkres
 import qualified Data.Array.IArray as DAI
@@ -140,3 +142,16 @@ weightedMaxMatching matchFun expected got = hungarianMethodDouble complementWeig
          n = length got
          weightList = [((i, j), 1.0 - (matchFun x y)) | (i, x) <- zip [1..m] expected,
                                                         (j, y) <- zip [1..n] got]
+
+
+
+getProbabilisticCounts :: EntityWithProbability e => ([BareEntity e], [e]) -> ([Double], [Double], Double, Int)
+getProbabilisticCounts (expected, got) = (results, (map getProbabilityAsDouble got),
+                                              gotMass,
+                                              length expected)
+  where gotMass = sum $ map (\(i, j) -> (matchScore (expected !! (i - 1)) (got !! (j - 1))) * (getProbabilityAsDouble (got !! (j - 1))))  matching
+        results = map findResult [1..(length got)]
+        findResult j = case find (\(i, j') -> j' == j) $ matching of
+          Just (i, _) -> matchScore (expected !! (i - 1)) (got !! (j - 1))
+          Nothing -> 0.0
+        (matching, _) = weightedMaxMatching matchScore expected got

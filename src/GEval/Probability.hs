@@ -1,6 +1,8 @@
+{-# LANGUAGE TypeFamilies #-}
 
 module GEval.Probability
-       (Probability, getP, isProbability, mkProbability, probabilityOne, probabilityZero)
+       (Probability, getP, isProbability, mkProbability, probabilityOne, probabilityZero,
+        EntityWithProbability, getProbability, getProbabilityAsDouble, getBareEntity, matchScore, BareEntity)
        where
 
 newtype Probability = P { getP :: Double }
@@ -19,3 +21,12 @@ probabilityOne = mkProbability 1.0
 
 probabilityZero :: Probability
 probabilityZero = mkProbability 0.0
+
+class EntityWithProbability e where
+  type BareEntity e :: *
+  getProbability :: e -> Probability
+  getProbability = mkProbability . getProbabilityAsDouble
+  getProbabilityAsDouble :: e -> Double
+  getProbabilityAsDouble = getP . getProbability
+  getBareEntity :: e -> BareEntity e
+  matchScore :: BareEntity e -> e -> Double

@@ -631,7 +631,7 @@ gevalCore' (SoftFMeasure beta) _ = gevalCoreWithoutInput parseAnnotations
 
 gevalCore' (ProbabilisticSoftFMeasure beta) _ = gevalCoreWithoutInput parseAnnotations
                                                                       parseObtainedAnnotations
-                                                                      getProbabilisticSoftCounts
+                                                                      getProbabilisticCounts
                                                                       probabilisticSoftAgg
                                                                       (fMeasureOnProbabilisticCounts beta)
                                                                       loessGraph

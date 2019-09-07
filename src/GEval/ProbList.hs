@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module GEval.ProbList
        (parseIntoProbList, selectByStandardThreshold, countLogLossOnProbList)
@@ -9,11 +10,20 @@ import qualified Data.Text as T
 import GEval.Common
 import GEval.Probability
 
+
 data ProbList = ProbList [WordWithProb]
   deriving (Show)
 
 data WordWithProb = WordWithProb T.Text Probability
   deriving (Show)
+
+instance EntityWithProbability WordWithProb where
+  type BareEntity WordWithProb = T.Text
+  getBareEntity (WordWithProb w _) = w
+  getProbability (WordWithProb _ p) = p
+  matchScore w1 (WordWithProb w2 _)
+    | w1 == w2 = 1.0
+    | otherwise = 0.0
 
 parseIntoWordWithProb :: T.Text -> WordWithProb
 parseIntoWordWithProb t =
