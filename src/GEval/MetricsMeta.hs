@@ -47,6 +47,9 @@ listOfAvailableMetrics = [RMSE,
                           MultiLabelFMeasure 1.0,
                           MultiLabelFMeasure 2.0,
                           MultiLabelFMeasure 0.25,
+                          ProbabilisticMultiLabelFMeasure 1.0,
+                          ProbabilisticMultiLabelFMeasure 2.0,
+                          ProbabilisticMultiLabelFMeasure 0.25,
                           MultiLabelLikelihood,
                           MAP,
                           BLEU,
@@ -88,6 +91,7 @@ isEvaluationSchemeDescribed _ = False
 isMetricDescribed :: Metric -> Bool
 isMetricDescribed (SoftFMeasure _) = True
 isMetricDescribed (Soft2DFMeasure _) = True
+isMetricDescribed (ProbabilisticMultiLabelFMeasure _) = True
 isMetricDescribed _ = False
 
 getEvaluationSchemeDescription :: EvaluationScheme -> String
@@ -106,6 +110,15 @@ if a label `foo` is expected for the rectangle (0, 0)-(100, 200) and this label 
 the span (50, 100)-(150, 150), it is treated as recall=1/8 and precision=1/2. For each item (line) F-score
 is evaluated separately and finally averaged.
 |]
+getMetricDescription (ProbabilisticMultiLabelFMeasure _) =
+  [i|F-measure generalised so that labels could annotated with probabilities and the quality
+of probabilities is assessed as well. It is calculated as the harmonic mean of calibration and recall
+where calibration measures the quality of probabilities (how well they are calibrated, e.g.
+if we have 10 items with probability 0.5 and 5 of them are correct, then the calibration
+is perfect.
+|]
+
+
 
 outContents :: Metric -> String
 outContents (SoftFMeasure _) = [hereLit|inwords:1-4
@@ -113,6 +126,10 @@ inwords:1-3 indigits:5
 |]
 outContents (Soft2DFMeasure _) = [hereLit|foo:3/250,130,340,217
 bar:1/0,0,100,200 foo:1/40,50,1000,1000 bar:1/400,600,1000,1000
+|]
+outContents (ProbabilisticMultiLabelFMeasure _) = [hereLit|first-name/1:0.8 surname/3:1.0
+surname/1:0.4
+first-name/3:0.9
 |]
 
 expectedScore :: EvaluationScheme -> MetricValue
@@ -124,6 +141,10 @@ expectedScore (EvaluationScheme (Soft2DFMeasure beta) [])
   = let precision = 0.211622914314256
         recall = 0.2749908502976
       in (weightedHarmonicMean beta precision recall) / 2.0
+expectedScore (EvaluationScheme (ProbabilisticMultiLabelFMeasure beta) [])
+  = let precision = 0.6569596940847289
+        recall = 0.675
+      in weightedHarmonicMean beta precision recall
 
 listOfAvailableEvaluationSchemes :: [EvaluationScheme]
 listOfAvailableEvaluationSchemes = map (\m -> EvaluationScheme m []) listOfAvailableMetrics
@@ -163,6 +184,10 @@ formatDescription (Soft2DFMeasure _) = [hereLit|Each line is a sequence of entit
 the form LABEL:PAGE/X0,Y0,X1,Y1 where LABEL is any label, page is the page number (starting from 1) and
 (X0, Y0) and (X1, Y1) are clipping corners.
 |]
+formatDescription (ProbabilisticMultiLabelFMeasure _) = [hereLit|In each line a number of labels (entities) can be given. A label probability
+can be provided with a colon (e.g. "foo:0.7"). By default, 1.0 is assumed.
+|]
+
 
 scoreExplanation :: EvaluationScheme -> Maybe String
 scoreExplanation (EvaluationScheme (SoftFMeasure _) [])
@@ -173,6 +198,7 @@ scoreExplanation (EvaluationScheme (Soft2DFMeasure _) [])
 As far as the second item is concerned, the total area that covered by the output is 50*150+600*400=247500.
 Hence, recall is 247500/902500=0.274 and precision - 247500/(20000+912000+240000)=0.211. Therefore, the F-score
 for the second item is 0.238 and the F-score for the whole set is (0 + 0.238)/2 = 0.119.|]
+scoreExplanation (EvaluationScheme (ProbabilisticMultiLabelFMeasure _) []) = Nothing
 
 pasteLines :: String -> String -> String
 pasteLines a b = printf "%-35s %s\n" a b

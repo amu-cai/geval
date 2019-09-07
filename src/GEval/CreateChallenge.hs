@@ -297,6 +297,7 @@ in the expected file (but not in the output file).
 
 |] ++ (commonReadmeMDContents testName)
 
+readmeMDContents (ProbabilisticMultiLabelFMeasure beta) testName = readmeMDContents (MultiLabelFMeasure beta) testName
 readmeMDContents (MultiLabelFMeasure beta) testName = [i|
 Tag names and their component
 =============================
@@ -308,9 +309,7 @@ Tags:
 * surname
 * first-name
 
-For each tag a sequence of token IDs separated with commas should be given (after a colon).
-
-The metric is F1 on labels.
+For each tag a sequence of token IDs separated with commas should be given (after a slash).
 |] ++ (commonReadmeMDContents testName)
 
 readmeMDContents MultiLabelLikelihood testName = readmeMDContents MultiLabelLogLoss testName
@@ -474,9 +473,10 @@ B-firstname/JOHN I-surname/VON I-surname/NEUMANN	John von Nueman
 trainContents TokenAccuracy = [hereLit|* V N	I like cats
 * * V * N	I can see the rainbow
 |]
-trainContents (MultiLabelFMeasure _) = [hereLit|I know Mr John Smith	person:3,4,5 first-name:4 surname:5
-Steven bloody Brown	person:1,3 first-name:1 surname:3
-James and James	first-name:1 firstname:3
+trainContents (ProbabilisticMultiLabelFMeasure beta) = trainContents (MultiLabelFMeasure beta)
+trainContents (MultiLabelFMeasure _) = [hereLit|I know Mr John Smith	person/3,4,5 first-name/4 surname/5
+Steven bloody Brown	person/1,3 first-name/1 surname/3
+James and James	first-name/1 firstname/3
 |]
 trainContents MultiLabelLikelihood = [hereLit|I hate you!	HATE
 Love and hate	LOVE HATE
@@ -540,6 +540,7 @@ Mr Jan Kowalski
 devInContents TokenAccuracy = [hereLit|The cats on the mat
 Ala has a cat
 |]
+devInContents (ProbabilisticMultiLabelFMeasure beta) = devInContents (MultiLabelFMeasure beta)
 devInContents (MultiLabelFMeasure _) = [hereLit|Jan Kowalski is here
 I see him
 Barbara
@@ -603,9 +604,10 @@ O B-firstname/JAN B-surname/KOWALSKI
 devExpectedContents TokenAccuracy = [hereLit|* N * * N
 N V * N
 |]
-devExpectedContents (MultiLabelFMeasure _) = [hereLit|person:1,2 first-name:1 surname:2
+devExpectedContents (ProbabilisticMultiLabelFMeasure beta) = devExpectedContents (MultiLabelFMeasure beta)
+devExpectedContents (MultiLabelFMeasure _) = [hereLit|person/1,2 first-name/1 surname/2
 
-first-name:1
+first-name/1
 |]
 devExpectedContents MultiLabelLikelihood = devExpectedContents MultiLabelLogLoss
 devExpectedContents MultiLabelLogLoss = [hereLit|LOVE
@@ -670,6 +672,7 @@ No name here
 testInContents TokenAccuracy = [hereLit|I have cats
 I know
 |]
+testInContents (ProbabilisticMultiLabelFMeasure beta) = testInContents (MultiLabelFMeasure beta)
 testInContents (MultiLabelFMeasure _) = [hereLit|John bloody Smith
 Nobody is there
 I saw Marketa
@@ -735,9 +738,10 @@ O O O
 testExpectedContents TokenAccuracy = [hereLit|* V N
 * V
 |]
-testExpectedContents (MultiLabelFMeasure _) = [hereLit|person:1,3 first-name:1 surname:3
+testExpectedContents (ProbabilisticMultiLabelFMeasure beta) = testExpectedContents (MultiLabelFMeasure beta)
+testExpectedContents (MultiLabelFMeasure _) = [hereLit|person/1,3 first-name/1 surname/3
 
-first-name:3
+first-name/3
 |]
 testExpectedContents MultiLabelLikelihood = testExpectedContents MultiLabelLogLoss
 testExpectedContents MultiLabelLogLoss = [hereLit|SADNESS
