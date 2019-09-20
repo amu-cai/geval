@@ -478,9 +478,53 @@ gevalCoreOnSources :: (MonadIO m, MonadThrow m, MonadUnliftIO m) =>
                      -> LineSource (ResourceT m)  -- ^ source to read the expected output
                      -> LineSource (ResourceT m)  -- ^ source to read the output
                      -> m (MetricOutput)           -- ^ metric values for the output against the expected output
-gevalCoreOnSources Likelihood _ = gevalCoreWithoutInput doubleParser doubleParser itemLogLossError averageC logLossToLikehood noGraph
 
+-- first not-standard metrics
+
+-- CharMatch is the only metric needing input lines (so far)
+gevalCoreOnSources CharMatch inputLineSource = helper inputLineSource
+ where
+   helper inputLineSource expectedLineSource outputLineSource = do
+     gevalCoreGeneralized (ParserSpecWithInput justUnpack justUnpack justUnpack) step countAgg (fMeasureOnCounts charMatchBeta) noGraph (WithInput inputLineSource expectedLineSource outputLineSource)
+   step (ParsedRecordWithInput inp exp out) = getCharMatchCount inp exp out
+   justUnpack = liftOp (Right . unpack)
+
+gevalCoreOnSources (LogLossHashed nbOfBits) _ = helperLogLossHashed nbOfBits id
 gevalCoreOnSources (LikelihoodHashed nbOfBits) _ = helperLogLossHashed nbOfBits logLossToLikehood
+
+-- only MultiLabel-F1 handled for JSONs for the time being...
+gevalCoreOnSources (MultiLabelFMeasure beta) _ = gevalCoreWithoutInputOnItemTargets (Right . intoWords)
+                                                                            (Right . getWords)
+                                                                            (getCounts (==))
+                                                                            countAgg
+                                                                            (fMeasureOnCounts beta)
+                                                                            noGraph
+    where
+      getWords (RawItemTarget t) = Prelude.map unpack $ selectByStandardThreshold $ parseIntoProbList t
+      getWords (PartiallyParsedItemTarget ts) = Prelude.map unpack ts
+      intoWords (RawItemTarget t) = Prelude.map unpack $ Data.Text.words t
+      intoWords (PartiallyParsedItemTarget ts) = Prelude.map unpack ts
+
+gevalCoreOnSources Pearson _ = gevalCoreByCorrelationMeasure pearson
+gevalCoreOnSources Spearman _ = gevalCoreByCorrelationMeasure spearman
+
+gevalCoreOnSources (ProbabilisticMultiLabelFMeasure beta) _ = generalizedProbabilisticFMeasure beta
+                                                                                       intoWords
+                                                                                       (Right . (\(ProbList es) -> es) . parseIntoProbList)
+  where intoWords = Right . Data.Text.words
+
+gevalCoreOnSources (ProbabilisticSoftFMeasure beta) _ = generalizedProbabilisticFMeasure beta
+                                                                                 parseAnnotations
+                                                                                 parseObtainedAnnotations
+
+-- and now more typical metrics, which:
+-- 1) parse the expected output
+-- 2) parse the actual output
+-- 3) compare the actual output and the expected output (for each record/line separately)
+-- 4) aggregate the results
+-- 5) apply some final funtion on the aggregate
+-- 6) create a graph using the aggregate (applicable only to some metrics)
+gevalCoreOnSources Likelihood _ = gevalCoreWithoutInput doubleParser doubleParser itemLogLossError averageC logLossToLikehood noGraph
 
 gevalCoreOnSources MultiLabelLikelihood _ = gevalCoreWithoutInput intoWords
                                                        (Right . parseIntoProbList)
@@ -499,9 +543,6 @@ gevalCoreOnSources MAE _ = gevalCoreWithoutInput doubleParser doubleParser itemA
 
 gevalCoreOnSources SMAPE _ = gevalCoreWithoutInput doubleParser doubleParser smape averageC (* 100.0) noGraph
   where smape (exp, out) = (abs (exp-out)) `safeDoubleDiv` ((abs exp) + (abs out))
-
-gevalCoreOnSources Pearson _ = gevalCoreByCorrelationMeasure pearson
-gevalCoreOnSources Spearman _ = gevalCoreByCorrelationMeasure spearman
 
 gevalCoreOnSources LogLoss _ = gevalCoreWithoutInput doubleParser doubleParser itemLogLossError averageC id noGraph
 
@@ -605,15 +646,6 @@ gevalCoreOnSources (SoftFMeasure beta) _ = gevalCoreWithoutInput parseAnnotation
                                                              Prelude.length expected,
                                                              Prelude.length got)
 
-gevalCoreOnSources (ProbabilisticMultiLabelFMeasure beta) _ = generalizedProbabilisticFMeasure beta
-                                                                                       intoWords
-                                                                                       (Right . (\(ProbList es) -> es) . parseIntoProbList)
-  where intoWords = Right . Data.Text.words
-
-gevalCoreOnSources (ProbabilisticSoftFMeasure beta) _ = generalizedProbabilisticFMeasure beta
-                                                                                 parseAnnotations
-                                                                                 parseObtainedAnnotations
-
 gevalCoreOnSources (Soft2DFMeasure beta) _ = gevalCoreWithoutInput parseLabeledClippings
                                                            parseLabeledClippings
                                                            count2DFScore
@@ -646,16 +678,6 @@ gevalCoreOnSources MAP _ = gevalCoreWithoutInput (Right . DLS.splitOn "\t" . unp
                                          id
                                          noGraph
 
-gevalCoreOnSources (LogLossHashed nbOfBits) _ = helperLogLossHashed nbOfBits id
-
-gevalCoreOnSources CharMatch inputLineSource = helper inputLineSource
- where
-   helper inputLineSource expectedLineSource outputLineSource = do
-     gevalCoreGeneralized (ParserSpecWithInput justUnpack justUnpack justUnpack) step countAgg (fMeasureOnCounts charMatchBeta) noGraph (WithInput inputLineSource expectedLineSource outputLineSource)
-   step (ParsedRecordWithInput inp exp out) = getCharMatchCount inp exp out
-   justUnpack = liftOp (Right . unpack)
-
-
 gevalCoreOnSources BIOF1 _ = gevalCoreWithoutInput parseBioSequenceIntoEntities parseBioSequenceIntoEntities (uncurry gatherCountsForBIO) countAgg f1MeasureOnCounts noGraph
 
 gevalCoreOnSources BIOF1Labels _ = gevalCoreWithoutInput parseBioSequenceIntoEntitiesWithoutNormalization parseBioSequenceIntoEntitiesWithoutNormalization (uncurry gatherCountsForBIO) countAgg f1MeasureOnCounts noGraph
@@ -683,19 +705,6 @@ gevalCoreOnSources TokenAccuracy _ = gevalCoreWithoutInput intoTokens
            | o `Prelude.elem` (splitOn (pack ";") e) = (h + 1, t + 1)
            | otherwise = (h, t + 1)
          hitsAndTotalsAgg = CC.foldl (\(h1, t1) (h2, t2) -> (h1 + h2, t1 + t2)) (0, 0)
-
--- only MultiLabel-F1 handled for JSONs for the time being...
-gevalCoreOnSources (MultiLabelFMeasure beta) _ = gevalCoreWithoutInputOnItemTargets (Right . intoWords)
-                                                                            (Right . getWords)
-                                                                            (getCounts (==))
-                                                                            countAgg
-                                                                            (fMeasureOnCounts beta)
-                                                                            noGraph
-    where
-      getWords (RawItemTarget t) = Prelude.map unpack $ selectByStandardThreshold $ parseIntoProbList t
-      getWords (PartiallyParsedItemTarget ts) = Prelude.map unpack ts
-      intoWords (RawItemTarget t) = Prelude.map unpack $ Data.Text.words t
-      intoWords (PartiallyParsedItemTarget ts) = Prelude.map unpack ts
 
 gevalCoreOnSources MultiLabelLogLoss _ = gevalCoreWithoutInput intoWords
                                                        (Right . parseIntoProbList)
