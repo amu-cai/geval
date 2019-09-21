@@ -2,6 +2,7 @@
 
 module GEval.BIO
        (BIOLabel(..), bioSequenceParser, parseBioSequenceIntoEntities,
+        parseBioSequenceIntoEntitiesWithoutNormalization,
         TaggedSpan(..), TaggedEntity(..), gatherCountsForBIO,
         eraseNormalisation)
        where
@@ -44,6 +45,10 @@ gatherCountsForBIO expected got = (maxMatchOnOrdered laterThan expected got, len
 
 parseBioSequenceIntoEntities :: T.Text -> Either String [TaggedEntity]
 parseBioSequenceIntoEntities t = labelsIntoEntities =<< (parseOnly (bioSequenceParser <* endOfInput) t)
+
+parseBioSequenceIntoEntitiesWithoutNormalization s = do
+  entities <- parseBioSequenceIntoEntities s
+  return $ Prelude.map eraseNormalisation entities
 
 labelsIntoEntities :: [BIOLabel] -> Either String [TaggedEntity]
 labelsIntoEntities labels = labelsIntoEntities' $ zip labels [1..]

@@ -17,6 +17,7 @@ library
   hs-source-dirs:      src
   exposed-modules:     GEval.Core
                      , GEval.Metric
+                     , GEval.MetricsMechanics
                      , GEval.MetricsMeta
                      , GEval.EvaluationScheme
                      , GEval.CreateChallenge
@@ -100,6 +101,7 @@ library
                      , filemanip
                      , temporary
                      , utf8-string
+                     , singletons
   default-language:    Haskell2010
 
 executable geval

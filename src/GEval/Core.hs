@@ -681,9 +681,6 @@ gevalCoreOnSources MAP _ = gevalCoreWithoutInput (Right . DLS.splitOn "\t" . unp
 gevalCoreOnSources BIOF1 _ = gevalCoreWithoutInput parseBioSequenceIntoEntities parseBioSequenceIntoEntities (uncurry gatherCountsForBIO) countAgg f1MeasureOnCounts noGraph
 
 gevalCoreOnSources BIOF1Labels _ = gevalCoreWithoutInput parseBioSequenceIntoEntitiesWithoutNormalization parseBioSequenceIntoEntitiesWithoutNormalization (uncurry gatherCountsForBIO) countAgg f1MeasureOnCounts noGraph
-   where parseBioSequenceIntoEntitiesWithoutNormalization s = do
-           entities <- parseBioSequenceIntoEntities s
-           return $ Prelude.map eraseNormalisation entities
 
 gevalCoreOnSources TokenAccuracy _ = gevalCoreWithoutInput intoTokens
                                                    intoTokens
