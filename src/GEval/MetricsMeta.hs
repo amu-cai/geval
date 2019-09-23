@@ -9,7 +9,8 @@ module GEval.MetricsMeta
    getEvaluationSchemeDescription,
    outContents,
    expectedScore,
-   allMetricsDescription)
+   allMetricsDescription,
+   helpMetricParameterMetricsList)
   where
 
 import GEval.Common
@@ -145,6 +146,12 @@ expectedScore (EvaluationScheme (ProbabilisticMultiLabelFMeasure beta) [])
   = let precision = 0.6569596940847289
         recall = 0.675
       in weightedHarmonicMean beta precision recall
+
+helpMetricParameterMetricsList :: String
+helpMetricParameterMetricsList = intercalate ", " $ map (\s -> (show s) ++ (case extraInfo s of
+                                                                             Just eI -> " (" ++ eI ++ ")"
+                                                                             Nothing -> ""))
+                                                    listOfAvailableEvaluationSchemes
 
 listOfAvailableEvaluationSchemes :: [EvaluationScheme]
 listOfAvailableEvaluationSchemes = map (\m -> EvaluationScheme m []) listOfAvailableMetrics
