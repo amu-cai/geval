@@ -1,7 +1,7 @@
 # GEval
 
 GEval is a Haskell library and a stand-alone tool for evaluating the
-results of solutions to machine learning challenges as defined on the
+results of solutions to machine learning challenges as defined in the
 [Gonito](https://gonito.net) platform. Also could be used outside the
 context of Gonito.net challenges, assuming the test data is given in
 simple TSV (tab-separated values) files.
@@ -50,12 +50,12 @@ If you see a message like this:
     already installed but in a non-standard location then you can use the flags
     --extra-include-dirs= and --extra-lib-dirs= to specify where it is.
     If the header file does exist, it may contain errors that are caught by the C
-    compiler at the preprocessing stage. In this case you can re-run configure
+    compiler at the preprocessing stage. In this case, you can re-run configure
     with the verbosity flag -v3 to see the error messages.
 
 it means that you need to install lzma library on your operating
 system. The same might go for pkg-config. On macOS (it's more likely
-to happen on macOS, as these packages are usually installed out of box on Linux), you need to run:
+to happen on macOS, as these packages are usually installed out of the box on Linux), you need to run:
 
     brew install xz
     brew install pkg-config
@@ -74,7 +74,7 @@ This is a fully static binary, it should work on any 64-bit Linux.
 
 Let's use GEval to evaluate machine translation (MT) systems (but keep
 in mind than GEval could be used for many other machine learning task
-types). We start with simple evaluation, but then we switch to what
+types). We start with a simple evaluation, but then we switch to what
 might be called black-box debugging of ML models.
 
 First, we will run GEval on WMT-2017, a German-to-English machine
@@ -84,7 +84,7 @@ run on other test sets, not just the ones conforming to specific
 Gonito.net standards). Let's download one of the solutions, it's just
 available via git, so you don't have to click anywhere, just type:
 
-    git clone git://gonito.net/wmt-2017 -b submission-01229
+    git clone git://gonito.net/wmt-2017 -b submission-01229 --single-branch
 
 Let's step into the repo and run GEval (I assume you added `geval`
 path to `$PATH`, so that you could just use `geval` instead of
@@ -178,11 +178,11 @@ For instance, the average GLEU score for sentences for which a double quote is e
 is 0.27823151. At first glance, it does not seem much worse than the general score
 (0.30514), but actually…
 4. … it's highly significant. The probability to get it by chance
-(according to [Mann-Whitney _U_ test](https://en.wikipedia.org/wiki/Mann%E2%80%93Whitney_U_test))
+(according to the [Mann-Whitney _U_ test](https://en.wikipedia.org/wiki/Mann%E2%80%93Whitney_U_test))
 is extremely low (_p_ = 0.000009).
 
 But why were double quotes so problematic in German-English
-translation?! Well, look at the second worst feature — `&apos;&apos;`
+translation?! Well, look at the second-worst feature — `&apos;&apos;`
 in the _output_! Oops, it seems like a very stupid mistake with
 post-processing was done and no double quote was correctly generated,
 which decreased the score a little bit for each sentence in which the
@@ -313,7 +313,7 @@ have a look at the first 5 items:
 
 Now let's try to evaluate some solution to this challenge. Let's fetch it:
 
-    git fetch git://gonito.net/sentiment-by-emoticons submission-01865
+    git fetch git://gonito.net/sentiment-by-emoticons submission-01865 --single-branch
     git reset --hard FETCH_HEAD
 
 and now run geval:
@@ -327,7 +327,7 @@ be hard to interpret, so you could try other metrics.
     geval -t dev-0 --metric Accuracy --metric Likelihood
 
 So now you can see that the accuracy is over 78% and the likelihood
-(i.e. geometric mean of probabilities of the correct classes) is 0.62.
+(i.e. the geometric mean of probabilities of the correct classes) is 0.62.
 
 ## Yet another example
 
@@ -575,7 +575,7 @@ special `--submit` option:
 where:
 
 * _HOST_ is the name of the host with a Gonito platform
-* _TOKEN_ is a special per-user authorisation token (can be copied
+* _TOKEN_ is a special per-user authorization token (can be copied
   from "your account" page)
 
 _HOST_ must be given when `--submit` is used (unless the creator of the challenge
@@ -622,7 +622,7 @@ Available options:
                            set
   -w,--worst-features      Print a ranking of worst features, i.e. features that
                            worsen the score significantly. Features are sorted
-                           using p-value for Mann-Whitney U test comparing the
+                           using p-value for the Mann-Whitney U test comparing the
                            items with a given feature and without it. For each
                            feature the number of occurrences, average score and
                            p-value is given.
@@ -682,7 +682,7 @@ Available options:
 
 If you need another metric, let me know, or do it yourself!
 
-## Licence
+## License
 
 Apache License 2.0
 
