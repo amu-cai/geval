@@ -53,16 +53,23 @@ If you see a message like this:
     compiler at the preprocessing stage. In this case, you can re-run configure
     with the verbosity flag -v3 to see the error messages.
 
-it means that you need to install lzma library on your operating
-system. The same might go for pkg-config. On macOS (it's more likely
+it means that you need to install `lzma` library on your operating
+system. The same might go for `pkg-config`. On macOS (it's more likely
 to happen on macOS, as these packages are usually installed out of the box on Linux), you need to run:
 
     brew install xz
     brew install pkg-config
 
-In case the lzma package is not installed on your Linux, you need to run (assuming Debian/Ubuntu):
+In case the `lzma` package is not installed on your Linux, you need to run (assuming Debian/Ubuntu):
 
     sudo apt-get install pkg-config liblzma-dev libpq-dev libpcre3-dev
+    
+For some Linux distributions, installation of the following packages might be required as well:
+
+    apt-get install pkg-config              # in case of missing "pkg-config" in error log (most probably while building pcre-light)
+    apt-get install libcairo2-dev           # in case of failure while building cairo
+    apt-get install libbz2-dev              # in case of failure while building bz2
+
 
 ### Plan B — just download the GEval binary
 
