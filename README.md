@@ -60,6 +60,10 @@ to happen on macOS, as these packages are usually installed out of the box on Li
     brew install xz
     brew install pkg-config
 
+In case the lzma package is not installed on your Linux, you need to run (assuming Debian/Ubuntu):
+
+    sudo apt-get install pkg-config liblzma-dev libpq-dev libpcre3-dev
+
 ### Plan B — just download the GEval binary
 
 (Assuming you have a 64-bit Linux.)
