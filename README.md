@@ -35,6 +35,8 @@ order to run `geval` you need to either add `$HOME/.local/bin` to
 `$PATH` in your configuration or to type:
 
     PATH="$HOME/.local/bin" geval ...
+	
+In Windows you should add new global variable with name 'geval' and path should be the same as above.
 
 ### Troubleshooting
 
@@ -63,6 +65,31 @@ to happen on macOS, as these packages are usually installed out of the box on Li
 In case the lzma package is not installed on your Linux, you need to run (assuming Debian/Ubuntu):
 
     sudo apt-get install pkg-config liblzma-dev libpq-dev libpcre3-dev
+	
+If you see this message on Windows during executing `stack test` command:
+
+	In the dependencies for geval-1.21.1.0:
+	    unix needed, but the stack configuration has no specified version
+	In the dependencies for lzma-0.0.0.3:
+	    lzma-clib needed, but the stack configuration has no specified version
+
+You should replace `unix` with `unix-compat` in `geval.cabal` file,
+because `unix` package is not supported for Windows.
+
+And you should add `lzma-clib-5.2.2` and `unix-compat-0.5.2` to section extra-deps in `stack.yaml` file.
+
+If you see message about missing pkg-config on Windpws you should download two packages from the site:
+http://ftp.gnome.org/pub/gnome/binaries/win32/dependencies/
+These packages are:
+		- pkg-config (newest version) 
+		- gettext-runtime (newest version)
+Extract `pkg-config.exe` file in Windows PATH
+Extract init.dll file from gettext-runtime
+
+You should also download from http://ftp.gnome.org/pub/gnome/binaries/win32/glib/2.28 glib package
+and extract libglib-2.0-0.dll file.
+
+All files you should put for example in `C:\MinGW\bin` directory.
 
 ### Plan B — just download the GEval binary
 
@@ -72,7 +99,17 @@ In case the lzma package is not installed on your Linux, you need to run (assumi
     chmod u+x geval
     ./geval --help
 
-This is a fully static binary, it should work on any 64-bit Linux.
+
+For Windows you should use Windows Powershell.
+
+	wget https://gonito.net/get/bin/geval
+
+Next you should go to the folder where you download `geval` and right-click to `geval` file.
+Go to `Properties` and in the section `Security` grant full access to the folder.
+
+Or you should use `icacls "folder path to geval" /grant USER:<username>`
+
+This is a fully static binary, it should work on any 64-bit Linux or 64-bit Windows.
 
 ## Quick tour
 
