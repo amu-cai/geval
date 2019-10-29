@@ -93,6 +93,7 @@ isMetricDescribed :: Metric -> Bool
 isMetricDescribed (SoftFMeasure _) = True
 isMetricDescribed (Soft2DFMeasure _) = True
 isMetricDescribed (ProbabilisticMultiLabelFMeasure _) = True
+isMetricDescribed GLEU = True
 isMetricDescribed _ = False
 
 getEvaluationSchemeDescription :: EvaluationScheme -> String
@@ -118,7 +119,21 @@ where calibration measures the quality of probabilities (how well they are calib
 if we have 10 items with probability 0.5 and 5 of them are correct, then the calibration
 is perfect.
 |]
-
+getMetricDescription GLEU =
+  [i|For the GLEU score, we record all sub-sequences of
+1, 2, 3 or 4 tokens in output and target sequence (n-grams). We then
+compute a recall, which is the ratio of the number of matching n-grams
+to the number of total n-grams in the target (ground truth) sequence,
+and a precision, which is the ratio of the number of matching n-grams
+to the number of total n-grams in the generated output sequence. Then
+GLEU score is simply the minimum of recall and precision. This GLEU
+score's range is always between 0 (no matches) and 1 (all match) and
+it is symmetrical when switching output and target. According to
+the article, GLEU score correlates quite well with the BLEU
+metric on a corpus level but does not have its drawbacks for our per
+sentence reward objective.
+see: https://arxiv.org/pdf/1609.08144.pdf
+|]
 
 
 outContents :: Metric -> String
@@ -131,6 +146,8 @@ bar:1/0,0,100,200 foo:1/40,50,1000,1000 bar:1/400,600,1000,1000
 outContents (ProbabilisticMultiLabelFMeasure _) = [hereLit|first-name/1:0.8 surname/3:1.0
 surname/1:0.4
 first-name/3:0.9
+|]
+outContents GLEU = [hereLit|Alice has a black 
 |]
 
 expectedScore :: EvaluationScheme -> MetricValue
@@ -146,6 +163,8 @@ expectedScore (EvaluationScheme (ProbabilisticMultiLabelFMeasure beta) [])
   = let precision = 0.6569596940847289
         recall = 0.675
       in weightedHarmonicMean beta precision recall
+expectedScore (EvaluationScheme GLEU [])
+  = 0.7142857142857143
 
 helpMetricParameterMetricsList :: String
 helpMetricParameterMetricsList = intercalate ", " $ map (\s -> (show s) ++ (case extraInfo s of
@@ -194,7 +213,8 @@ the form LABEL:PAGE/X0,Y0,X1,Y1 where LABEL is any label, page is the page numbe
 formatDescription (ProbabilisticMultiLabelFMeasure _) = [hereLit|In each line a number of labels (entities) can be given. A label probability
 can be provided with a colon (e.g. "foo:0.7"). By default, 1.0 is assumed.
 |]
-
+formatDescription GLEU = [hereLit|In each line a there is a space sparated sentence of words. 
+|]
 
 scoreExplanation :: EvaluationScheme -> Maybe String
 scoreExplanation (EvaluationScheme (SoftFMeasure _) [])
@@ -206,6 +226,14 @@ As far as the second item is concerned, the total area that covered by the outpu
 Hence, recall is 247500/902500=0.274 and precision - 247500/(20000+912000+240000)=0.211. Therefore, the F-score
 for the second item is 0.238 and the F-score for the whole set is (0 + 0.238)/2 = 0.119.|]
 scoreExplanation (EvaluationScheme (ProbabilisticMultiLabelFMeasure _) []) = Nothing
+scoreExplanation (EvaluationScheme GLEU [])
+  = Just [hereLit|To find out GLEU score we first count number of tp (true positives) fp(false positives) and fn(false negatives). 
+  We have 4 matching unigrams ("Alice", "has", "a", "black") , 3 bigrams ("Alice has", "has a", "a black"), 2 trigrams ("Alice has a", "has a black") and 1 tetragram ("Alice has a black"),
+so tp=10. We have no fp, therefore fp=0. There are 4 fn - ("cat", "black cat", "a black cat", "has a black cat"). 
+Now we have to calculate precision and recall:
+  Precision is tp / (tp+fp) = 10/(10+0) = 1, 
+  recall is tp / (tp+fn) = 10 / (10+4) = 10/14 =~ 0.71428...
+  The GLEU score is min(precision,recall)=0.71428 |]
 
 pasteLines :: String -> String -> String
 pasteLines a b = printf "%-35s %s\n" a b

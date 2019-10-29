@@ -624,7 +624,8 @@ devExpectedContents _ = [hereLit|0.82
 |]
 
 testInContents :: Metric -> String
-testInContents GLEU = testInContents BLEU
+testInContents GLEU = [hereLit|Alice has a black
+|]
 testInContents BLEU = [hereLit|ja jumala kutsui valkeuden päiväksi , ja pimeyden hän kutsui yöksi
 ja tuli ehtoo , ja tuli aamu , ensimmäinen päivä
 |]
@@ -690,7 +691,6 @@ testInContents _ = [hereLit|0.72	0	0.007
 |]
 
 testExpectedContents :: Metric -> String
-testExpectedContents GLEU = testExpectedContents BLEU
 testExpectedContents BLEU = [hereLit|na ka huaina e te atua te marama ko te awatea , a ko te pouri i huaina e ia ko te po
 a ko te ahiahi , ko te ata , he ra kotahi
 |]
@@ -753,9 +753,12 @@ bar:1/50,50,1000,1000
 testExpectedContents ClippEU = [hereLit|3/0,0,100,100/10
 1/10,10,1000,1000/10
 |]
+testExpectedContents GLEU = [hereLit|Alice has a black cat
+|]
 testExpectedContents _ = [hereLit|0.11
 17.2
 |]
+
 
 gitignoreContents :: String
 gitignoreContents = [hereLit|
