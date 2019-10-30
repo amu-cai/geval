@@ -66,7 +66,6 @@ In case the `lzma` package is not installed on your Linux, you need to run (assu
     
 For some Linux distributions, installation of the following packages might be required as well:
 
-    apt-get install pkg-config              # in case of missing "pkg-config" in error log (most probably while building pcre-light)
     apt-get install libcairo2-dev           # in case of failure while building cairo
     apt-get install libbz2-dev              # in case of failure while building bz2
 
