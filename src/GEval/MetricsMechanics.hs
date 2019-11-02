@@ -11,7 +11,19 @@ module GEval.MetricsMechanics
 
 import Data.Singletons.TH
 
+import Text.Read (readMaybe)
+
 import GEval.Metric
+import GEval.Common
+import GEval.BLEU (bleuStep, gleuStep)
+import GEval.WER (werStep)
+import GEval.Clippings (totalArea, coveredBy, clippEUMatchStep)
+import GEval.BIO (gatherCountsForBIO)
+
+import GEval.Probability
+import GEval.PrecisionRecall (weightedMaxMatch, fMeasureOnCounts, calculateMAPForOneResult, getProbabilisticCounts, getCounts)
+
+import Control.Exception
 
 import Data.Text
 import Data.Text.Read as TR
@@ -25,7 +37,7 @@ import GEval.Annotation (Annotation, ObtainedAnnotation, parseAnnotations, parse
 import GEval.Clippings (Clipping, ClippingSpec, LabeledClipping, lineClippingsParser, lineClippingSpecsParser, lineLabeledClippingsParser)
 import GEval.BIO (TaggedEntity, parseBioSequenceIntoEntities, parseBioSequenceIntoEntitiesWithoutNormalization)
 import GEval.LogLossHashed (parseWordSpecs, wordSpecToPair)
-import GEval.ProbList (ProbList(..), parseIntoProbList, WordWithProb(..))
+import GEval.ProbList (ProbList(..), parseIntoProbList, WordWithProb(..), countLogLossOnProbList)
 
 -- | Helper type so that singleton can be used.
 -- | (The problem is that some metrics are parametrized by Double
@@ -184,6 +196,60 @@ outputParser SAMultiLabelFMeasure = intoWords
 outputParser SAMultiLabelLogLoss = Right . parseIntoProbList
 outputParser SAMultiLabelLikelihood = Right . parseIntoProbList
 
+type family ItemIntermediateRepresentationType (t :: AMetric) :: * where
+  ItemIntermediateRepresentationType ABLEU = (Int, Int, Int, Int, Int, Int, Int, Int, Int)
+  ItemIntermediateRepresentationType AGLEU = (Int, Int)
+  ItemIntermediateRepresentationType AFMeasure = (Int, Int, Int)
+  ItemIntermediateRepresentationType AMacroFMeasure = (Maybe Text, Maybe Text, Maybe Text)
+  ItemIntermediateRepresentationType ASoftFMeasure = (Double, Int, Int)
+  ItemIntermediateRepresentationType ASoft2DFMeasure = (Integer, Integer, Integer)
+  ItemIntermediateRepresentationType AClippEU = (Int, Int, Int)
+  ItemIntermediateRepresentationType ANMI = (Text, Text)
+  ItemIntermediateRepresentationType ABIOF1 = (Int, Int, Int)
+  ItemIntermediateRepresentationType ABIOF1Labels = (Int, Int, Int)
+  ItemIntermediateRepresentationType ATokenAccuracy = (Int, Int)
+  ItemIntermediateRepresentationType AProbabilisticMultiLabelFMeasure = ([Double], [Double], Double, Int)
+  ItemIntermediateRepresentationType AProbabilisticSoftFMeasure = ([Double], [Double], Double, Int)
+  ItemIntermediateRepresentationType APearson = (Double, Double)
+  ItemIntermediateRepresentationType ASpearman = (Double, Double)
+  ItemIntermediateRepresentationType AMultiLabelFMeasure = (Int, Int, Int)
+  ItemIntermediateRepresentationType ALogLossHashed = (Text, Text)
+  ItemIntermediateRepresentationType ALikelihoodHashed = (Text, Text)
+  ItemIntermediateRepresentationType ACharMatch = (Text, Text)
+  ItemIntermediateRepresentationType t = Double
+
+itemStep :: SAMetric t -> (ParsedExpectedType t, ParsedOutputType t) -> ItemIntermediateRepresentationType t
+itemStep SARMSE = itemSquaredError
+itemStep SAMSE = itemSquaredError
+itemStep SAPearson = id
+itemStep SASpearman = id
+itemStep SABLEU = uncurry bleuStep
+itemStep SAGLEU = uncurry gleuStep
+itemStep SAWER = uncurry werStep
+itemStep SAAccuracy = hitOrMiss
+itemStep SAClippEU = clippEUMatchStep
+itemStep SAFMeasure = getCount
+itemStep SAMacroFMeasure = getClassesInvolved
+itemStep SASoftFMeasure = getSoftCounts
+itemStep SAProbabilisticMultiLabelFMeasure = getProbabilisticCounts
+itemStep SAProbabilisticSoftFMeasure = getProbabilisticCounts
+itemStep SASoft2DFMeasure = getSoft2DCounts
+itemStep SANMI = id
+itemStep SALogLossHashed = id
+itemStep SALikelihoodHashed = id
+itemStep SACharMatch = id
+itemStep SAMAP = uncurry calculateMAPForOneResult
+itemStep SALogLoss = itemLogLossError
+itemStep SALikelihood = itemLogLossError
+itemStep SABIOF1 = uncurry gatherCountsForBIO
+itemStep SABIOF1Labels = uncurry gatherCountsForBIO
+itemStep SATokenAccuracy = countHitsAndTotals
+itemStep SAMAE = itemAbsoluteError
+itemStep SASMAPE = smape
+itemStep SAMultiLabelFMeasure = getCounts (==)
+itemStep SAMultiLabelLogLoss = uncurry countLogLossOnProbList
+itemStep SAMultiLabelLikelihood = uncurry countLogLossOnProbList
+
 
 doubleParser = getValue . TR.double
 
@@ -233,3 +299,63 @@ controlledParse parser t =
   case parseOnly parser t of
     (Right v) -> Right v
     (Left _) -> Left "cannot parse line"
+
+smape (exp, out) = (abs (exp-out)) `safeDoubleDiv` ((abs exp) + (abs out))
+
+hitOrMiss (exp, got) =
+  -- first try to parse what we got as a probability distribution
+  -- (like the one used for Likelikehood/LogLossHashed metric)
+  case parseWordSpecs got of
+    Right wordSpecs -> if Prelude.null pairs
+                      then 0.0
+                      else indicator (exp == (snd $ Prelude.maximum pairs))
+      where pairs = catMaybes $ Prelude.map wordSpecToPair wordSpecs
+    Left _ ->  indicator ((normalizeProbForAccuracy exp got) == exp)
+              -- if the expected value is 0 or 1 treat values
+              -- between 0.0 and 1.0 as probabilities
+              -- for the positive outcome
+  where  normalizeProbForAccuracy :: Text -> Text -> Text
+         normalizeProbForAccuracy exp got
+           | exp == (pack "1") = case tryReadingAsFloat got of
+                                  Just p -> if p >= 0.5 && p <= 1.0 then exp else got
+                                  Nothing -> got
+           | exp == (pack "0") = case tryReadingAsFloat got of
+                                  Just p -> if p < 0.5 && p >= 0.0 then exp else got
+                                  Nothing -> got
+           | otherwise = got
+         tryReadingAsFloat :: Text -> Maybe Float
+         tryReadingAsFloat = readMaybe . unpack
+
+getCount :: (Bool, Bool) -> (Int, Int, Int)
+getCount (True, True)   = (1, 1, 1)
+getCount (True, False)  = (0, 1, 0)
+getCount (False, True)  = (0, 0, 1)
+getCount (False, False) = (0, 0, 0)
+
+getClassesInvolved (Just a, Nothing) = (Nothing, Just a, Nothing)
+getClassesInvolved (Nothing, Just b) = (Nothing, Nothing, Just b) -- should not occur, for completeness
+getClassesInvolved (Just a, Just b) = if a == b
+                                      then (Just a, Just a, Just a)
+                                      else (Nothing, Just a, Just b)
+
+getSoftCounts (expected, got) = (weightedMaxMatch matchScore expected got,
+                                 Prelude.length expected,
+                                 Prelude.length got)
+
+getSoft2DCounts (expected, got) = (tpArea, expArea, gotArea)
+  where tpArea = coveredBy expected got
+        expArea = totalArea expected
+        gotArea = totalArea got
+
+countHitsAndTotals :: ([Text], [Text]) -> (Int, Int)
+countHitsAndTotals (es, os) =
+  if Prelude.length os /= Prelude.length es
+  then throw $ OtherException "wrong number of tokens"
+  else Prelude.foldl matchFun
+                     (0, 0)
+                     (Prelude.zip es os)
+  where  matchFun :: (Int, Int) -> (Text, Text) -> (Int, Int)
+         matchFun (h, t) (e, o)
+           | e == (pack "*") = (h, t)
+           | o `Prelude.elem` (splitOn (pack ";") e) = (h + 1, t + 1)
+           | otherwise = (h, t + 1)

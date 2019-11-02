@@ -14,6 +14,7 @@ import Data.Maybe (catMaybes)
 import Debug.Trace
 
 import GEval.Common
+import GEval.PrecisionRecall (maxMatch)
 
 newtype PageNumber = PageNumber Int
         deriving (Eq, Show)
@@ -160,3 +161,7 @@ getLeftovers (Rectangle (Point x0 y0) (Point x1 y1))
                          Rectangle (Point x0' y0') (Point (x0 - 1) y1'),
                          Rectangle (Point (x1 + 1) y0') (Point x1' y1')]
   where validRectangle (Rectangle (Point x0 y0) (Point x1 y1)) = x0 <= x1 && y0 <= y1
+
+clippEUMatchStep (clippingSpecs, clippings) = (maxMatch matchClippingToSpec clippingSpecs clippings,
+                                               Prelude.length clippingSpecs,
+                                               Prelude.length clippings)

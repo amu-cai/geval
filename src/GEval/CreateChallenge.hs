@@ -7,7 +7,8 @@ module GEval.CreateChallenge
 
 import GEval.Metric
 import GEval.EvaluationScheme
-import GEval.Core (GEvalSpecification(..), GEvalException(..), configFileName, gesMainMetric, defaultTestName)
+import GEval.Common (GEvalException(..))
+import GEval.Core (GEvalSpecification(..), configFileName, gesMainMetric, defaultTestName)
 import GEval.Submit (tokenFileName)
 import qualified System.Directory as D
 import Control.Conditional (whenM)

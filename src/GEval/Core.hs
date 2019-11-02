@@ -19,7 +19,6 @@ module GEval.Core
       GEvalSpecification(..),
       ResultOrdering(..),
       GEvalOptions(..),
-      GEvalException(..),
       defaultGEvalSpecification,
       defaultOutDirectory,
       defaultTestName,
@@ -44,8 +43,7 @@ module GEval.Core
       getDataDecoder,
       threeLineSource,
       extensionsHandled,
-      isEmptyFile,
-      somethingWrongWithFilesMessage
+      isEmptyFile
     ) where
 
 import Debug.Trace
@@ -66,7 +64,6 @@ import Data.Text
 import Data.Text.Read as TR
 import Control.Applicative
 import Control.Exception
-import Text.Read (readMaybe)
 import Control.Conditional (unlessM, whenM)
 import qualified System.Directory as D
 import System.Posix
@@ -204,47 +201,6 @@ data GEvalOptions = GEvalOptions
                       geoBlackBoxDebugginsOptions :: BlackBoxDebuggingOptions,
                       geoGraphFile :: Maybe FilePath }
 
-data GEvalException = NoExpectedFile FilePath
-                      | NoOutFile FilePath
-                      | NoExpectedDirectory FilePath
-                      | NoOutDirectory FilePath
-                      | NoExpectedTestDirectory FilePath
-                      | NoOutTestDirectory FilePath
-                      | NoInputFile FilePath
-                      | FileAlreadyThere FilePath
-                      | TooFewLines
-                      | TooManyLines
-                      | TooFewLinesInInput
-                      | TooManyLinesInInput
-                      | EmptyOutput
-                      | UnexpectedData Word32 String
-                      | UnexpectedMultipleOutputs
-                      | OtherException String
-                      deriving (Eq)
-
-instance Exception GEvalException
-
-instance Show GEvalException where
-  show (NoExpectedFile filePath) = somethingWrongWithFilesMessage "No file with the expected results" filePath
-  show (NoOutFile filePath) = somethingWrongWithFilesMessage "No file with the test results" filePath
-  show (NoExpectedDirectory filePath) = somethingWrongWithFilesMessage "No directory with the expected results" filePath
-  show (NoOutDirectory filePath) = somethingWrongWithFilesMessage "No directory with the test results" filePath
-  show (NoExpectedTestDirectory filePath) = somethingWrongWithFilesMessage "No test subdirectory with the expected results" filePath
-  show (NoOutTestDirectory filePath) = somethingWrongWithFilesMessage "No test subdirectory with the results obtained" filePath
-  show (NoInputFile filePath) = somethingWrongWithFilesMessage "No file with the input" filePath
-  show (FileAlreadyThere filePath) = somethingWrongWithFilesMessage "File already there" filePath
-  show TooFewLines = "Too few lines in the output file"
-  show TooManyLines = "Too many lines in the output file"
-  show TooFewLinesInInput = "Too few lines in the input file"
-  show TooManyLinesInInput = "Too many lines in the input file"
-  show EmptyOutput = "The output file is empty"
-  show (UnexpectedData lineNo message) = "Line " ++ (show lineNo) ++ ": Unexpected data [" ++ message ++ "]"
-  show UnexpectedMultipleOutputs = "Multiple outputs are not possible in this mode, use -o option to select an output file"
-  show (OtherException message) = message
-
-somethingWrongWithFilesMessage :: String -> FilePath -> String
-somethingWrongWithFilesMessage msg filePath = Prelude.concat
-                                [ msg, ": `", filePath, "`" ]
 
 defaultGEvalSpecification = GEvalSpecification {
   gesOutDirectory = defaultOutDirectory,
@@ -513,12 +469,10 @@ gevalCoreOnSources Spearman _ = gevalCoreByCorrelationMeasure spearman
 
 gevalCoreOnSources (ProbabilisticMultiLabelFMeasure beta) _ = generalizedProbabilisticFMeasure beta
                                                                                                SAProbabilisticMultiLabelFMeasure
-                                                                                               (Right . (\(ProbList es) -> es) . parseIntoProbList)
   where intoWords = Right . Data.Text.words
 
 gevalCoreOnSources (ProbabilisticSoftFMeasure beta) _ = generalizedProbabilisticFMeasure beta
                                                                                          SAProbabilisticSoftFMeasure
-                                                                                         parseObtainedAnnotations
 
 -- and now more typical metrics, which:
 -- 1) parse the expected output
@@ -527,30 +481,27 @@ gevalCoreOnSources (ProbabilisticSoftFMeasure beta) _ = generalizedProbabilistic
 -- 4) aggregate the results
 -- 5) apply some final funtion on the aggregate
 -- 6) create a graph using the aggregate (applicable only to some metrics)
-gevalCoreOnSources Likelihood _ = gevalCoreWithoutInput SALikelihood itemLogLossError averageC logLossToLikehood noGraph
+gevalCoreOnSources Likelihood _ = gevalCoreWithoutInput SALikelihood averageC logLossToLikehood noGraph
 
 gevalCoreOnSources MultiLabelLikelihood _ = gevalCoreWithoutInput SAMultiLabelLikelihood
-                                                                  (uncurry countLogLossOnProbList)
                                                                   averageC
                                                                   logLossToLikehood
                                                                   noGraph
     where
       intoWords = Right . Data.Text.words
 
-gevalCoreOnSources MSE _ = gevalCoreWithoutInput SAMSE itemSquaredError averageC id noGraph
+gevalCoreOnSources MSE _ = gevalCoreWithoutInput SAMSE averageC id noGraph
 
-gevalCoreOnSources RMSE _ = gevalCoreWithoutInput SARMSE itemSquaredError averageC (** 0.5) noGraph
+gevalCoreOnSources RMSE _ = gevalCoreWithoutInput SARMSE averageC (** 0.5) noGraph
 
-gevalCoreOnSources MAE _ = gevalCoreWithoutInput SAMAE itemAbsoluteError averageC id noGraph
+gevalCoreOnSources MAE _ = gevalCoreWithoutInput SAMAE averageC id noGraph
 
-gevalCoreOnSources SMAPE _ = gevalCoreWithoutInput SASMAPE smape averageC (* 100.0) noGraph
-  where smape (exp, out) = (abs (exp-out)) `safeDoubleDiv` ((abs exp) + (abs out))
+gevalCoreOnSources SMAPE _ = gevalCoreWithoutInput SASMAPE averageC (* 100.0) noGraph
 
-gevalCoreOnSources LogLoss _ = gevalCoreWithoutInput SALogLoss itemLogLossError averageC id noGraph
+gevalCoreOnSources LogLoss _ = gevalCoreWithoutInput SALogLoss averageC id noGraph
 
-gevalCoreOnSources BLEU _ = gevalCoreWithoutInput SABLEU bleuCombine bleuAgg bleuFinal noGraph
+gevalCoreOnSources BLEU _ = gevalCoreWithoutInput SABLEU bleuAgg bleuFinal noGraph
   where bleuFinal (p1, p2, p3, p4, rl, l1, l2, l3, l4) = ((p1 /. l1) * (p2 /. l2) * (p3 /. l3) * (p4 /. l4)) ** 0.25 * (brevityPenalty l1 rl)
-        bleuCombine (refs, sen) = bleuStep refs sen
         bleuAgg = CC.foldl bleuFuse (0, 0, 0, 0, 0,  0, 0, 0, 0)
         bleuFuse (a1, a2, a3, a4, a5, a6, a7, a8, a9) (b1, b2, b3, b4, b5, b6, b7, b8, b9) = (a1+b1, a2+b2, a3+b3, a4+b4, a5+b5, a6+b6, a7+b7, a8+b8, a9+b9)
         brevityPenalty c r
@@ -558,63 +509,19 @@ gevalCoreOnSources BLEU _ = gevalCoreWithoutInput SABLEU bleuCombine bleuAgg ble
           | c == 0 && r > 0 = 0.0
           | otherwise = exp (1.0 - (r /. c))
 
-gevalCoreOnSources GLEU _ = gevalCoreWithoutInput SAGLEU gleuCombine gleuAgg gleuFinal noGraph
+gevalCoreOnSources GLEU _ = gevalCoreWithoutInput SAGLEU gleuAgg gleuFinal noGraph
   where gleuFinal (m, t) = m /. t
-        gleuCombine (refs, sen) = gleuStep refs sen
         gleuAgg = CC.foldl gleuFuse (0, 0)
         gleuFuse (a1, a2) (b1, b2) = (a1+b1, a2+b2)
 
-gevalCoreOnSources WER _ = gevalCoreWithoutInput SAWER (uncurry werStep) averageC id noGraph
+gevalCoreOnSources WER _ = gevalCoreWithoutInput SAWER averageC id noGraph
 
-gevalCoreOnSources Accuracy _ = gevalCoreWithoutInput SAAccuracy hitOrMiss averageC id noGraph
-                      where hitOrMiss (exp, got) =
-                              -- first try to parse what we got as a probability distribution
-                              -- (like the one used for Likelikehood/LogLossHashed metric)
-                              case parseWordSpecs got of
-                                Right wordSpecs -> if Prelude.null pairs
-                                                   then 0.0
-                                                   else indicator (exp == (snd $ Prelude.maximum pairs))
-                                                 where pairs = catMaybes $ Prelude.map wordSpecToPair wordSpecs
-                                Left _ ->  indicator ((normalizeProbForAccuracy exp got) == exp)
-                                          -- if the expected value is 0 or 1 treat values
-                                          -- between 0.0 and 1.0 as probabilities
-                                          -- for the positive outcome
-                            normalizeProbForAccuracy :: Text -> Text -> Text
-                            normalizeProbForAccuracy exp got
-                              | exp == (pack "1") = case tryReadingAsFloat got of
-                                            Just p -> if p >= 0.5 && p <= 1.0 then exp else got
-                                            Nothing -> got
-                              | exp == (pack "0") = case tryReadingAsFloat got of
-                                            Just p -> if p < 0.5 && p >= 0.0 then exp else got
-                                            Nothing -> got
-                              | otherwise = got
-                            tryReadingAsFloat :: Text -> Maybe Float
-                            tryReadingAsFloat = readMaybe . unpack
+gevalCoreOnSources Accuracy _ = gevalCoreWithoutInput SAAccuracy averageC id noGraph
 
-gevalCoreOnSources (FMeasure beta) _ = gevalCoreWithoutInput SAFMeasure getCount countAgg (fMeasureOnCounts beta) noGraph
-  where -- output value could be a probability (for compatibility with other measures)
-        getCount :: (Bool, Bool) -> (Int, Int, Int)
-        getCount (True, True)   = (1, 1, 1)
-        getCount (True, False)  = (0, 1, 0)
-        getCount (False, True)  = (0, 0, 1)
-        getCount (False, False) = (0, 0, 0)
+gevalCoreOnSources (FMeasure beta) _ = gevalCoreWithoutInput SAFMeasure countAgg (fMeasureOnCounts beta) noGraph
 
-gevalCoreOnSources (MacroFMeasure beta) _ = gevalCoreWithoutInput SAMacroFMeasure getClassesInvolved gatherClassC macroAverageOnCounts noGraph
-                      where predicted got =
-                              -- first try to parse what we got as a probability distribution
-                              -- (like the one used for Likelikehood/LogLossHashed metric)
-                              case parseWordSpecs got of
-                                Right wordSpecs -> if Prelude.null pairs
-                                                   then Nothing
-                                                   else Just $ snd $ Prelude.maximum pairs
-                                                 where pairs = catMaybes $ Prelude.map wordSpecToPair wordSpecs
-                                Left _ -> Just got
-                            getClassesInvolved (Just a, Nothing) = (Nothing, Just a, Nothing)
-                            getClassesInvolved (Nothing, Just b) = (Nothing, Nothing, Just b) -- should not occur, for completeness
-                            getClassesInvolved (Just a, Just b) = if a == b
-                                                                     then (Just a, Just a, Just a)
-                                                                     else (Nothing, Just a, Just b)
-                            gatherClassC = CC.foldl gatherClassCombiner (M.empty, M.empty, M.empty)
+gevalCoreOnSources (MacroFMeasure beta) _ = gevalCoreWithoutInput SAMacroFMeasure gatherClassC macroAverageOnCounts noGraph
+                      where gatherClassC = CC.foldl gatherClassCombiner (M.empty, M.empty, M.empty)
                             gatherClassCombiner (tpMap, expectedMap, gotMap) (tp, expected, got) =
                               (insertMaybeToMap tp tpMap,
                                insertMaybeToMap expected expectedMap,
@@ -629,66 +536,39 @@ gevalCoreOnSources (MacroFMeasure beta) _ = gevalCoreWithoutInput SAMacroFMeasur
                                $ M.keys expectedMap) / (fromIntegral $ Prelude.length $ M.keys expectedMap)
 
 gevalCoreOnSources (SoftFMeasure beta) _ = gevalCoreWithoutInput SASoftFMeasure
-                                                                 getSoftCounts
                                                                  countAgg
                                                                  (fMeasureOnCounts beta)
                                                                  noGraph
-                      where getSoftCounts (expected, got) = (weightedMaxMatch matchScore expected got,
-                                                             Prelude.length expected,
-                                                             Prelude.length got)
 
 gevalCoreOnSources (Soft2DFMeasure beta) _ = gevalCoreWithoutInput SASoft2DFMeasure
-                                                                   count2DFScore
-                                                                   averageC
+                                                                   (CC.map (fMeasureOnCounts beta) .| averageC)
                                                                    id
                                                                    noGraph
-                      where
-                        count2DFScore (expected, got) = fMeasureOnCounts beta (tpArea, expArea, gotArea)
-                                                        where tpArea = coveredBy expected got
-                                                              expArea = totalArea expected
-                                                              gotArea = totalArea got
 
-gevalCoreOnSources ClippEU _ = gevalCoreWithoutInput SAClippEU matchStep clippeuAgg finalStep noGraph
+gevalCoreOnSources ClippEU _ = gevalCoreWithoutInput SAClippEU clippeuAgg finalStep noGraph
   where
-    matchStep (clippingSpecs, clippings) = (maxMatch matchClippingToSpec clippingSpecs clippings,
-                                            Prelude.length clippingSpecs,
-                                            Prelude.length clippings)
     clippeuAgg = CC.foldl countFolder (0, 0, 0)
     finalStep counts = f2MeasureOnCounts counts
 
-gevalCoreOnSources NMI _ = gevalCoreWithoutInput SANMI id (CC.foldl updateConfusionMatrix M.empty) normalizedMutualInformationFromConfusionMatrix noGraph
+gevalCoreOnSources NMI _ = gevalCoreWithoutInput SANMI (CC.foldl updateConfusionMatrix M.empty) normalizedMutualInformationFromConfusionMatrix noGraph
 
 gevalCoreOnSources MAP _ = gevalCoreWithoutInput SAMAP
-                                                 (\(e,g) -> calculateMAPForOneResult e g)
                                                  averageC
                                                  id
                                                  noGraph
 
-gevalCoreOnSources BIOF1 _ = gevalCoreWithoutInput SABIOF1 (uncurry gatherCountsForBIO) countAgg f1MeasureOnCounts noGraph
+gevalCoreOnSources BIOF1 _ = gevalCoreWithoutInput SABIOF1 countAgg f1MeasureOnCounts noGraph
 
-gevalCoreOnSources BIOF1Labels _ = gevalCoreWithoutInput SABIOF1Labels (uncurry gatherCountsForBIO) countAgg f1MeasureOnCounts noGraph
+gevalCoreOnSources BIOF1Labels _ = gevalCoreWithoutInput SABIOF1Labels countAgg f1MeasureOnCounts noGraph
 
 gevalCoreOnSources TokenAccuracy _ = gevalCoreWithoutInput SATokenAccuracy
-                                                           countHitsAndTotals
                                                            hitsAndTotalsAgg
                                                            (\(hits, total) -> hits /. total)
                                                            noGraph
-   where countHitsAndTotals :: ([Text], [Text]) -> (Int, Int)
-         countHitsAndTotals (es, os) =
-             if Prelude.length os /= Prelude.length es
-               then throw $ OtherException "wrong number of tokens"
-               else Prelude.foldl matchFun
-                                  (0, 0)
-                                  (Prelude.zip es os)
-         matchFun :: (Int, Int) -> (Text, Text) -> (Int, Int)
-         matchFun (h, t) (e, o)
-           | e == (pack "*") = (h, t)
-           | o `Prelude.elem` (splitOn (pack ";") e) = (h + 1, t + 1)
-           | otherwise = (h, t + 1)
+   where
          hitsAndTotalsAgg = CC.foldl (\(h1, t1) (h2, t2) -> (h1 + h2, t1 + t2)) (0, 0)
 
 gevalCoreOnSources MultiLabelLogLoss _ = gevalCoreWithoutInput SAMultiLabelLogLoss
-                                                               (uncurry countLogLossOnProbList)
                                                                averageC
                                                                id
                                                                noGraph
@@ -703,11 +583,10 @@ helperLogLossHashed nbOfBits finalStep expectedLineSource outLineSource =
           Right _ -> Right t
           Left m -> Left m
 
-generalizedProbabilisticFMeasure beta metric parseEntities = gevalCoreWithoutInput metric
-                                                                                   getProbabilisticCounts
-                                                                                   probabilisticSoftAgg
-                                                                                   (fMeasureOnProbabilisticCounts beta)
-                                                                                   loessGraph
+generalizedProbabilisticFMeasure beta metric = gevalCoreWithoutInput metric
+                                               probabilisticSoftAgg
+                                               (fMeasureOnProbabilisticCounts beta)
+                                               loessGraph
   where probabilisticSoftAgg :: Monad m => ConduitM ([Double], [Double], Double, Int) o m ([Double], [Double], Double, Int)
         probabilisticSoftAgg = CC.foldl probabilisticSoftFolder ([], [], fromInteger 0, 0)
         probabilisticSoftFolder (r1, p1, g1, e1) (r2, p2, g2, e2) = (r1 ++ r2, p1 ++ p2, g1 + g2, e1 + e2)
@@ -732,7 +611,7 @@ gevalCoreByCorrelationMeasure :: (MonadUnliftIO m, MonadThrow m, MonadIO m) =>
                                 LineSource (ResourceT m) ->  -- ^ source to read the output
                                 m (MetricOutput)             -- ^ metric values for the output against the expected output
 gevalCoreByCorrelationMeasure correlationFunction =
-  gevalCoreWithoutInput SAPearson id correlationC finalStep noGraph
+  gevalCoreWithoutInput SAPearson correlationC finalStep noGraph
   where correlationC = CC.foldl (flip (:)) []
         finalStep pairs = correlationFunction $ V.fromList pairs
 
@@ -749,20 +628,18 @@ skipLineNumber fun = fun . snd
 -- | A helper function to run evaluation when the input is not needed to calculate the metric value.
 gevalCoreWithoutInput :: (MonadUnliftIO m, MonadThrow m, MonadIO m)
                       => SAMetric t
-                      -> ((ParsedExpectedType t, ParsedOutputType t) -> c)             -- ^ function which combines parsed values into a single value
-                                                   -- (will be launched for each item, e.g. an error/cost function
-                                                   -- could be calculated here)
-                      -> (ConduitT c Void (ResourceT m) d)  -- ^ a Conduit which aggregates all the combined values into
+                      -> (ConduitT (ItemIntermediateRepresentationType t) Void (ResourceT m) d)  -- ^ a Conduit which aggregates all the combined values into
                                                    -- a "total" value
                       -> (d -> Double)             -- ^ function to transform the "total" value into the final score
                       -> (d -> Maybe GraphSeries)
                       -> LineSource (ResourceT m)  -- ^ source to read the expected output
                       -> LineSource (ResourceT m)  -- ^ source to read the output
                       -> m (MetricOutput)           -- ^ metric values for the output against the expected output
-gevalCoreWithoutInput smetric itemStep aggregator finalStep generateGraph expectedLineStream outLineStream =
-  gevalCoreWithoutInputOnItemTargets (liftOp expParser) (liftOp outParser) itemStep aggregator finalStep generateGraph expectedLineStream outLineStream
+gevalCoreWithoutInput smetric aggregator finalStep generateGraph expectedLineStream outLineStream =
+  gevalCoreWithoutInputOnItemTargets (liftOp expParser) (liftOp outParser) iStep aggregator finalStep generateGraph expectedLineStream outLineStream
   where expParser = expectedParser smetric
         outParser = outputParser smetric
+        iStep = itemStep smetric
 
 gevalCoreWithoutInputOnItemTargets :: (MonadUnliftIO m, MonadThrow m, MonadIO m)
                       => (ItemTarget -> Either String a) -- ^ parser for values in the expected output
@@ -922,21 +799,3 @@ items (LineSource lineSource itemDecoder preprocess _ _) parser =
 linesAsItems :: MonadResource m => LineSource m -> ConduitT () (SourceItem Text) m ()
 linesAsItems (LineSource lineSource _ _ _ _) =
   (lineSource .| CL.map Got) >> yield Done
-
-itemAbsoluteError :: (Double, Double) -> Double
-itemAbsoluteError (exp, out) = abs (exp-out)
-
-itemSquaredError :: (Double, Double) -> Double
-itemSquaredError (exp, out) = (exp-out)**2
-
-
-itemLogLossError :: (Double, Double) -> Double
-itemLogLossError (exp, out)
-  | exp' > 0.5 = - (log out')
-  | otherwise = - (log (1 - out'))
-  where exp' = normalizeAsProb exp
-        out' = normalizeAsProb out
-        normalizeAsProb v
-          | v >= 1.0 = 1.0
-          | v <= 0.0 = 0.0
-          | otherwise = v

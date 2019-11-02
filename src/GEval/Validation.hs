@@ -6,7 +6,7 @@ module GEval.Validation
 
 import GEval.Metric
 import GEval.EvaluationScheme
-import GEval.Core (GEvalSpecification(..), GEvalException(..), somethingWrongWithFilesMessage, isEmptyFile, geval, defaultInputFile, defaultExpectedFile, defaultOutFile)
+import GEval.Core (GEvalSpecification(..), isEmptyFile, geval, defaultInputFile, defaultExpectedFile, defaultOutFile)
 import GEval.Common
 import qualified System.Directory as D
 

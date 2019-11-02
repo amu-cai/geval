@@ -4,6 +4,9 @@ module GEval.Common
 import qualified Data.Text as T
 import Data.Text.Read as TR
 
+import Data.Word
+import Control.Exception
+
 import Data.Attoparsec.Text
 
 type MetricValue = Double
@@ -79,3 +82,62 @@ class AEq a where
 
 instance AEq Double where
     x =~ y = abs ( x - y ) < (1.0e-4 :: Double)
+
+itemAbsoluteError :: (Double, Double) -> Double
+itemAbsoluteError (exp, out) = abs (exp-out)
+
+itemSquaredError :: (Double, Double) -> Double
+itemSquaredError (exp, out) = (exp-out)**2
+
+itemLogLossError :: (Double, Double) -> Double
+itemLogLossError (exp, out)
+  | exp' > 0.5 = - (log out')
+  | otherwise = - (log (1 - out'))
+  where exp' = normalizeAsProb exp
+        out' = normalizeAsProb out
+        normalizeAsProb v
+          | v >= 1.0 = 1.0
+          | v <= 0.0 = 0.0
+          | otherwise = v
+
+data GEvalException = NoExpectedFile FilePath
+                      | NoOutFile FilePath
+                      | NoExpectedDirectory FilePath
+                      | NoOutDirectory FilePath
+                      | NoExpectedTestDirectory FilePath
+                      | NoOutTestDirectory FilePath
+                      | NoInputFile FilePath
+                      | FileAlreadyThere FilePath
+                      | TooFewLines
+                      | TooManyLines
+                      | TooFewLinesInInput
+                      | TooManyLinesInInput
+                      | EmptyOutput
+                      | UnexpectedData Word32 String
+                      | UnexpectedMultipleOutputs
+                      | OtherException String
+                      deriving (Eq)
+
+instance Exception GEvalException
+
+instance Show GEvalException where
+  show (NoExpectedFile filePath) = somethingWrongWithFilesMessage "No file with the expected results" filePath
+  show (NoOutFile filePath) = somethingWrongWithFilesMessage "No file with the test results" filePath
+  show (NoExpectedDirectory filePath) = somethingWrongWithFilesMessage "No directory with the expected results" filePath
+  show (NoOutDirectory filePath) = somethingWrongWithFilesMessage "No directory with the test results" filePath
+  show (NoExpectedTestDirectory filePath) = somethingWrongWithFilesMessage "No test subdirectory with the expected results" filePath
+  show (NoOutTestDirectory filePath) = somethingWrongWithFilesMessage "No test subdirectory with the results obtained" filePath
+  show (NoInputFile filePath) = somethingWrongWithFilesMessage "No file with the input" filePath
+  show (FileAlreadyThere filePath) = somethingWrongWithFilesMessage "File already there" filePath
+  show TooFewLines = "Too few lines in the output file"
+  show TooManyLines = "Too many lines in the output file"
+  show TooFewLinesInInput = "Too few lines in the input file"
+  show TooManyLinesInInput = "Too many lines in the input file"
+  show EmptyOutput = "The output file is empty"
+  show (UnexpectedData lineNo message) = "Line " ++ (show lineNo) ++ ": Unexpected data [" ++ message ++ "]"
+  show UnexpectedMultipleOutputs = "Multiple outputs are not possible in this mode, use -o option to select an output file"
+  show (OtherException message) = message
+
+somethingWrongWithFilesMessage :: String -> FilePath -> String
+somethingWrongWithFilesMessage msg filePath = Prelude.concat
+                                [ msg, ": `", filePath, "`" ]
