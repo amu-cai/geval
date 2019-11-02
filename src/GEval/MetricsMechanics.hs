@@ -141,13 +141,15 @@ expectedParser SAMultiLabelLogLoss = intoWords
 expectedParser SAMultiLabelLikelihood = intoWords
 
 type family ParsedOutputType (t :: AMetric) :: * where
-  ParsedOutputType ABLEU = [Text]
-  ParsedOutputType AGLEU = [Text]
+  ParsedOutputType ABLEU = [String]
+  ParsedOutputType AGLEU = [String]
   ParsedOutputType AClippEU = [Clipping]
   ParsedOutputType AMacroFMeasure = Maybe Text
   ParsedOutputType ASoftFMeasure = [ObtainedAnnotation]
   ParsedOutputType AProbabilisticSoftFMeasure = [ObtainedAnnotation]
   ParsedOutputType AProbabilisticMultiLabelFMeasure = [WordWithProb]
+  ParsedOutputType AMultiLabelLikelihood = ProbList
+  ParsedOutputType AMultiLabelLogLoss = ProbList
   ParsedOutputType t = ParsedExpectedType t
 
 outputParser :: SAMetric t -> Text -> Either String (ParsedOutputType t)
@@ -155,8 +157,8 @@ outputParser SARMSE = expectedParser SARMSE
 outputParser SAMSE = expectedParser SARMSE
 outputParser SAPearson = expectedParser SAPearson
 outputParser SASpearman = expectedParser SASpearman
-outputParser SABLEU = intoWords
-outputParser SAGLEU = intoWords
+outputParser SABLEU = Right . Prelude.words . unpack
+outputParser SAGLEU = Right . Prelude.words . unpack
 outputParser SAWER = expectedParser SAWER
 outputParser SAAccuracy = expectedParser SAAccuracy
 outputParser SAClippEU = controlledParse lineClippingsParser
@@ -179,8 +181,8 @@ outputParser SATokenAccuracy = intoWords
 outputParser SAMAE = doubleParser
 outputParser SASMAPE = doubleParser
 outputParser SAMultiLabelFMeasure = intoWords
-outputParser SAMultiLabelLogLoss = intoWords
-outputParser SAMultiLabelLikelihood = intoWords
+outputParser SAMultiLabelLogLoss = Right . parseIntoProbList
+outputParser SAMultiLabelLikelihood = Right . parseIntoProbList
 
 
 doubleParser = getValue . TR.double
