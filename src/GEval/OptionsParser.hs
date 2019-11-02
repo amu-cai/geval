@@ -196,6 +196,12 @@ specParser = GEvalSpecification
           <> help "External text file referenced"
         )
       )
+  <*> ( optional $ option auto
+        (long "bootstrap-resampling"
+          <> short 'B'
+          <> metavar "NUMBER-OF-SAMPLES"
+          <> help "Tests on NUMBER-OF-SAMPLES bootstrap samples rather than just on the whole test set" ))
+
 
 defaultMinFrequency :: Integer
 defaultMinFrequency = 1

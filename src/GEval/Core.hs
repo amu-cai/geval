@@ -168,7 +168,8 @@ data GEvalSpecification = GEvalSpecification
                             gesGonitoHost :: Maybe String,
                             gesToken :: Maybe String,
                             gesGonitoGitAnnexRemote :: Maybe String,
-                            gesReferences :: Maybe String }
+                            gesReferences :: Maybe String,
+                            gesBootstrapSampling :: Maybe Int }
 
 
 gesMainMetric :: GEvalSpecification -> Metric
@@ -216,7 +217,8 @@ defaultGEvalSpecification = GEvalSpecification {
   gesGonitoHost = Nothing,
   gesToken = Nothing,
   gesGonitoGitAnnexRemote = Nothing,
-  gesReferences = Nothing}
+  gesReferences = Nothing,
+  gesBootstrapSampling = Nothing }
 
 isEmptyFile :: FilePath -> IO (Bool)
 isEmptyFile path = do
