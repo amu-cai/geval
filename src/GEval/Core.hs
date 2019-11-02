@@ -169,7 +169,7 @@ data GEvalSpecification = GEvalSpecification
                             gesToken :: Maybe String,
                             gesGonitoGitAnnexRemote :: Maybe String,
                             gesReferences :: Maybe String,
-                            gesBootstrapSampling :: Maybe Int }
+                            gesBootstrapResampling :: Maybe Int }
 
 
 gesMainMetric :: GEvalSpecification -> Metric
@@ -218,7 +218,7 @@ defaultGEvalSpecification = GEvalSpecification {
   gesToken = Nothing,
   gesGonitoGitAnnexRemote = Nothing,
   gesReferences = Nothing,
-  gesBootstrapSampling = Nothing }
+  gesBootstrapResampling = Nothing }
 
 isEmptyFile :: FilePath -> IO (Bool)
 isEmptyFile path = do
@@ -693,7 +693,7 @@ gevalCoreGeneralized' parserSpec itemStep aggregator finalStep generateGraph con
      (((getZipSource $ (,)
        <$> ZipSource (CL.sourceList [(getFirstLineNo (Proxy :: Proxy m) context)..])
        <*> (ZipSource $ recordSource context parserSpec)) .| CL.map (checkStep (Proxy :: Proxy m) itemStep)) .| CL.catMaybes .| aggregator)
-   return $ MetricOutput (finalStep v) (generateGraph v)
+   return $ MetricOutput (SimpleRun $ finalStep v) (generateGraph v)
 
 -- | A type family to handle all the evaluation "context".
 --

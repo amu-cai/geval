@@ -13,10 +13,18 @@ type MetricValue = Double
 
 data GraphSeries = GraphSeries [(Double, Double)]
 
-data MetricOutput = MetricOutput MetricValue (Maybe GraphSeries)
+data MetricResult = SimpleRun MetricValue | BootstrapResampling [MetricValue]
 
-getMetricValue :: MetricOutput -> MetricValue
+instance Show MetricResult where
+  show (SimpleRun val) = show val
+
+data MetricOutput = MetricOutput MetricResult (Maybe GraphSeries)
+
+getMetricValue :: MetricOutput -> MetricResult
 getMetricValue (MetricOutput v _) = v
+
+extractSimpleRunValue :: MetricResult -> MetricValue
+extractSimpleRunValue (SimpleRun v) = v
 
 getGraphSeries :: MetricOutput -> Maybe GraphSeries
 getGraphSeries (MetricOutput _ gs) = gs

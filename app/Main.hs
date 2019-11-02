@@ -34,12 +34,12 @@ main = do
     Right (opts, Just results) -> showTheResult opts results
     Right (_, Nothing) -> return ()
 
-showTheResult :: GEvalOptions -> [(SourceSpec, [MetricValue])] -> IO ()
+showTheResult :: GEvalOptions -> [(SourceSpec, [MetricResult])] -> IO ()
 showTheResult opts [(_, vals)] = showTheResult' opts vals
 showTheResult opts [] = error "no output given"
 showTheResult opts multipleResults = showTable opts multipleResults
 
-showTable :: GEvalOptions -> [(SourceSpec, [MetricValue])] -> IO ()
+showTable :: GEvalOptions -> [(SourceSpec, [MetricResult])] -> IO ()
 showTable opts multipleResults = do
   let params = Prelude.map (\(ss, _) -> parseParamsFromSourceSpec ss) multipleResults
 
@@ -64,7 +64,7 @@ getHeader [] schemes = Just $ intercalate "\t" ("File name" : Prelude.map evalua
 getHeader params schemes = Just $ intercalate "\t" (Prelude.map T.unpack params
                                                     ++ Prelude.map evaluationSchemeName schemes)
 
-formatTableEntry :: GEvalOptions -> [T.Text] -> ((SourceSpec, [MetricValue]), OutputFileParsed) -> String
+formatTableEntry :: GEvalOptions -> [T.Text] -> ((SourceSpec, [MetricResult]), OutputFileParsed) -> String
 formatTableEntry opts paramNames ((sourceSpec, metrics), ofParsed) = intercalate "\t" ((initialColumns paramNames sourceSpec ofParsed) ++ vals)
    where vals = Prelude.map (formatTheResult (gesPrecision $ geoSpec opts)) metrics
 
@@ -73,7 +73,7 @@ initialColumns [] sourceSpec ofParsed = [formatSourceSpec sourceSpec]
 initialColumns params sourceSpec (OutputFileParsed _ paramMap) =
   Prelude.map (\p -> T.unpack $ M.findWithDefault (T.pack "") p paramMap) params
 
-showTheResult' :: GEvalOptions -> [MetricValue] -> IO ()
+showTheResult' :: GEvalOptions -> [MetricResult] -> IO ()
 -- do not show the metric if just one was given
 showTheResult' opts [val] = putStrLn $ formatTheResult (gesPrecision $ geoSpec opts) val
 showTheResult' opts [] = do
@@ -85,10 +85,13 @@ formatSourceSpec :: SourceSpec -> String
 formatSourceSpec (FilePathSpec fp) = dropExtensions $ takeFileName fp
 formatSourceSpec spec = show spec
 
-formatTheMetricAndResult :: Maybe Int -> (EvaluationScheme, MetricValue) -> String
+formatTheMetricAndResult :: Maybe Int -> (EvaluationScheme, MetricResult) -> String
 formatTheMetricAndResult mPrecision (scheme, val) = (evaluationSchemeName scheme) ++ "\t" ++ (formatTheResult mPrecision val)
 
 
-formatTheResult :: Maybe Int -> MetricValue -> String
-formatTheResult Nothing  = show
-formatTheResult (Just prec) = printf "%0.*f" prec
+formatTheResult :: Maybe Int -> MetricResult -> String
+formatTheResult mPrecision (SimpleRun val) = formatSimpleResult mPrecision val
+
+formatSimpleResult :: Maybe Int -> MetricValue -> String
+formatSimpleResult Nothing = show
+formatSimpleResult (Just prec) = printf "%0.*f" prec

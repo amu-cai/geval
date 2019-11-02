@@ -265,14 +265,14 @@ altMetricReader = optional $ option auto
                  <> metavar "METRIC"
                  <> help "Alternative metric (overrides --metric option)" )
 
-runGEval :: [String] -> IO (Either (ParserResult GEvalOptions) (Maybe [(SourceSpec, [MetricValue])]))
+runGEval :: [String] -> IO (Either (ParserResult GEvalOptions) (Maybe [(SourceSpec, [MetricResult])]))
 runGEval args = do
   ret <- runGEvalGetOptions args
   case ret of
     Left e -> return $ Left e
     Right (_, mmv) -> return $ Right mmv
 
-runGEvalGetOptions :: [String] -> IO (Either (ParserResult GEvalOptions) (GEvalOptions, Maybe [(SourceSpec, [MetricValue])]))
+runGEvalGetOptions :: [String] -> IO (Either (ParserResult GEvalOptions) (GEvalOptions, Maybe [(SourceSpec, [MetricResult])]))
 runGEvalGetOptions args = do
   optionExtractionResult <- getOptions args
   case optionExtractionResult of
@@ -308,7 +308,7 @@ attemptToReadOptsFromConfigFile args opts = do
   where configFilePath = (getExpectedDirectory $ geoSpec opts) </> configFileName
 
 
-runGEval'' :: GEvalOptions -> IO (Maybe [(SourceSpec, [MetricValue])])
+runGEval'' :: GEvalOptions -> IO (Maybe [(SourceSpec, [MetricResult])])
 runGEval'' opts = runGEval''' (geoSpecialCommand opts)
                               (geoResultOrdering opts)
                               (geoFilter opts)
@@ -322,7 +322,7 @@ runGEval''' :: Maybe GEvalSpecialCommand
               -> GEvalSpecification
               -> BlackBoxDebuggingOptions
               -> Maybe FilePath
-              -> IO (Maybe [(SourceSpec, [MetricValue])])
+              -> IO (Maybe [(SourceSpec, [MetricResult])])
 runGEval''' Nothing _ _ spec _ mGraphFile = do
   vals' <- geval spec
   let vals = map (\(s, val) -> (s, map getMetricValue val)) vals'

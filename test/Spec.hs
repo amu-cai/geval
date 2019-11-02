@@ -87,7 +87,7 @@ main :: IO ()
 main = hspec $ do
   describe "root mean square error" $ do
     it "simple test" $ do
-      [(_, ((MetricOutput val _):_))] <-  geval $ defaultGEvalSpecification {gesExpectedDirectory=Just "test/rmse-simple/rmse-simple", gesOutDirectory="test/rmse-simple/rmse-simple-solution"}
+      [(_, ((MetricOutput (SimpleRun val) _):_))] <-  geval $ defaultGEvalSpecification {gesExpectedDirectory=Just "test/rmse-simple/rmse-simple", gesOutDirectory="test/rmse-simple/rmse-simple-solution"}
       val `shouldBeAlmost` 0.64549722436790
   describe "mean square error" $ do
     it "simple test with arguments" $
@@ -331,7 +331,7 @@ main = hspec $ do
       runGEvalTest "f1-with-preprocessing" `shouldReturnAlmost` 0.57142857142857
   describe "evaluating single lines" $ do
     it "RMSE" $ do
-      (MetricOutput v _) <- gevalCoreOnSingleLines RMSE id RawItemTarget
+      (MetricOutput (SimpleRun v) _) <- gevalCoreOnSingleLines RMSE id RawItemTarget
                                                           (LineInFile (FilePathSpec "stub1") 1 "blabla")
                                                           RawItemTarget
                                                           (LineInFile (FilePathSpec "stub2") 1 "3.4")
@@ -439,7 +439,8 @@ main = hspec $ do
             gesGonitoHost = Nothing,
             gesToken = Nothing,
             gesGonitoGitAnnexRemote = Nothing,
-            gesReferences = Nothing }
+            gesReferences = Nothing,
+            gesBootstrapResampling = Nothing }
     it "simple test" $ do
       results <- runLineByLineGeneralized KeepTheOriginalOrder sampleChallenge (const Data.Conduit.List.consume)
       Prelude.map (\(LineRecord inp _ _ _ _) -> inp) results `shouldBe` ["foo",
@@ -683,8 +684,8 @@ testMatchFun 'b' 1 = True
 testMatchFun 'c' 1 = True
 testMatchFun _ _ = False
 
-extractVal :: (Either (ParserResult GEvalOptions) (Maybe [(SourceSpec, [MetricValue])])) -> IO MetricValue
-extractVal (Right (Just ([(_, val:_)]))) = return val
+extractVal :: (Either (ParserResult GEvalOptions) (Maybe [(SourceSpec, [MetricResult])])) -> IO MetricValue
+extractVal (Right (Just ([(_, (SimpleRun val):_)]))) = return val
 extractVal (Right Nothing) = return $ error "no metrics???"
 extractVal (Right (Just [])) = return $ error "emtpy metric list???"
 extractVal (Left result) = do

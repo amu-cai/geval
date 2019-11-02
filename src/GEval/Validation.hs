@@ -223,5 +223,5 @@ runOnTest spec testPath = do
       createPerfectOutputFromExpected metric expectedFile tmpOutFile
       [(_, [MetricOutput value _])] <- geval specificSpec
       let bestValue = bestPossibleValue metric
-      unless (bestValue =~ value) $ throw $ BestPossibleValueNotObtainedWithExpectedData bestValue value
+      unless (bestValue =~ (extractSimpleRunValue value)) $ throw $ BestPossibleValueNotObtainedWithExpectedData bestValue (extractSimpleRunValue value)
       return ()
