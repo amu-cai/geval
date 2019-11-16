@@ -2,7 +2,7 @@
 
 GEval is a Haskell library and a stand-alone tool for evaluating the
 results of solutions to machine learning challenges as defined in the
-[Gonito](https://gonito.net) platform. Also could be used outside the
+[Gonito](https://gonito.net) platform. Also, could be used outside the
 context of Gonito.net challenges, assuming the test data is given in
 simple TSV (tab-separated values) files.
 
@@ -13,6 +13,29 @@ The official repository is `git://gonito.net/geval`, browsable at
 <https://gonito.net/gitlist/geval.git/>.
 
 ## Installing
+
+### The easy way: just download the fully static GEval binary
+
+(Assuming you have a 64-bit Linux.)
+
+    wget https://gonito.net/get/bin/geval
+    chmod u+x geval
+    ./geval --help
+
+#### On Windows
+
+For Windows, you should use Windows PowerShell.
+
+	wget https://gonito.net/get/bin/geval
+
+Next, you should go to the folder where you download `geval` and right-click to `geval` file.
+Go to `Properties` and in the section `Security` grant full access to the folder.
+
+Or you should use `icacls "folder path to geval" /grant USER:<username>`
+
+This is a fully static binary, it should work on any 64-bit Linux or 64-bit Windows.
+
+### Build from scratch
 
 You need [Haskell Stack](https://github.com/commercialhaskell/stack).
 You could install Stack with your package manager or with:
@@ -35,7 +58,7 @@ order to run `geval` you need to either add `$HOME/.local/bin` to
 `$PATH` in your configuration or to type:
 
     PATH="$HOME/.local/bin" geval ...
-	
+
 In Windows you should add new global variable with name 'geval' and path should be the same as above.
 
 ### Troubleshooting
@@ -65,7 +88,9 @@ to happen on macOS, as these packages are usually installed out of the box on Li
 In case the lzma package is not installed on your Linux, you need to run (assuming Debian/Ubuntu):
 
     sudo apt-get install pkg-config liblzma-dev libpq-dev libpcre3-dev
-	
+
+#### Windows issues
+
 If you see this message on Windows during executing `stack test` command:
 
 	In the dependencies for geval-1.21.1.0:
@@ -81,8 +106,8 @@ And you should add `lzma-clib-5.2.2` and `unix-compat-0.5.2` to section extra-de
 If you see message about missing pkg-config on Windpws you should download two packages from the site:
 http://ftp.gnome.org/pub/gnome/binaries/win32/dependencies/
 These packages are:
-		- pkg-config (newest version) 
-		- gettext-runtime (newest version)
+		- pkg-config (the newest version)
+		- gettext-runtime (the newest version)
 Extract `pkg-config.exe` file in Windows PATH
 Extract init.dll file from gettext-runtime
 
@@ -90,26 +115,6 @@ You should also download from http://ftp.gnome.org/pub/gnome/binaries/win32/glib
 and extract libglib-2.0-0.dll file.
 
 All files you should put for example in `C:\MinGW\bin` directory.
-
-### Plan B — just download the GEval binary
-
-(Assuming you have a 64-bit Linux.)
-
-    wget https://gonito.net/get/bin/geval
-    chmod u+x geval
-    ./geval --help
-
-
-For Windows you should use Windows Powershell.
-
-	wget https://gonito.net/get/bin/geval
-
-Next you should go to the folder where you download `geval` and right-click to `geval` file.
-Go to `Properties` and in the section `Security` grant full access to the folder.
-
-Or you should use `icacls "folder path to geval" /grant USER:<username>`
-
-This is a fully static binary, it should work on any 64-bit Linux or 64-bit Windows.
 
 ## Quick tour
 
@@ -226,7 +231,7 @@ But why were double quotes so problematic in German-English
 translation?! Well, look at the second-worst feature — `&apos;&apos;`
 in the _output_! Oops, it seems like a very stupid mistake with
 post-processing was done and no double quote was correctly generated,
-which decreased the score a little bit for each sentence in which the
+which decreased the score a little for each sentence in which the
 quote was expected.
 
 When I fixed this simple bug, the BLUE metric increased from 0.27358
@@ -539,9 +544,9 @@ submitted. The suggested way to do this is as follows:
    `test-A/expected.tsv` added. This branch should be accessible by
    Gonito platform, but should be kept “hidden” for regular users (or
    at least they should be kindly asked not to peek there). It is
-   recommended (though not obligatory) that this branch contain all
+   recommended (though not obligatory) that this branch contains all
    the source codes and data used to generate the train/dev/test sets.
-   (Use [git-annex](https://git-annex.branchable.com/) if you have really big files there.)
+   (Use [git-annex](https://git-annex.branchable.com/) if you have huge files there.)
 
 Branch (1) should be the parent of the branch (2), for instance, the
 repo (for the toy “planets” challenge) could be created as follows:
@@ -604,7 +609,7 @@ be nice and commit also your source codes.
     git push mine master
 
 Then let Gonito pull them and evaluate your results, either manually clicking
-"submit" at the Gonito web site or using `--submit` option (see below).
+"submit" at the Gonito website or using `--submit` option (see below).
 
 ### Submitting a solution to a Gonito platform with GEval
 
