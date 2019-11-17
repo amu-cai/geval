@@ -63,6 +63,7 @@ listOfAvailableMetrics = [RMSE,
                           BIOF1,
                           BIOF1Labels,
                           TokenAccuracy,
+                          SegmentAccuracy,
                           SoftFMeasure 1.0,
                           SoftFMeasure 2.0,
                           SoftFMeasure 0.25,
@@ -94,6 +95,7 @@ isMetricDescribed (SoftFMeasure _) = True
 isMetricDescribed (Soft2DFMeasure _) = True
 isMetricDescribed (ProbabilisticMultiLabelFMeasure _) = True
 isMetricDescribed GLEU = True
+isMetricDescribed SegmentAccuracy = True
 isMetricDescribed _ = False
 
 getEvaluationSchemeDescription :: EvaluationScheme -> String
@@ -134,7 +136,11 @@ metric on a corpus level but does not have its drawbacks for our per
 sentence reward objective.
 see: https://arxiv.org/pdf/1609.08144.pdf
 |]
-
+getMetricDescription SegmentAccuracy =
+  [i|Accuracy counted for segments, i.e. labels with positions.
+The percentage of labels in the ground truth retrieved in the actual output is returned.
+Accuracy is calculated separately for each item and then averaged.
+|]
 
 outContents :: Metric -> String
 outContents (SoftFMeasure _) = [hereLit|inwords:1-4
@@ -147,7 +153,10 @@ outContents (ProbabilisticMultiLabelFMeasure _) = [hereLit|first-name/1:0.8 surn
 surname/1:0.4
 first-name/3:0.9
 |]
-outContents GLEU = [hereLit|Alice has a black 
+outContents GLEU = [hereLit|Alice has a black
+|]
+outContents SegmentAccuracy = [hereLit|N:1-4 V:5-6 N:8-10 V:12-13 A:15-17
+N:1-4 V:6-7 A:9-13
 |]
 
 expectedScore :: EvaluationScheme -> MetricValue
@@ -165,6 +174,8 @@ expectedScore (EvaluationScheme (ProbabilisticMultiLabelFMeasure beta) [])
       in weightedHarmonicMean beta precision recall
 expectedScore (EvaluationScheme GLEU [])
   = 0.7142857142857143
+expectedScore (EvaluationScheme SegmentAccuracy [])
+  = 0.875
 
 helpMetricParameterMetricsList :: String
 helpMetricParameterMetricsList = intercalate ", " $ map (\s -> (show s) ++ (case extraInfo s of
@@ -213,7 +224,14 @@ the form LABEL:PAGE/X0,Y0,X1,Y1 where LABEL is any label, page is the page numbe
 formatDescription (ProbabilisticMultiLabelFMeasure _) = [hereLit|In each line a number of labels (entities) can be given. A label probability
 can be provided with a colon (e.g. "foo:0.7"). By default, 1.0 is assumed.
 |]
-formatDescription GLEU = [hereLit|In each line a there is a space sparated sentence of words. 
+formatDescription GLEU = [hereLit|In each line a there is a space sparated sentence of words.
+|]
+formatDescription SegmentAccuracy = [hereLit|Labels can be any strings (without spaces), whereas is a list of
+1-based indexes or spans separated by commas (spans are inclusive
+ranges, e.g. "10-14"). For instance, "foo:bar:2,4-7,10" is a
+label "foo:bar" for positions 2, 4, 5, 6, 7 and 10. Note that no
+overlapping segments can be returned (evaluation will fail in
+such a case).
 |]
 
 scoreExplanation :: EvaluationScheme -> Maybe String
@@ -227,13 +245,16 @@ Hence, recall is 247500/902500=0.274 and precision - 247500/(20000+912000+240000
 for the second item is 0.238 and the F-score for the whole set is (0 + 0.238)/2 = 0.119.|]
 scoreExplanation (EvaluationScheme (ProbabilisticMultiLabelFMeasure _) []) = Nothing
 scoreExplanation (EvaluationScheme GLEU [])
-  = Just [hereLit|To find out GLEU score we first count number of tp (true positives) fp(false positives) and fn(false negatives). 
+  = Just [hereLit|To find out GLEU score we first count number of tp (true positives) fp(false positives) and fn(false negatives).
   We have 4 matching unigrams ("Alice", "has", "a", "black") , 3 bigrams ("Alice has", "has a", "a black"), 2 trigrams ("Alice has a", "has a black") and 1 tetragram ("Alice has a black"),
-so tp=10. We have no fp, therefore fp=0. There are 4 fn - ("cat", "black cat", "a black cat", "has a black cat"). 
+so tp=10. We have no fp, therefore fp=0. There are 4 fn - ("cat", "black cat", "a black cat", "has a black cat").
 Now we have to calculate precision and recall:
-  Precision is tp / (tp+fp) = 10/(10+0) = 1, 
+  Precision is tp / (tp+fp) = 10/(10+0) = 1,
   recall is tp / (tp+fn) = 10 / (10+4) = 10/14 =~ 0.71428...
   The GLEU score is min(precision,recall)=0.71428 |]
+scoreExplanation (EvaluationScheme SegmentAccuracy [])
+  = Just [hereLit|Out of 4 segments in the expected output for the first item, 3 were retrieved correcly (accuracy is 3/4=0.75).
+The second item was retrieved perfectly (accuracy is 1.0). Hence, the average is (0.75+1.0)/2=0.875.|]
 
 pasteLines :: String -> String -> String
 pasteLines a b = printf "%-35s %s\n" a b

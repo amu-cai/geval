@@ -4,11 +4,12 @@
 module GEval.Annotation
        (parseAnnotations, Annotation(..),
         parseObtainedAnnotations, ObtainedAnnotation(..),
-        matchScore, intSetParser)
+        matchScore, intSetParser, segmentAccuracy, parseSegmentAnnotations)
        where
 
 import qualified Data.IntSet as IS
 import qualified Data.Text as T
+import Data.Set (intersection, fromList)
 
 import Data.Attoparsec.Text
 import Data.Attoparsec.Combinator
@@ -17,11 +18,12 @@ import GEval.Common (sepByWhitespaces, (/.))
 import GEval.Probability
 import Data.Char
 import Data.Maybe (fromMaybe)
+import Data.Either (partitionEithers)
 
 import GEval.PrecisionRecall(weightedMaxMatching)
 
 data Annotation = Annotation T.Text IS.IntSet
-                  deriving (Eq, Show)
+                  deriving (Eq, Show, Ord)
 
 data ObtainedAnnotation = ObtainedAnnotation Annotation Double
                           deriving (Eq, Show)
@@ -52,6 +54,36 @@ obtainedAnnotationParser = do
 parseAnnotations :: T.Text -> Either String [Annotation]
 parseAnnotations t = parseOnly (annotationsParser <* endOfInput) t
 
+parseSegmentAnnotations :: T.Text -> Either String [Annotation]
+parseSegmentAnnotations t = case parseAnnotationsWithColons t of
+  Left m -> Left m
+  Right annotations -> if areSegmentsDisjoint annotations
+                      then (Right annotations)
+                      else (Left "Overlapping segments")
+
+areSegmentsDisjoint :: [Annotation] -> Bool
+areSegmentsDisjoint = areIntSetsDisjoint . map (\(Annotation _ s) -> s)
+
+areIntSetsDisjoint :: [IS.IntSet] -> Bool
+areIntSetsDisjoint ss = snd $ foldr step (IS.empty, True) ss
+  where step _ w@(_, False) = w
+        step s (u, True) = (s `IS.union` u, s `IS.disjoint` u)
+
+-- unfortunately, attoparsec does not seem to back-track properly
+-- so we need a special function if labels can contain colons
+parseAnnotationsWithColons :: T.Text -> Either String [Annotation]
+parseAnnotationsWithColons t = case partitionEithers (map parseAnnotationWithColons $ T.words t) of
+  ([], annotations) -> Right annotations
+  ((firstProblem:_), _) -> Left firstProblem
+
+parseAnnotationWithColons :: T.Text -> Either String Annotation
+parseAnnotationWithColons t = if T.null label
+                              then Left "Colon expected"
+                              else case parseOnly (intSetParser <* endOfInput) position of
+                                     Left m -> Left m
+                                     Right s -> Right (Annotation (T.init label) s)
+  where (label, position) = T.breakOnEnd ":" t
+
 annotationsParser :: Parser [Annotation]
 annotationsParser = sepByWhitespaces annotationParser
 
@@ -70,3 +102,7 @@ intervalParser = do
   startIx <- decimal
   endIx <- (string "-" *> decimal <|> pure startIx)
   pure $ IS.fromList [startIx..endIx]
+
+segmentAccuracy :: [Annotation] -> [Annotation] -> Double
+segmentAccuracy expected output = (fromIntegral $ length matched) / (fromIntegral $ length expected)
+  where matched = (fromList expected) `intersection` (fromList output)

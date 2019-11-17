@@ -706,6 +706,13 @@ gevalCoreOnSources TokenAccuracy _ = gevalCoreWithoutInput intoTokens
            | otherwise = (h, t + 1)
          hitsAndTotalsAgg = CC.foldl (\(h1, t1) (h2, t2) -> (h1 + h2, t1 + t2)) (0, 0)
 
+gevalCoreOnSources SegmentAccuracy _ = gevalCoreWithoutInput parseSegmentAnnotations
+                                                             parseSegmentAnnotations
+                                                             (uncurry segmentAccuracy)
+                                                             averageC
+                                                             id
+                                                             noGraph
+
 gevalCoreOnSources MultiLabelLogLoss _ = gevalCoreWithoutInput intoWords
                                                        (Right . parseIntoProbList)
                                                        (uncurry countLogLossOnProbList)

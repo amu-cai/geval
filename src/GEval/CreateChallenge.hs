@@ -297,6 +297,19 @@ in the expected file (but not in the output file).
 
 |] ++ (commonReadmeMDContents testName)
 
+readmeMDContents SegmentAccuracy testName = [i|
+Segment a sentence and tag with POS tags
+========================================
+
+This is a sample, toy challenge for SegmentAccuracy.
+
+For each sentence, give a sequence of POS tags, each one with
+its position (1-indexed). For instance, `N:1-10` means a nouns
+starting from the beginning (the first character) up to to the tenth
+character (inclusively).
+
+|] ++ (commonReadmeMDContents testName)
+
 readmeMDContents (ProbabilisticMultiLabelFMeasure beta) testName = readmeMDContents (MultiLabelFMeasure beta) testName
 readmeMDContents (MultiLabelFMeasure beta) testName = [i|
 Tag names and their component
@@ -473,6 +486,9 @@ B-firstname/JOHN I-surname/VON I-surname/NEUMANN	John von Nueman
 trainContents TokenAccuracy = [hereLit|* V N	I like cats
 * * V * N	I can see the rainbow
 |]
+trainContents SegmentAccuracy = [hereLit|Art:1-3 N:5-11 V:12-13 A:15-19	The student's smart
+N:1-6 N:8-10 V:12-13 A:15-18	Mary's dog is nice
+|]
 trainContents (ProbabilisticMultiLabelFMeasure beta) = trainContents (MultiLabelFMeasure beta)
 trainContents (MultiLabelFMeasure _) = [hereLit|I know Mr John Smith	person/3,4,5 first-name/4 surname/5
 Steven bloody Brown	person/1,3 first-name/1 surname/3
@@ -540,6 +556,9 @@ Mr Jan Kowalski
 devInContents TokenAccuracy = [hereLit|The cats on the mat
 Ala has a cat
 |]
+devInContents SegmentAccuracy = [hereLit|John is smart
+Mary's intelligent
+|]
 devInContents (ProbabilisticMultiLabelFMeasure beta) = devInContents (MultiLabelFMeasure beta)
 devInContents (MultiLabelFMeasure _) = [hereLit|Jan Kowalski is here
 I see him
@@ -603,6 +622,9 @@ O B-firstname/JAN B-surname/KOWALSKI
 |]
 devExpectedContents TokenAccuracy = [hereLit|* N * * N
 N V * N
+|]
+devExpectedContents SegmentAccuracy = [hereLit|N:1-4 V:6-7 A:9-13
+N:1-4 V:6-7 A:9-19
 |]
 devExpectedContents (ProbabilisticMultiLabelFMeasure beta) = devExpectedContents (MultiLabelFMeasure beta)
 devExpectedContents (MultiLabelFMeasure _) = [hereLit|person/1,2 first-name/1 surname/2
@@ -673,6 +695,9 @@ No name here
 testInContents TokenAccuracy = [hereLit|I have cats
 I know
 |]
+testInContents SegmentAccuracy = [hereLit|Mary's cat is old
+John is young
+|]
 testInContents (ProbabilisticMultiLabelFMeasure beta) = testInContents (MultiLabelFMeasure beta)
 testInContents (MultiLabelFMeasure _) = [hereLit|John bloody Smith
 Nobody is there
@@ -737,6 +762,9 @@ O O O
 |]
 testExpectedContents TokenAccuracy = [hereLit|* V N
 * V
+|]
+testExpectedContents SegmentAccuracy = [hereLit|N:1-6 N:8-10 V:12-13 A:15-17
+N:1-4 V:6-7 A:9-13
 |]
 testExpectedContents (ProbabilisticMultiLabelFMeasure beta) = testExpectedContents (MultiLabelFMeasure beta)
 testExpectedContents (MultiLabelFMeasure _) = [hereLit|person/1,3 first-name/1 surname/3

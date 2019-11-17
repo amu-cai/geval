@@ -146,6 +146,9 @@ main = hspec $ do
   describe "TokenAccuracy" $ do
     it "simple example" $ do
        runGEvalTest "token-accuracy-simple" `shouldReturnAlmost` 0.5
+  describe "SegmentAccuracy" $ do
+    it "simple test" $ do
+      runGEvalTest "segment-accuracy-simple" `shouldReturnAlmost` 0.4444444
   describe "precision count" $ do
     it "simple test" $ do
       precisionCount [["Alice", "has", "a", "cat" ]] ["Ala", "has", "cat"] `shouldBe` 2
@@ -342,6 +345,11 @@ main = hspec $ do
     it "just parse" $ do
       parseAnnotations "foo:3,7-10 baz:4-6" `shouldBe` Right [Annotation "foo" (IS.fromList [3,7,8,9,10]),
                                                               Annotation "baz" (IS.fromList [4,5,6])]
+    it "just parse wit colons" $ do
+      parseSegmentAnnotations "foo:x:3,7-10 baz:4-6" `shouldBe` Right [Annotation "foo:x" (IS.fromList [3,7,8,9,10]),
+                                                                       Annotation "baz" (IS.fromList [4,5,6])]
+    it "just parse wit colons" $ do
+      parseSegmentAnnotations "foo:x:3,7-10 baz:2-6" `shouldBe` Left "Overlapping segments"
     it "just parse 2" $ do
       parseAnnotations "inwords:1-3 indigits:5" `shouldBe` Right [Annotation "inwords" (IS.fromList [1,2,3]),
                                                                   Annotation "indigits" (IS.fromList [5])]
