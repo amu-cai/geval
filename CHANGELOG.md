@@ -1,4 +1,8 @@
 
+## 1.22.0.0
+
+* Add SegmentAccuracy
+
 ## 1.21.0.0
 
 * Add Probabilistic-MultiLabel-F-measure
