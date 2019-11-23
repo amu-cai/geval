@@ -723,18 +723,18 @@ continueGEvalCalculations SABLEU BLEU = defineContinuation bleuAgg bleuFinal noG
           | c == 0 && r > 0 = 0.0
           | otherwise = exp (1.0 - (r /. c))
 
-continueGEvalCalculations GLEU _ = defineContinuation SAGLEU gleuAgg gleuFinal noGraph
+continueGEvalCalculations SAGLEU GLEU = defineContinuation gleuAgg gleuFinal noGraph
   where gleuFinal (m, t) = m /. t
         gleuAgg = CC.foldl gleuFuse (0, 0)
         gleuFuse (a1, a2) (b1, b2) = (a1+b1, a2+b2)
 
-continueGEvalCalculations WER _ = defineContinuation SAWER averageC id noGraph
+continueGEvalCalculations SAWER WER = defineContinuation averageC id noGraph
 
-continueGEvalCalculations Accuracy _ = defineContinuation SAAccuracy averageC id noGraph
+continueGEvalCalculations SAAccuracy Accuracy = defineContinuation averageC id noGraph
 
-continueGEvalCalculations (FMeasure beta) _ = defineContinuation SAFMeasure countAgg (fMeasureOnCounts beta) noGraph
+continueGEvalCalculations SAFMeasure (FMeasure beta) = defineContinuation countAgg (fMeasureOnCounts beta) noGraph
 
-continueGEvalCalculations (MacroFMeasure beta) _ = defineContinuation SAMacroFMeasure gatherClassC macroAverageOnCounts noGraph
+continueGEvalCalculations SAMacroFMeasure (MacroFMeasure beta) = defineContinuation gatherClassC macroAverageOnCounts noGraph
                       where gatherClassC = CC.foldl gatherClassCombiner (M.empty, M.empty, M.empty)
                             gatherClassCombiner (tpMap, expectedMap, gotMap) (tp, expected, got) =
                               (insertMaybeToMap tp tpMap,
@@ -749,44 +749,38 @@ continueGEvalCalculations (MacroFMeasure beta) _ = defineContinuation SAMacroFMe
                                                                          M.lookupDefault 0 c gotMap))
                                $ M.keys expectedMap) / (fromIntegral $ Prelude.length $ M.keys expectedMap)
 
-continueGEvalCalculations (SoftFMeasure beta) _ = defineContinuation SASoftFMeasure
-                                                                 countAgg
-                                                                 (fMeasureOnCounts beta)
-                                                                 noGraph
+continueGEvalCalculations SASoftFMeasure (SoftFMeasure beta) = defineContinuation countAgg
+                                                                     (fMeasureOnCounts beta)
+                                                                     noGraph
 
-continueGEvalCalculations (Soft2DFMeasure beta) _ = defineContinuation SASoft2DFMeasure
-                                                                   (CC.map (fMeasureOnCounts beta) .| averageC)
-                                                                   id
-                                                                   noGraph
+continueGEvalCalculations SASoft2DFMeasure (Soft2DFMeasure beta) = defineContinuation (CC.map (fMeasureOnCounts beta) .| averageC)
+                                                                       id
+                                                                       noGraph
 
-continueGEvalCalculations ClippEU _ = defineContinuation SAClippEU clippeuAgg finalStep noGraph
+continueGEvalCalculations SAClippEU ClippEU = defineContinuation clippeuAgg finalStep noGraph
   where
     clippeuAgg = CC.foldl countFolder (0, 0, 0)
     finalStep counts = f2MeasureOnCounts counts
 
-continueGEvalCalculations NMI _ = defineContinuation SANMI (CC.foldl updateConfusionMatrix M.empty) normalizedMutualInformationFromConfusionMatrix noGraph
+continueGEvalCalculations SANMI NMI = defineContinuation (CC.foldl updateConfusionMatrix M.empty) normalizedMutualInformationFromConfusionMatrix noGraph
 
-continueGEvalCalculations MAP _ = defineContinuation SAMAP
-                                                 averageC
-                                                 id
-                                                 noGraph
+continueGEvalCalculations SAMAP MAP = defineContinuation averageC
+                                                     id
+                                                     noGraph
 
-continueGEvalCalculations BIOF1 _ = defineContinuation SABIOF1 countAgg f1MeasureOnCounts noGraph
+continueGEvalCalculations SABIOF1 BIOF1 = defineContinuation countAgg f1MeasureOnCounts noGraph
 
-continueGEvalCalculations BIOF1Labels _ = defineContinuation SABIOF1Labels countAgg f1MeasureOnCounts noGraph
+continueGEvalCalculations SABIOF1Labels BIOF1Labels = defineContinuation countAgg f1MeasureOnCounts noGraph
 
-continueGEvalCalculations TokenAccuracy _ = defineContinuation SATokenAccuracy
-                                                           hitsAndTotalsAgg
-                                                           (\(hits, total) -> hits /. total)
-                                                           noGraph
+continueGEvalCalculations SATokenAccuracy TokenAccuracy = defineContinuation hitsAndTotalsAgg
+                                                               (\(hits, total) -> hits /. total)
+                                                               noGraph
    where
          hitsAndTotalsAgg = CC.foldl (\(h1, t1) (h2, t2) -> (h1 + h2, t1 + t2)) (0, 0)
 
-continueGEvalCalculations MultiLabelLogLoss _ = defineContinuation SAMultiLabelLogLoss
-                                                               averageC
-                                                               id
-                                                               noGraph
-
+continueGEvalCalculations SAMultiLabelLogLoss MultiLabelLogLoss = defineContinuation averageC
+                                                                   id
+                                                                   noGraph
 
 
 defineContinuation ::  (ConduitT c Void (ResourceT m) d)  -- ^ a Conduit which aggregates all the combined values into
