@@ -33,7 +33,9 @@ import Data.Maybe (catMaybes)
 
 import Control.Monad ((<=<))
 
-import GEval.Annotation (Annotation, ObtainedAnnotation, parseAnnotations, parseObtainedAnnotations)
+import GEval.Annotation (Annotation, ObtainedAnnotation,
+                         parseAnnotations, parseObtainedAnnotations,
+                         parseSegmentAnnotations, segmentAccuracy)
 import GEval.Clippings (Clipping, ClippingSpec, LabeledClipping, lineClippingsParser, lineClippingSpecsParser, lineLabeledClippingsParser)
 import GEval.BIO (TaggedEntity, parseBioSequenceIntoEntities, parseBioSequenceIntoEntitiesWithoutNormalization)
 import GEval.LogLossHashed (parseWordSpecs, wordSpecToPair)
@@ -45,7 +47,7 @@ import GEval.ProbList (ProbList(..), parseIntoProbList, WordWithProb(..), countL
 singletons [d|data AMetric = ARMSE | AMSE | APearson | ASpearman | ABLEU | AGLEU | AWER | AAccuracy | AClippEU
                              | AFMeasure | AMacroFMeasure | ANMI
                              | ALogLossHashed | ACharMatch | AMAP | ALogLoss | ALikelihood
-                             | ABIOF1 | ABIOF1Labels | ATokenAccuracy | ALikelihoodHashed | AMAE | ASMAPE | AMultiLabelFMeasure
+                             | ABIOF1 | ABIOF1Labels | ATokenAccuracy | ASegmentAccuracy | ALikelihoodHashed | AMAE | ASMAPE | AMultiLabelFMeasure
                              | AMultiLabelLogLoss | AMultiLabelLikelihood
                              | ASoftFMeasure | AProbabilisticMultiLabelFMeasure | AProbabilisticSoftFMeasure | ASoft2DFMeasure
                              deriving (Eq)
@@ -73,6 +75,7 @@ toHelper Likelihood = ALikelihood
 toHelper BIOF1 = ABIOF1
 toHelper BIOF1Labels = ABIOF1Labels
 toHelper TokenAccuracy = ATokenAccuracy
+toHelper SegmentAccuracy = ASegmentAccuracy
 toHelper (LikelihoodHashed _) = ALikelihoodHashed
 toHelper MAE = AMAE
 toHelper SMAPE = ASMAPE
@@ -114,6 +117,7 @@ type family ParsedExpectedType (t :: AMetric) :: * where
   ParsedExpectedType ABIOF1 = [TaggedEntity]
   ParsedExpectedType ABIOF1Labels = [TaggedEntity]
   ParsedExpectedType ATokenAccuracy = [Text]
+  ParsedExpectedType ASegmentAccuracy = [Annotation]
   ParsedExpectedType AMAE = Double
   ParsedExpectedType ASMAPE = Double
   ParsedExpectedType AMultiLabelFMeasure = [Text]
@@ -146,6 +150,7 @@ expectedParser SALikelihood = doubleParser
 expectedParser SABIOF1 = parseBioSequenceIntoEntities
 expectedParser SABIOF1Labels = parseBioSequenceIntoEntitiesWithoutNormalization
 expectedParser SATokenAccuracy = intoWords
+expectedParser SASegmentAccuracy = parseSegmentAnnotations
 expectedParser SAMAE = doubleParser
 expectedParser SASMAPE = doubleParser
 expectedParser SAMultiLabelFMeasure = intoWords
@@ -190,6 +195,7 @@ outputParser SALikelihood = doubleParser
 outputParser SABIOF1 = parseBioSequenceIntoEntities
 outputParser SABIOF1Labels = parseBioSequenceIntoEntitiesWithoutNormalization
 outputParser SATokenAccuracy = intoWords
+outputParser SASegmentAccuracy = parseSegmentAnnotations
 outputParser SAMAE = doubleParser
 outputParser SASMAPE = doubleParser
 outputParser SAMultiLabelFMeasure = intoWords
@@ -244,6 +250,7 @@ itemStep SALikelihood = itemLogLossError
 itemStep SABIOF1 = uncurry gatherCountsForBIO
 itemStep SABIOF1Labels = uncurry gatherCountsForBIO
 itemStep SATokenAccuracy = countHitsAndTotals
+itemStep SASegmentAccuracy = uncurry segmentAccuracy
 itemStep SAMAE = itemAbsoluteError
 itemStep SASMAPE = smape
 itemStep SAMultiLabelFMeasure = getCounts (==)

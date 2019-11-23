@@ -26,7 +26,7 @@ import Data.Attoparsec.Text (parseOnly)
 data Metric = RMSE | MSE | Pearson | Spearman | BLEU | GLEU | WER | Accuracy | ClippEU
               | FMeasure Double | MacroFMeasure Double | NMI
               | LogLossHashed Word32 | CharMatch | MAP | LogLoss | Likelihood
-              | BIOF1 | BIOF1Labels | TokenAccuracy | LikelihoodHashed Word32 | MAE | SMAPE | MultiLabelFMeasure Double
+              | BIOF1 | BIOF1Labels | TokenAccuracy | SegmentAccuracy | LikelihoodHashed Word32 | MAE | SMAPE | MultiLabelFMeasure Double
               | MultiLabelLogLoss | MultiLabelLikelihood
               | SoftFMeasure Double | ProbabilisticMultiLabelFMeasure Double | ProbabilisticSoftFMeasure Double | Soft2DFMeasure Double
               deriving (Eq)
@@ -67,6 +67,7 @@ instance Show Metric where
   show BIOF1 = "BIO-F1"
   show BIOF1Labels = "BIO-F1-Labels"
   show TokenAccuracy = "TokenAccuracy"
+  show SegmentAccuracy = "SegmentAccuracy"
   show MAE = "MAE"
   show SMAPE = "SMAPE"
   show (MultiLabelFMeasure beta) = "MultiLabel-F" ++ (show beta)
@@ -118,6 +119,7 @@ instance Read Metric where
   readsPrec _ ('B':'I':'O':'-':'F':'1':'-':'L':'a':'b':'e':'l':'s':theRest) = [(BIOF1Labels, theRest)]
   readsPrec _ ('B':'I':'O':'-':'F':'1':theRest) = [(BIOF1, theRest)]
   readsPrec _ ('T':'o':'k':'e':'n':'A':'c':'c':'u':'r':'a':'c':'y':theRest) = [(TokenAccuracy, theRest)]
+  readsPrec _ ('S':'e':'g':'m':'e':'n':'t':'A':'c':'c':'u':'r':'a':'c':'y':theRest) = [(SegmentAccuracy, theRest)]
   readsPrec _ ('M':'A':'E':theRest) = [(MAE, theRest)]
   readsPrec _ ('S':'M':'A':'P':'E':theRest) = [(SMAPE, theRest)]
   readsPrec _ ('M':'u':'l':'t':'i':'L':'a':'b':'e':'l':'-':'L':'o':'g':'L':'o':'s':'s':theRest) = [(MultiLabelLogLoss, theRest)]
@@ -154,6 +156,7 @@ getMetricOrdering Likelihood = TheHigherTheBetter
 getMetricOrdering BIOF1 = TheHigherTheBetter
 getMetricOrdering BIOF1Labels = TheHigherTheBetter
 getMetricOrdering TokenAccuracy = TheHigherTheBetter
+getMetricOrdering SegmentAccuracy = TheHigherTheBetter
 getMetricOrdering MAE = TheLowerTheBetter
 getMetricOrdering SMAPE = TheLowerTheBetter
 getMetricOrdering (MultiLabelFMeasure _) = TheHigherTheBetter

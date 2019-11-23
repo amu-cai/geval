@@ -567,6 +567,11 @@ gevalCoreOnSources TokenAccuracy _ = gevalCoreWithoutInput SATokenAccuracy
    where
          hitsAndTotalsAgg = CC.foldl (\(h1, t1) (h2, t2) -> (h1 + h2, t1 + t2)) (0, 0)
 
+gevalCoreOnSources SegmentAccuracy _ = gevalCoreWithoutInput SASegmentAccuracy
+                                                             averageC
+                                                             id
+                                                             noGraph
+
 gevalCoreOnSources MultiLabelLogLoss _ = gevalCoreWithoutInput SAMultiLabelLogLoss
                                                                averageC
                                                                id
