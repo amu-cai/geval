@@ -698,6 +698,26 @@ gevalCoreGeneralized' parserSpec itemStep aggregator finalStep generateGraph con
    return $ MetricOutput (SimpleRun $ finalStep v) (generateGraph v)
 
 
+-- stuff for new dependent-type-based solution
+
+gevalRunPipeline :: (EvaluationContext ctxt m, MonadUnliftIO m, MonadThrow m, MonadIO m)
+                        => ParserSpec ctxt                   -- ^ parsers to parse data
+                        -> (ParsedRecord ctxt -> c)          -- ^ function to go from the parsed value into
+                                                             -- some "local" score calculated for each line (item)
+                        -> ConduitT c Void (ResourceT m) MetricOutput
+                        -> ctxt                              -- ^ "context", i.e. 2 or 3 sources needed to operate
+                        -> m MetricOutput
+gevalRunPipeline parserSpec itemStep finalPipeline context =
+  gevalRunPipeline' parserSpec (skipLineNumber itemStep) finalPipeline context
+
+gevalRunPipeline' :: forall m ctxt c . (EvaluationContext ctxt m, MonadUnliftIO m, MonadThrow m, MonadIO m) => ParserSpec ctxt -> ((Word32, ParsedRecord ctxt) -> c) -> ConduitT c Void (ResourceT m) MetricOutput -> ctxt -> m (MetricOutput)
+gevalRunPipeline' parserSpec itemStep finalPipeline context = do
+   runResourceT $ runConduit $
+     (((getZipSource $ (,)
+       <$> ZipSource (CL.sourceList [(getFirstLineNo (Proxy :: Proxy m) context)..])
+       <*> (ZipSource $ recordSource context parserSpec)) .| CL.map (checkStep (Proxy :: Proxy m) itemStep)) .| CL.catMaybes .| finalPipeline)
+
+
 continueGEvalCalculations :: (MonadIO m) =>
                             SAMetric t
                             -> Metric
