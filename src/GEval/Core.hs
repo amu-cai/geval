@@ -492,6 +492,23 @@ gevalCoreOnSources CharMatch inputLineSource = helper inputLineSource
 gevalCoreOnSources (LogLossHashed nbOfBits) _ = helperLogLossHashed nbOfBits id
 gevalCoreOnSources (LikelihoodHashed nbOfBits) _ = helperLogLossHashed nbOfBits logLossToLikehood
 
+
+gevalCoreOnSources (Mean (MultiLabelFMeasure beta)) _
+  = gevalCoreWithoutInputOnItemTargets (Right . intoWords)
+                                       (Right . getWords)
+                                       ((fMeasureOnCounts beta) . (getCounts (==)))
+                                       averageC
+                                       id
+                                       noGraph
+    where
+      -- repeated as below, as it will be refactored into dependent types soon anyway
+      getWords (RawItemTarget t) = Prelude.map unpack $ selectByStandardThreshold $ parseIntoProbList t
+      getWords (PartiallyParsedItemTarget ts) = Prelude.map unpack ts
+      intoWords (RawItemTarget t) = Prelude.map unpack $ Data.Text.words t
+      intoWords (PartiallyParsedItemTarget ts) = Prelude.map unpack ts
+
+gevalCoreOnSources (Mean _) _ = error $ "Mean/ meta-metric defined only for MultiLabel-F1 for the time being"
+
 -- only MultiLabel-F1 handled for JSONs for the time being...
 gevalCoreOnSources (MultiLabelFMeasure beta) _ = gevalCoreWithoutInputOnItemTargets (Right . intoWords)
                                                                             (Right . getWords)

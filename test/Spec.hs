@@ -127,6 +127,8 @@ main = hspec $ do
       runGEvalTest "accuracy-simple" `shouldReturnAlmost` 0.6
     it "with probs" $
       runGEvalTest "accuracy-probs" `shouldReturnAlmost` 0.4
+    it "sorted" $
+      runGEvalTest "accuracy-on-sorted" `shouldReturnAlmost` 0.75
   describe "F-measure" $ do
     it "simple example" $
       runGEvalTest "f-measure-simple" `shouldReturnAlmost` 0.57142857
@@ -326,6 +328,9 @@ main = hspec $ do
       runGEvalTest "multilabel-f1-with-probs" `shouldReturnAlmost` 0.615384615384615
     it "labels given with probs and numbers" $ do
       runGEvalTest "multilabel-f1-with-probs-and-numbers" `shouldReturnAlmost` 0.6666666666666
+  describe "Mean/MultiLabel-F" $ do
+    it "simple" $ do
+      runGEvalTest "mean-multilabel-f1-simple" `shouldReturnAlmost` 0.5
   describe "MultiLabel-Likelihood" $ do
     it "simple" $ do
       runGEvalTest "multilabel-likelihood-simple" `shouldReturnAlmost` 0.115829218528827
