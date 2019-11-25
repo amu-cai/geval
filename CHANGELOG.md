@@ -1,4 +1,9 @@
 
+## 1.22.1.0
+
+* Add "Mean/" meta-metric (for the time being working only with MultiLabel-F-measure)
+* Add :S flag
+
 ## 1.22.0.0
 
 * Add SegmentAccuracy
