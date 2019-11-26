@@ -45,6 +45,7 @@ data ValidationException = NoChallengeDirectory FilePath
                          | SpaceSuffixDetect FilePath
                          | VaryingNumberOfColumns FilePath
                          | BestPossibleValueNotObtainedWithExpectedData MetricValue MetricValue
+                         | OldStyleTrainFile
 
 instance Exception ValidationException
 
@@ -65,6 +66,7 @@ instance Show ValidationException where
   show (SpaceSuffixDetect filePaths) = somethingWrongWithFilesMessage "Found space at the end of line" filePaths
   show (VaryingNumberOfColumns filePaths) = somethingWrongWithFilesMessage "The file contains varying number of columns" filePaths
   show (BestPossibleValueNotObtainedWithExpectedData expected got) = "The best possible value was not obtained with the expected data, expected: " ++ (show expected) ++ " , obtained: " ++ (show got)
+  show OldStyleTrainFile = "Found old-style train file `train.tsv`, whereas the same convention as in test directories should be used (`in.tsv` and `expected.tsv`)"
 
 validationChallenge :: FilePath -> GEvalSpecification -> IO ()
 validationChallenge challengeDirectory spec = do
@@ -147,7 +149,9 @@ never :: FindClause Bool
 never = depth ==? 0
 
 testDirFilter :: FindClause Bool
-testDirFilter = (SFF.fileType ==? Directory) &&? (SFF.fileName ~~? "dev-*" ||? SFF.fileName ~~? "test-*")
+testDirFilter = (SFF.fileType ==? Directory) &&? (SFF.fileName ~~? "dev-*"
+                                                  ||? SFF.fileName ~~? "test-*"
+                                                  ||? SFF.fileName ==? "train")
 
 fileFilter :: String -> FindClause Bool
 fileFilter fileName = (SFF.fileType ==? RegularFile) &&? (SFF.fileName ~~? fileName ||? SFF.fileName ~~? fileName ++ exts)
@@ -189,12 +193,7 @@ checkTrainDirectory metric challengeDirectory = do
   let trainDirectory = challengeDirectory </> "train"
   whenM (doesDirectoryExist trainDirectory) $ do
     trainFiles <- findTrainFiles trainDirectory
-    when (null trainFiles) $ throw $ NoInputFile "train.tsv"
-    when (length trainFiles > 1) $ throw $ TooManyTrainFiles trainFiles
-    let [trainFile] = trainFiles
-    checkCorrectFile trainFile
-    when (fixedNumberOfColumnsInInput metric && fixedNumberOfColumnsInExpected metric) $ do
-      checkColumns trainFile
+    when (not $ null trainFiles) $ throw $ OldStyleTrainFile
 
 checkColumns :: FilePath -> IO ()
 checkColumns filePath = do

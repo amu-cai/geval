@@ -18,6 +18,9 @@ import Control.Exception
 import Control.Monad.Trans.Resource
 import Data.String.Here
 
+import Data.List (intercalate)
+import Data.List.Split (splitOn)
+
 createChallenge :: Bool -> FilePath -> GEvalSpecification -> IO ()
 createChallenge withDataFiles expectedDirectory spec = do
   D.createDirectoryIfMissing False expectedDirectory
@@ -30,7 +33,8 @@ createChallenge withDataFiles expectedDirectory spec = do
   if withDataFiles
     then
      do
-      createFile (trainDirectory </> "train.tsv") $ trainContents metric
+      createFile (trainDirectory </> "in.tsv") $ trainInContents metric
+      createFile (trainDirectory </> expectedFile) $ trainExpectedContents metric
 
       createFile (devDirectory </> "in.tsv") $ devInContents metric
       createFile (devDirectory </> expectedFile) $ devExpectedContents metric
@@ -413,6 +417,20 @@ configContents schemes precision testName = unwords (Prelude.map (\scheme -> ("-
     where precisionOpt Nothing = ""
           precisionOpt (Just p) = " --precision " ++ (show p)
 
+-- Originally train content was in one file, to avoid large changes
+-- for the time being we are using the original function.
+
+trainInContents :: Metric -> String
+trainInContents metric = unlines
+                         $ map (intercalate "\t")
+                         $ map tail
+                         $ map (splitOn "\t")
+                         $ lines
+                         $ trainContents metric
+
+trainExpectedContents :: Metric -> String
+trainExpectedContents metric = unlines $ map head $ map (splitOn "\t") $ lines $ trainContents metric
+
 trainContents :: Metric -> String
 trainContents (Mean metric) = trainContents metric
 trainContents GLEU = trainContents BLEU
@@ -502,13 +520,13 @@ I am sad	SADNESS
 I am so sad and hateful	SADNESS HATE
 |]
 trainContents (Soft2DFMeasure _) = trainContents ClippEU
-trainContents ClippEU = [hereLit|2/0,0,10,150	foo.djvu
-1/30,40,100,1000	bar.djvu
+trainContents ClippEU = [hereLit|2/0,0,10,150/10	foo.djvu
+1/30,40,100,1000/10	bar.djvu
 |]
-trainContents _ = [hereLit|0.06        0.39    0       0.206
-1.00   1.00    1       0.017
-317.8  5.20    67      0.048
-14.6   19.22   27      0.047
+trainContents _ = [hereLit|0.06	0.39	0	0.206
+1.00	1.00	1	0.017
+317.8	5.20	67	0.048
+14.6	19.22	27	0.047
 |]
 
 devInContents :: Metric -> String
