@@ -249,9 +249,6 @@ metricReader = many $ option auto         -- actually `some` should be used inst
                  <> metavar "METRIC"
                  <> help ("Metric to be used, e.g.:" ++ helpMetricParameterMetricsList))
 
-
---                   RMSE, MSE, MAE, SMAPE, Pearson, Spearman, Accuracy, LogLoss, Likelihood, F-measure (specify as F1, F2, F0.25, etc.), macro F-measure (specify as Macro-F1, Macro-F2, Macro-F0.25, etc.), multi-label F-measure (specify as MultiLabel-F1, MultiLabel-F2, MultiLabel-F0.25, etc.), MultiLabel-Likelihood, MAP, BLEU, GLEU (\"Google GLEU\" not the grammar correction metric), WER, NMI, ClippEU, LogLossHashed, LikelihoodHashed, BIO-F1, BIO-F1-Labels, TokenAccuracy, soft F-measure (specify as Soft-F1, Soft-F2, Soft-F0.25), probabilistic soft F-measure (specify as Probabilistic-Soft-F1, Probabilistic-Soft-F2, Probabilistic-Soft-F0.25) or CharMatch" )
-
 altMetricReader :: Parser (Maybe EvaluationScheme)
 altMetricReader = optional $ option auto
                ( long "alt-metric"
