@@ -522,8 +522,8 @@ I am so sad and hateful	SADNESS HATE
 trainContents (Soft2DFMeasure _) = [hereLit|2/0,0,10,150	foo.djvu
 1/30,40,100,1000	bar.djvu
 |]
-trainContents ClippEU = [hereLit|2/0,0,10,150/10	foo.djvu
-1/30,40,100,1000/10	bar.djvu
+trainContents ClippEU = [hereLit|1/30,40,100,1000/10	bar.djvu
+2/30,40,500,600/10	foo.djvu
 |]
 trainContents _ = [hereLit|0.06	0.39	0	0.206
 1.00	1.00	1	0.017
