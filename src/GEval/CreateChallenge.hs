@@ -501,7 +501,7 @@ trainContents LogLoss = [hereLit|0.0	Hell, no!!!
 trainContents BIOF1Labels = trainContents BIOF1
 trainContents BIOF1 = [hereLit|O O O B-surname/BOND O B-firstname/JAMES B-surname/BOND	My name is Bond , James Bond
 O O O O O	There is no name here
-B-firstname/JOHN I-surname/VON I-surname/NEUMANN	John von Nueman
+B-firstname/JOHN B-surname/VON I-surname/NEUMANN	John von Nueman
 |]
 trainContents TokenAccuracy = [hereLit|* V N	I like cats
 * * V * N	I can see the rainbow
@@ -519,7 +519,9 @@ Love and hate	LOVE HATE
 I am sad	SADNESS
 I am so sad and hateful	SADNESS HATE
 |]
-trainContents (Soft2DFMeasure _) = trainContents ClippEU
+trainContents (Soft2DFMeasure _) = [hereLit|2/0,0,10,150	foo.djvu
+1/30,40,100,1000	bar.djvu
+|]
 trainContents ClippEU = [hereLit|2/0,0,10,150/10	foo.djvu
 1/30,40,100,1000/10	bar.djvu
 |]
