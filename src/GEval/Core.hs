@@ -492,6 +492,23 @@ gevalCoreOnSources CharMatch inputLineSource = helper inputLineSource
 gevalCoreOnSources (LogLossHashed nbOfBits) _ = helperLogLossHashed nbOfBits id
 gevalCoreOnSources (LikelihoodHashed nbOfBits) _ = helperLogLossHashed nbOfBits logLossToLikehood
 
+
+gevalCoreOnSources (Mean (MultiLabelFMeasure beta)) _
+  = gevalCoreWithoutInputOnItemTargets (Right . intoWords)
+                                       (Right . getWords)
+                                       ((fMeasureOnCounts beta) . (getCounts (==)))
+                                       averageC
+                                       id
+                                       noGraph
+    where
+      -- repeated as below, as it will be refactored into dependent types soon anyway
+      getWords (RawItemTarget t) = Prelude.map unpack $ selectByStandardThreshold $ parseIntoProbList t
+      getWords (PartiallyParsedItemTarget ts) = Prelude.map unpack ts
+      intoWords (RawItemTarget t) = Prelude.map unpack $ Data.Text.words t
+      intoWords (PartiallyParsedItemTarget ts) = Prelude.map unpack ts
+
+gevalCoreOnSources (Mean _) _ = error $ "Mean/ meta-metric defined only for MultiLabel-F1 for the time being"
+
 -- only MultiLabel-F1 handled for JSONs for the time being...
 gevalCoreOnSources (MultiLabelFMeasure beta) _ = gevalCoreWithoutInputOnItemTargets (Right . intoWords)
                                                                             (Right . getWords)
@@ -705,6 +722,13 @@ gevalCoreOnSources TokenAccuracy _ = gevalCoreWithoutInput intoTokens
            | o `Prelude.elem` (splitOn (pack ";") e) = (h + 1, t + 1)
            | otherwise = (h, t + 1)
          hitsAndTotalsAgg = CC.foldl (\(h1, t1) (h2, t2) -> (h1 + h2, t1 + t2)) (0, 0)
+
+gevalCoreOnSources SegmentAccuracy _ = gevalCoreWithoutInput parseSegmentAnnotations
+                                                             parseSegmentAnnotations
+                                                             (uncurry segmentAccuracy)
+                                                             averageC
+                                                             id
+                                                             noGraph
 
 gevalCoreOnSources MultiLabelLogLoss _ = gevalCoreWithoutInput intoWords
                                                        (Right . parseIntoProbList)

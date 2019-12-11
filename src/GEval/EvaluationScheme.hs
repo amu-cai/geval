@@ -6,8 +6,8 @@ import GEval.Metric
 
 import Text.Regex.PCRE.Heavy
 import Text.Regex.PCRE.Light.Base (Regex(..))
-import Data.Text (Text(..), concat, toLower, toUpper, pack, unpack)
-import Data.List (intercalate, break)
+import Data.Text (Text(..), concat, toLower, toUpper, pack, unpack, words, unwords)
+import Data.List (intercalate, break, sort)
 import Data.Either
 import Data.Maybe (fromMaybe)
 import qualified Data.ByteString.UTF8 as BSU
@@ -16,7 +16,7 @@ import qualified Data.ByteString.UTF8 as BSU
 data EvaluationScheme = EvaluationScheme Metric [PreprocessingOperation]
   deriving (Eq)
 
-data PreprocessingOperation = RegexpMatch Regex | LowerCasing | UpperCasing | SetName Text
+data PreprocessingOperation = RegexpMatch Regex | LowerCasing | UpperCasing | Sorting | SetName Text
   deriving (Eq)
 
 leftParameterBracket :: Char
@@ -39,6 +39,8 @@ readOps ('l':theRest) = (LowerCasing:ops, theRest')
 readOps ('u':theRest) = (UpperCasing:ops, theRest')
     where (ops, theRest') = readOps theRest
 readOps ('m':theRest) = handleParametrizedOp (RegexpMatch . (fromRight undefined) . ((flip compileM) []) . BSU.fromString) theRest
+readOps ('S':theRest) = (Sorting:ops, theRest')
+    where (ops, theRest') = readOps theRest
 readOps ('N':theRest) = handleParametrizedOp (SetName . pack) theRest
 readOps s = ([], s)
 
@@ -70,6 +72,7 @@ instance Show PreprocessingOperation where
   show (RegexpMatch (Regex _ regexp)) = parametrizedOperation "m" (BSU.toString regexp)
   show LowerCasing = "l"
   show UpperCasing = "u"
+  show Sorting = "S"
   show (SetName t) = parametrizedOperation "N" (unpack t)
 
 parametrizedOperation :: String -> String -> String
@@ -82,4 +85,5 @@ applyPreprocessingOperation :: PreprocessingOperation -> Text -> Text
 applyPreprocessingOperation (RegexpMatch regex) = Data.Text.concat . (map fst) . (scan regex)
 applyPreprocessingOperation LowerCasing = toLower
 applyPreprocessingOperation UpperCasing = toUpper
+applyPreprocessingOperation Sorting = Data.Text.unwords . sort . Data.Text.words
 applyPreprocessingOperation (SetName _) = id

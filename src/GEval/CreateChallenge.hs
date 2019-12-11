@@ -55,6 +55,7 @@ createFile filePath contents = do
   writeFile filePath contents
 
 readmeMDContents :: Metric -> String -> String
+readmeMDContents (Mean metric) testName = readmeMDContents metric testName
 readmeMDContents GLEU testName = readmeMDContents BLEU testName
 readmeMDContents BLEU testName = [i|
 GEval sample machine translation challenge
@@ -297,6 +298,19 @@ in the expected file (but not in the output file).
 
 |] ++ (commonReadmeMDContents testName)
 
+readmeMDContents SegmentAccuracy testName = [i|
+Segment a sentence and tag with POS tags
+========================================
+
+This is a sample, toy challenge for SegmentAccuracy.
+
+For each sentence, give a sequence of POS tags, each one with
+its position (1-indexed). For instance, `N:1-10` means a nouns
+starting from the beginning (the first character) up to to the tenth
+character (inclusively).
+
+|] ++ (commonReadmeMDContents testName)
+
 readmeMDContents (ProbabilisticMultiLabelFMeasure beta) testName = readmeMDContents (MultiLabelFMeasure beta) testName
 readmeMDContents (MultiLabelFMeasure beta) testName = [i|
 Tag names and their component
@@ -400,6 +414,7 @@ configContents schemes precision testName = unwords (Prelude.map (\scheme -> ("-
           precisionOpt (Just p) = " --precision " ++ (show p)
 
 trainContents :: Metric -> String
+trainContents (Mean metric) = trainContents metric
 trainContents GLEU = trainContents BLEU
 trainContents BLEU = [hereLit|alussa loi jumala taivaan ja maan	he mea hanga na te atua i te timatanga te rangi me te whenua
 ja maa oli autio ja tyhjä , ja pimeys oli syvyyden päällä	a kahore he ahua o te whenua , i takoto kau ; he pouri ano a runga i te mata o te hohonu
@@ -473,6 +488,9 @@ B-firstname/JOHN I-surname/VON I-surname/NEUMANN	John von Nueman
 trainContents TokenAccuracy = [hereLit|* V N	I like cats
 * * V * N	I can see the rainbow
 |]
+trainContents SegmentAccuracy = [hereLit|Art:1-3 N:5-11 V:12-13 A:15-19	The student's smart
+N:1-6 N:8-10 V:12-13 A:15-18	Mary's dog is nice
+|]
 trainContents (ProbabilisticMultiLabelFMeasure beta) = trainContents (MultiLabelFMeasure beta)
 trainContents (MultiLabelFMeasure _) = [hereLit|I know Mr John Smith	person/3,4,5 first-name/4 surname/5
 Steven bloody Brown	person/1,3 first-name/1 surname/3
@@ -494,6 +512,7 @@ trainContents _ = [hereLit|0.06        0.39    0       0.206
 |]
 
 devInContents :: Metric -> String
+devInContents (Mean metric) = devInContents metric
 devInContents GLEU = devInContents BLEU
 devInContents BLEU = [hereLit|ja jumala sanoi : " tulkoon valkeus " , ja valkeus tuli
 ja jumala näki , että valkeus oli hyvä ; ja jumala erotti valkeuden pimeydestä
@@ -540,6 +559,9 @@ Mr Jan Kowalski
 devInContents TokenAccuracy = [hereLit|The cats on the mat
 Ala has a cat
 |]
+devInContents SegmentAccuracy = [hereLit|John is smart
+Mary's intelligent
+|]
 devInContents (ProbabilisticMultiLabelFMeasure beta) = devInContents (MultiLabelFMeasure beta)
 devInContents (MultiLabelFMeasure _) = [hereLit|Jan Kowalski is here
 I see him
@@ -558,6 +580,7 @@ devInContents _ = [hereLit|0.72	0	0.007
 |]
 
 devExpectedContents :: Metric -> String
+devExpectedContents (Mean metric) = devExpectedContents metric
 devExpectedContents GLEU = devExpectedContents BLEU
 devExpectedContents BLEU = [hereLit|a ka ki te atua , kia marama : na ka marama
 a ka kite te atua i te marama , he pai : a ka wehea e te atua te marama i te pouri
@@ -604,6 +627,9 @@ O B-firstname/JAN B-surname/KOWALSKI
 devExpectedContents TokenAccuracy = [hereLit|* N * * N
 N V * N
 |]
+devExpectedContents SegmentAccuracy = [hereLit|N:1-4 V:6-7 A:9-13
+N:1-4 V:6-7 A:9-19
+|]
 devExpectedContents (ProbabilisticMultiLabelFMeasure beta) = devExpectedContents (MultiLabelFMeasure beta)
 devExpectedContents (MultiLabelFMeasure _) = [hereLit|person/1,2 first-name/1 surname/2
 
@@ -624,7 +650,9 @@ devExpectedContents _ = [hereLit|0.82
 |]
 
 testInContents :: Metric -> String
-testInContents GLEU = testInContents BLEU
+testInContents (Mean metric) = testInContents metric
+testInContents GLEU = [hereLit|Alice has a black
+|]
 testInContents BLEU = [hereLit|ja jumala kutsui valkeuden päiväksi , ja pimeyden hän kutsui yöksi
 ja tuli ehtoo , ja tuli aamu , ensimmäinen päivä
 |]
@@ -672,6 +700,9 @@ No name here
 testInContents TokenAccuracy = [hereLit|I have cats
 I know
 |]
+testInContents SegmentAccuracy = [hereLit|Mary's cat is old
+John is young
+|]
 testInContents (ProbabilisticMultiLabelFMeasure beta) = testInContents (MultiLabelFMeasure beta)
 testInContents (MultiLabelFMeasure _) = [hereLit|John bloody Smith
 Nobody is there
@@ -690,7 +721,7 @@ testInContents _ = [hereLit|0.72	0	0.007
 |]
 
 testExpectedContents :: Metric -> String
-testExpectedContents GLEU = testExpectedContents BLEU
+testExpectedContents (Mean metric) = testExpectedContents metric
 testExpectedContents BLEU = [hereLit|na ka huaina e te atua te marama ko te awatea , a ko te pouri i huaina e ia ko te po
 a ko te ahiahi , ko te ata , he ra kotahi
 |]
@@ -738,6 +769,9 @@ O O O
 testExpectedContents TokenAccuracy = [hereLit|* V N
 * V
 |]
+testExpectedContents SegmentAccuracy = [hereLit|N:1-6 N:8-10 V:12-13 A:15-17
+N:1-4 V:6-7 A:9-13
+|]
 testExpectedContents (ProbabilisticMultiLabelFMeasure beta) = testExpectedContents (MultiLabelFMeasure beta)
 testExpectedContents (MultiLabelFMeasure _) = [hereLit|person/1,3 first-name/1 surname/3
 
@@ -753,9 +787,12 @@ bar:1/50,50,1000,1000
 testExpectedContents ClippEU = [hereLit|3/0,0,100,100/10
 1/10,10,1000,1000/10
 |]
+testExpectedContents GLEU = [hereLit|Alice has a black cat
+|]
 testExpectedContents _ = [hereLit|0.11
 17.2
 |]
+
 
 gitignoreContents :: String
 gitignoreContents = [hereLit|
