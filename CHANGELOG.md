@@ -1,4 +1,11 @@
 
+## 1.23.0.0
+
+* New style of train data is preferred
+  - `in.tsv` and `expected.tsv` instead of `train.tsv`
+  - though this is not required as sometimes training data look different than test data
+  - `--validate` option was changed accordingly
+
 ## 1.22.1.0
 
 * Add "Mean/" meta-metric (for the time being working only with MultiLabel-F-measure)
