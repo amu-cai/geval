@@ -33,8 +33,7 @@ createChallenge withDataFiles expectedDirectory spec = do
   if withDataFiles
     then
      do
-      createFile (trainDirectory </> "in.tsv") $ trainInContents metric
-      createFile (trainDirectory </> expectedFile) $ trainExpectedContents metric
+      createTrainFiles metric trainDirectory expectedFile
 
       createFile (devDirectory </> "in.tsv") $ devInContents metric
       createFile (devDirectory </> expectedFile) $ devExpectedContents metric
@@ -52,6 +51,16 @@ createChallenge withDataFiles expectedDirectory spec = do
         devDirectory = expectedDirectory </> "dev-0"
         testDirectory = expectedDirectory </> testName
         expectedFile = gesExpectedFile spec
+
+createTrainFiles :: Metric -> FilePath -> FilePath -> IO ()
+createTrainFiles metric@(LogLossHashed _) trainDirectory _ = createSingleTrainFile metric trainDirectory
+createTrainFiles metric@(LikelihoodHashed _) trainDirectory _ = createSingleTrainFile metric trainDirectory
+createTrainFiles metric trainDirectory expectedFile = do
+  createFile (trainDirectory </> "in.tsv") $ trainInContents metric
+  createFile (trainDirectory </> expectedFile) $ trainExpectedContents metric
+
+createSingleTrainFile metric trainDirectory =
+  createFile (trainDirectory </> "train.tsv") $ trainContents metric
 
 createFile :: FilePath -> String -> IO ()
 createFile filePath contents = do
