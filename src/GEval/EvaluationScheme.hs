@@ -1,5 +1,10 @@
 module GEval.EvaluationScheme
-  (EvaluationScheme(..), evaluationSchemeMetric, applyPreprocessingOperations, evaluationSchemeName, PreprocessingOperation(..))
+  (EvaluationScheme(..),
+   evaluationSchemeMetric,
+   applyPreprocessingOperations,
+   evaluationSchemeName,
+   evaluationSchemePriority,
+   PreprocessingOperation(..))
   where
 
 import GEval.Metric
@@ -9,14 +14,19 @@ import Text.Regex.PCRE.Light.Base (Regex(..))
 import Data.Text (Text(..), concat, toLower, toUpper, pack, unpack, words, unwords)
 import Data.List (intercalate, break, sort)
 import Data.Either
-import Data.Maybe (fromMaybe)
+import Data.Maybe (fromMaybe, catMaybes)
 import qualified Data.ByteString.UTF8 as BSU
 
 
 data EvaluationScheme = EvaluationScheme Metric [PreprocessingOperation]
   deriving (Eq)
 
-data PreprocessingOperation = RegexpMatch Regex | LowerCasing | UpperCasing | Sorting | SetName Text
+data PreprocessingOperation = RegexpMatch Regex
+                              | LowerCasing
+                              | UpperCasing
+                              | Sorting
+                              | SetName Text
+                              | SetPriority Int
   deriving (Eq)
 
 leftParameterBracket :: Char
@@ -42,6 +52,7 @@ readOps ('m':theRest) = handleParametrizedOp (RegexpMatch . (fromRight undefined
 readOps ('S':theRest) = (Sorting:ops, theRest')
     where (ops, theRest') = readOps theRest
 readOps ('N':theRest) = handleParametrizedOp (SetName . pack) theRest
+readOps ('P':theRest) = handleParametrizedOp (SetPriority . read) theRest
 readOps s = ([], s)
 
 handleParametrizedOp :: (String -> PreprocessingOperation) -> String -> ([PreprocessingOperation], String)
@@ -60,10 +71,21 @@ instance Show EvaluationScheme where
 evaluationSchemeName :: EvaluationScheme -> String
 evaluationSchemeName scheme@(EvaluationScheme metric operations) = fromMaybe (show scheme) (findNameSet operations)
 
+evaluationSchemePriority scheme@(EvaluationScheme _ operations) = fromMaybe defaultPriority (findPrioritySet operations)
+  where defaultPriority = 1
+
 findNameSet :: [PreprocessingOperation] -> Maybe String
-findNameSet [] = Nothing
-findNameSet ((SetName name):_) = Just (unpack name)
-findNameSet (_:ops) = findNameSet ops
+findNameSet ops = case names of
+  [] -> Nothing
+  _ -> Just $ intercalate " " names
+  where names = catMaybes $ map extractName ops
+        extractName (SetName n) = Just (unpack n)
+        extractName _ = Nothing
+
+findPrioritySet :: [PreprocessingOperation] -> Maybe Int
+findPrioritySet [] = Nothing
+findPrioritySet ((SetPriority p):_) = Just p
+findPrioritySet (_:ops) = findPrioritySet ops
 
 evaluationSchemeMetric :: EvaluationScheme -> Metric
 evaluationSchemeMetric (EvaluationScheme metric _) = metric
@@ -74,6 +96,7 @@ instance Show PreprocessingOperation where
   show UpperCasing = "u"
   show Sorting = "S"
   show (SetName t) = parametrizedOperation "N" (unpack t)
+  show (SetPriority p) = parametrizedOperation "P" (show p)
 
 parametrizedOperation :: String -> String -> String
 parametrizedOperation opCode opArg = opCode ++ [leftParameterBracket] ++ opArg ++ [rightParameterBracket]
@@ -87,3 +110,4 @@ applyPreprocessingOperation LowerCasing = toLower
 applyPreprocessingOperation UpperCasing = toUpper
 applyPreprocessingOperation Sorting = Data.Text.unwords . sort . Data.Text.words
 applyPreprocessingOperation (SetName _) = id
+applyPreprocessingOperation (SetPriority _) = id
