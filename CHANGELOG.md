@@ -1,4 +1,9 @@
 
+## 1.24.0.0
+
+* Introduce metric priorities
+* Use "Cartesian" strings in metrics
+
 ## 1.23.0.0
 
 * New style of train data is preferred
