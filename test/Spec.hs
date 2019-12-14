@@ -64,6 +64,7 @@ import qualified Data.Vector.Unboxed as DVU
 import qualified Statistics.Matrix.Types as SMT
 import Data.Statistics.Loess (loess)
 import Data.Statistics.Calibration (calibration)
+import Data.CartesianStrings (parseCartesianString)
 
 informationRetrievalBookExample :: [(String, Int)]
 informationRetrievalBookExample = [("o", 2), ("o", 2), ("d", 2), ("x", 3), ("d", 3),
@@ -670,6 +671,21 @@ main = hspec $ do
       calibration [True, False] [0.0, 1.0] `shouldBeAlmost` 0.0
       calibration [True, False, False, True, False] [0.0, 1.0, 1.0, 0.5, 0.5] `shouldBeAlmost` 0.0
       calibration [False, True, True, True, True, False, False, True, False] [0.25, 0.25, 0.0, 0.25, 0.25, 1.0, 1.0, 0.5, 0.5] `shouldBeAlmost` 0.0
+  describe "Cartesian strings" $ do
+    it "singleton" $ do
+      (parseCartesianString "foo") `shouldBe` ["foo"]
+    it "simple" $ do
+      parseCartesianString "a-{foo,bar,baz}-b" `shouldBe` ["a-foo-b", "a-bar-b", "a-baz-b"]
+    it "3x2" $ do
+      parseCartesianString "a-{foo,bar,baz}-{b,c}" `shouldBe` ["a-foo-b", "a-foo-c", "a-bar-b",
+                                                               "a-bar-c", "a-baz-b", "a-baz-c" ]
+    it "3x2x3" $ do
+      parseCartesianString "{foo,bar,ba}-{b,c}-{0,1,2}x" `shouldBe` ["foo-b-0x", "foo-b-1x", "foo-b-2x",
+                                                                      "foo-c-0x", "foo-c-1x", "foo-c-2x",
+                                                                      "bar-b-0x", "bar-b-1x", "bar-b-2x",
+                                                                      "bar-c-0x", "bar-c-1x", "bar-c-2x",
+                                                                      "ba-b-0x", "ba-b-1x", "ba-b-2x",
+                                                                      "ba-c-0x", "ba-c-1x", "ba-c-2x" ]
 
 checkConduitPure conduit inList expList = do
   let outList = runConduitPure $ CC.yieldMany inList .| conduit .| CC.sinkList

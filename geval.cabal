@@ -48,6 +48,7 @@ library
                      , GEval.Selector
                      , Data.Statistics.Loess
                      , Data.Statistics.Calibration
+                     , Data.CartesianStrings
                      , Paths_geval
   build-depends:       base >= 4.7 && < 5
                      , cond

@@ -39,6 +39,7 @@ import GEval.Validation
 import Data.List (intercalate)
 
 import Data.Conduit.SmartSource
+import Data.CartesianStrings
 
 fullOptionsParser = info (helper <*> optionsParser)
        (fullDesc
@@ -243,11 +244,12 @@ sel (Just m) _ = m
 
 
 metricReader :: Parser [EvaluationScheme]
-metricReader = many $ option auto         -- actually `some` should be used instead of `many`, the problem is that
-               ( long "metric"            -- --metric might be in the config.txt file...
-                 <> short 'm'
-                 <> metavar "METRIC"
-                 <> help ("Metric to be used, e.g.:" ++ helpMetricParameterMetricsList))
+metricReader = concatCartesianStrings <$>
+  (many $ option auto         -- actually `some` should be used instead of `many`, the problem is that
+    ( long "metric"           -- --metric might be in the config.txt file...
+      <> short 'm'
+      <> metavar "METRIC"
+      <> help ("Metric to be used, e.g.:" ++ helpMetricParameterMetricsList)))
 
 altMetricReader :: Parser (Maybe EvaluationScheme)
 altMetricReader = optional $ option auto
