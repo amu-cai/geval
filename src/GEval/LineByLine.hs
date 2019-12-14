@@ -16,7 +16,8 @@ module GEval.LineByLine
         runDiffGeneralized,
         LineRecord(..),
         ResultOrdering(..),
-        justTokenize
+        justTokenize,
+        worstFeaturesPipeline
        ) where
 
 import GEval.Core
@@ -107,28 +108,26 @@ runFeatureFilter (Just feature) spec bbdo mReferences = CC.map (\l -> (fakeRank,
         checkFeature feature (_, LineWithFactors _ _ fs) = feature `elem` (Prelude.map show fs)
 
 runWorstFeatures :: ResultOrdering -> GEvalSpecification -> BlackBoxDebuggingOptions -> IO ()
-runWorstFeatures ordering spec bbdo = runLineByLineGeneralized ordering' spec (\mReferences -> worstFeaturesPipeline False spec bbdo mReferences)
+runWorstFeatures ordering spec bbdo = runLineByLineGeneralized ordering' spec (\mReferences -> worstFeaturesPipeline False spec bbdo mReferences consumFeatures)
   where ordering' = forceSomeOrdering ordering
 
+consumFeatures = CL.map (encodeUtf8 . formatFeatureWithPValue)
+                 .| CC.unlinesAscii
+                 .| CC.stdout
 
-
-worstFeaturesPipeline :: Bool -> GEvalSpecification -> BlackBoxDebuggingOptions -> Maybe References -> ConduitT LineRecord Void (ResourceT IO) ()
-worstFeaturesPipeline reversed spec bbdo mReferences = rank (lessByMetric reversed $ gesMainMetric spec)
+worstFeaturesPipeline :: Bool
+                        -> GEvalSpecification
+                        -> BlackBoxDebuggingOptions
+                        -> Maybe References
+                        -> ConduitT FeatureWithPValue Void (ResourceT IO) ()
+                        -> ConduitT LineRecord Void (ResourceT IO) ()
+worstFeaturesPipeline reversed spec bbdo mReferences consum = rank (lessByMetric reversed $ gesMainMetric spec)
                                       .| evalStateC 0 (extractFeaturesAndPValues spec bbdo mReferences)
                                       .| CC.filter (\(FeatureWithPValue _ p _ _) -> not $ isNaN p) -- NaN values would poison sorting
                                       .| gobbleAndDo (sortBy featureOrder)
                                       .| filtreCartesian (bbdoCartesian bbdo)
-                                      .| CL.map (encodeUtf8 . formatFeatureWithPValue)
-                                      .| CC.unlinesAscii
-                                      .| CC.stdout
-  where  formatOutput (LineRecord inp exp out _ score) = Data.Text.intercalate "\t" [
-           formatScore score,
-           escapeTabs inp,
-           escapeTabs exp,
-           escapeTabs out]
-         formatScore :: MetricValue -> Text
-         formatScore = Data.Text.pack . printf "%f"
-         featureOrder (FeatureWithPValue _ p1 _ _) (FeatureWithPValue _ p2 _ _) =
+                                      .| consum
+  where  featureOrder (FeatureWithPValue _ p1 _ _) (FeatureWithPValue _ p2 _ _) =
            p1 `compare` p2
 
 -- for commands like --worst-features we need some ordering (KeepTheOriginalOrder
@@ -402,7 +401,7 @@ runMostWorseningFeatures ordering otherOut spec bbdo  = runDiffGeneralized order
           FirstTheBest -> True
         consum :: Maybe References -> ConduitT (LineRecord, LineRecord) Void (ResourceT IO) ()
         consum = \mReferences -> CC.map prepareFakeLineRecord
-                                .| (worstFeaturesPipeline reversed spec bbdo mReferences)
+                                .| (worstFeaturesPipeline reversed spec bbdo mReferences consumFeatures)
         prepareFakeLineRecord :: (LineRecord, LineRecord) -> LineRecord
         prepareFakeLineRecord (LineRecord _ _ _ _ scorePrev, LineRecord inp exp out c score) =
           LineRecord inp exp out c (score - scorePrev)
