@@ -65,6 +65,7 @@ import qualified Statistics.Matrix.Types as SMT
 import Data.Statistics.Loess (loess)
 import Data.Statistics.Calibration (calibration)
 import Data.CartesianStrings (parseCartesianString)
+import Data.SplitIntoCrossTabs (splitIntoCrossTabs, CrossTab(..), TextFrag(..))
 
 informationRetrievalBookExample :: [(String, Int)]
 informationRetrievalBookExample = [("o", 2), ("o", 2), ("d", 2), ("x", 3), ("d", 3),
@@ -687,6 +688,26 @@ main = hspec $ do
                                                                       "bar-c-0x", "bar-c-1x", "bar-c-2x",
                                                                       "ba-b-0x", "ba-b-1x", "ba-b-2x",
                                                                       "ba-c-0x", "ba-c-1x", "ba-c-2x" ]
+  describe "cross-tabs" $ do
+    it "singleton" $ do
+      splitIntoCrossTabs ["abababab"] `shouldBe` [SingleItem "abababab"]
+    it "too small" $ do
+      splitIntoCrossTabs ["aabb", "aacc"] `shouldBe` [SingleItem "aabb", SingleItem "aacc"]
+    it "two tables" $ do
+      splitIntoCrossTabs ["yABC", "xx00", "yABD", "ZC", "xx11", "yy00", "yy11", "ZD"] `shouldBe` [
+                                         CrossTab [Prefix "yAB", Prefix "Z"] [Suffix "C", Suffix "D"],
+                                         CrossTab [Prefix "xx", Prefix "yy"] [Suffix "00", Suffix "11"]]
+    it "simple" $ do
+      splitIntoCrossTabs ["aabsolutely",
+                          "aaafoo",
+                          "other",
+                          "aaabaz",
+                          "aaabaq",
+                          "bbbfoo",
+                          "bbbbaz",
+                          "bbbbaq"] `shouldBe` [SingleItem "aabsolutely",
+                                                CrossTab [Suffix "foo", Suffix "baz", Suffix "baq"] [Prefix "aaa", Prefix "bbb"],
+                                                SingleItem "other"]
 
 checkConduitPure conduit inList expList = do
   let outList = runConduitPure $ CC.yieldMany inList .| conduit .| CC.sinkList

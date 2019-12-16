@@ -49,6 +49,7 @@ library
                      , Data.Statistics.Loess
                      , Data.Statistics.Calibration
                      , Data.CartesianStrings
+                     , Data.SplitIntoCrossTabs
                      , Paths_geval
   build-depends:       base >= 4.7 && < 5
                      , cond
@@ -101,6 +102,7 @@ library
                      , filemanip
                      , temporary
                      , utf8-string
+                     , ordered-containers
   default-language:    Haskell2010
 
 executable geval
