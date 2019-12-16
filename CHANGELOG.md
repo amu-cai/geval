@@ -1,4 +1,8 @@
 
+## 1.25.0.0
+
+* Add --oracle-item-based
+
 ## 1.24.0.0
 
 * Introduce metric priorities
