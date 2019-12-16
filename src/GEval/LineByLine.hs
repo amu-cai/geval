@@ -23,6 +23,7 @@ module GEval.LineByLine
 
 import GEval.Core
 import GEval.Common
+import GEval.EvaluationScheme
 import Text.Tokenizer
 
 import Data.Conduit.AutoDecompress (doNothing)
@@ -359,8 +360,9 @@ runLineByLineGeneralized ordering spec consum = do
   (inputFilePath, expectedFilePath, outFilePath) <- checkAndGetFilesSingleOut True spec
   gevalLineByLineCore metric mSelector preprocess inputFilePath expectedFilePath outFilePath (sorter ordering .| consum mReferences)
   where metric = gesMainMetric spec
+        scheme = gesMainScheme spec
         mSelector = gesSelector spec
-        preprocess = gesPreprocess spec
+        preprocess = (gesPreprocess spec) . (applyPreprocessingOperations scheme)
         sorter KeepTheOriginalOrder = doNothing
         sorter ordering = gobbleAndDo $ sortBy (sortOrder ordering (getMetricOrdering metric))
         sortOrder FirstTheWorst TheHigherTheBetter = compareScores
@@ -414,7 +416,8 @@ runMultiOutputGeneralized spec consum = do
   runResourceT $ runConduit $
     (sequenceSources sources .| consum)
   where metric = gesMainMetric spec
-        preprocess = gesPreprocess spec
+        scheme = gesMainScheme spec
+        preprocess = (gesPreprocess spec) . (applyPreprocessingOperations scheme)
         mSelector = gesSelector spec
 
 runMostWorseningFeatures :: ResultOrdering -> FilePath -> GEvalSpecification -> BlackBoxDebuggingOptions -> IO ()

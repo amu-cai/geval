@@ -40,6 +40,7 @@ module GEval.Core
       checkMultipleOuts,
       checkMultipleOutsCore,
       gesMainMetric,
+      gesMainScheme,
       gesPreprocess,
       getDataDecoder,
       threeLineSource,
@@ -175,6 +176,11 @@ data GEvalSpecification = GEvalSpecification
 gesMainMetric :: GEvalSpecification -> Metric
 gesMainMetric spec = case gesMetrics spec of
   (scheme:_) -> evaluationSchemeMetric scheme
+  otherwise -> error "no metric given"
+
+gesMainScheme :: GEvalSpecification -> EvaluationScheme
+gesMainScheme spec = case gesMetrics spec of
+  (scheme:_) -> scheme
   otherwise -> error "no metric given"
 
 gesPreprocess :: GEvalSpecification -> (Text -> Text)
