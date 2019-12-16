@@ -160,6 +160,7 @@ data GEvalSpecification = GEvalSpecification
                             gesTestName :: String,
                             gesSelector :: Maybe Selector,
                             gesOutFile :: String,
+                            gesAltOutFiles :: Maybe [String],
                             gesExpectedFile :: String,
                             gesInputFile :: String,
                             gesMetrics :: [EvaluationScheme],
@@ -190,6 +191,7 @@ data GEvalSpecialCommand = Init
                            | Diff FilePath | MostWorseningFeatures FilePath
                            | PrintVersion | JustTokenize | Submit
                            | Validate | ListMetrics
+                           | OracleItemBased
 
 data ResultOrdering = KeepTheOriginalOrder | FirstTheWorst | FirstTheBest
 
@@ -249,6 +251,7 @@ defaultGEvalSpecification = GEvalSpecification {
   gesTestName = defaultTestName,
   gesSelector = Nothing,
   gesOutFile = defaultOutFile,
+  gesAltOutFiles = Nothing,
   gesExpectedFile = defaultExpectedFile,
   gesInputFile = defaultInputFile,
   gesMetrics = [EvaluationScheme defaultMetric []],

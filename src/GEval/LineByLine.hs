@@ -17,7 +17,8 @@ module GEval.LineByLine
         LineRecord(..),
         ResultOrdering(..),
         justTokenize,
-        worstFeaturesPipeline
+        worstFeaturesPipeline,
+        runOracleItemBased
        ) where
 
 import GEval.Core
@@ -34,10 +35,11 @@ import Data.Text
 import Data.Text.Encoding
 import Data.Conduit.Rank
 import Data.Maybe (fromMaybe)
+import Data.Either (rights)
 
 import qualified Data.Vector as V
 
-import Data.List (sortBy, sortOn, sort, concat)
+import Data.List (sortBy, sortOn, sort, concat, maximumBy)
 
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Resource
@@ -83,7 +85,6 @@ readReferences referencesFilePath = do
 parseReferenceEntry :: Text -> (Integer, Text)
 parseReferenceEntry line = (read $ unpack refId, t)
   where [refId, t] = splitOn "\t" line
-
 
 runLineByLine :: ResultOrdering -> Maybe String -> GEvalSpecification -> BlackBoxDebuggingOptions -> IO ()
 runLineByLine ordering featureFilter spec bbdo = runLineByLineGeneralized ordering spec consum
@@ -391,6 +392,30 @@ runDiff ordering featureFilter otherOut spec bbdo = runDiffGeneralized ordering 
           escapeTabs outB]
         formatScoreDiff :: Double -> Text
         formatScoreDiff = Data.Text.pack . printf "%f"
+
+runOracleItemBased :: GEvalSpecification -> IO ()
+runOracleItemBased spec = runMultiOutputGeneralized spec consum
+  where consum = CL.map picker .| format
+        picker = maximumBy (\(LineRecord _ _ _ _ scoreA) (LineRecord _ _ _ _ scoreB) -> metricCompare metric scoreA scoreB)
+        format = CL.map (encodeUtf8 . formatOutput)
+                 .| CC.unlinesAscii
+                 .| CC.stdout
+        formatOutput (LineRecord _ _ out _ _) = out
+        metric = gesMainMetric spec
+
+runMultiOutputGeneralized :: GEvalSpecification -> ConduitT [LineRecord] Void (ResourceT IO) () -> IO ()
+runMultiOutputGeneralized spec consum = do
+  (inputSource, expectedSource, outSource) <- checkAndGetFilesSingleOut True spec
+  let (Just altOuts) = gesAltOutFiles spec
+  altSourceSpecs' <- mapM (getSmartSourceSpec ((gesOutDirectory spec) </> (gesTestName spec)) "out.tsv") altOuts
+  let altSourceSpecs = rights altSourceSpecs'
+  let sourceSpecs = (outSource:altSourceSpecs)
+  let sources = Prelude.map (gevalLineByLineSource metric mSelector preprocess inputSource expectedSource) sourceSpecs
+  runResourceT $ runConduit $
+    (sequenceSources sources .| consum)
+  where metric = gesMainMetric spec
+        preprocess = gesPreprocess spec
+        mSelector = gesSelector spec
 
 runMostWorseningFeatures :: ResultOrdering -> FilePath -> GEvalSpecification -> BlackBoxDebuggingOptions -> IO ()
 runMostWorseningFeatures ordering otherOut spec bbdo  = runDiffGeneralized ordering' otherOut spec consum

@@ -95,6 +95,10 @@ optionsParser = GEvalOptions
                 (flag' ListMetrics
                     ( long "list-metrics"
                       <> help "List all metrics with their descriptions"))
+                <|>
+                (flag' OracleItemBased
+                    ( long "oracle-item-based"
+                      <> help "Generate the best possible output considering outputs given by --out-file and --alt-out-file options (and peeking into the expected file)."))
                 )
 
    <*> ((flag' FirstTheWorst
@@ -152,6 +156,10 @@ specParser = GEvalSpecification
     <> showDefault
     <> metavar "OUT"
     <> help "The name of the file to be evaluated" )
+  <*> (optional $ some $ strOption
+        ( long "alt-out-file"
+          <> metavar "OUT"
+          <> help "Alternative output file, makes sense only for some options, e.g. --oracle-item-based"))
   <*> strOption
   ( long "expected-file"
     <> short 'e'
@@ -354,6 +362,9 @@ runGEval''' (Just Validate) _ _ spec _ _ = do
   return Nothing
 runGEval''' (Just ListMetrics) _ _ _ _ _ = do
   listMetrics
+  return Nothing
+runGEval''' (Just OracleItemBased) _ _ spec _ _ = do
+  runOracleItemBased spec
   return Nothing
 
 getGraphFilename :: Int -> FilePath -> FilePath

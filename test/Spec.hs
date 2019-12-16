@@ -445,6 +445,7 @@ main = hspec $ do
             gesTestName = "test-A",
             gesSelector = Nothing,
             gesOutFile = "out.tsv",
+            gesAltOutFiles = Nothing,
             gesExpectedFile = "expected.tsv",
             gesInputFile = "in.tsv",
             gesMetrics = [EvaluationScheme Likelihood []],

@@ -8,7 +8,8 @@ module GEval.Metric
    bestPossibleValue,
    perfectOutLineFromExpectedLine,
    fixedNumberOfColumnsInExpected,
-   fixedNumberOfColumnsInInput)
+   fixedNumberOfColumnsInInput,
+   metricCompare)
   where
 
 import Data.Word
@@ -172,6 +173,11 @@ getMetricOrdering (MultiLabelFMeasure _) = TheHigherTheBetter
 getMetricOrdering MultiLabelLogLoss = TheLowerTheBetter
 getMetricOrdering MultiLabelLikelihood = TheHigherTheBetter
 getMetricOrdering (Mean metric) = getMetricOrdering metric
+
+metricCompare :: Metric -> MetricValue -> MetricValue -> Ordering
+metricCompare metric a b = metricCompare' (getMetricOrdering metric) a b
+  where metricCompare' TheHigherTheBetter a b = a `compare` b
+        metricCompare' TheLowerTheBetter a b = b `compare` a
 
 bestPossibleValue :: Metric -> MetricValue
 bestPossibleValue metric = case getMetricOrdering metric of
