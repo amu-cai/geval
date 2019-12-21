@@ -1,4 +1,10 @@
 
+## 1.26.0.0
+
+* Change the meaning of WER (WER is calculated for the whole set now
+  - similar to the way BLEU is calculated)
+* Use `Mean/WER` if you want the old meaning (average of per-item results)
+
 ## 1.25.0.0
 
 * Add --oracle-item-based
