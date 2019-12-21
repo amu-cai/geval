@@ -5,8 +5,8 @@ module GEval.WER
 import Data.Array
 import GEval.Common
 
-werStep :: Eq a => [a] -> [a] -> Double
-werStep expected got = (fromIntegral $ distance expected got) `safeDoubleDiv` (fromIntegral $ length expected)
+werStep :: Eq a => [a] -> [a] -> (Int, Int)
+werStep expected got = (distance expected got, length expected)
 
 -- see https://stackoverflow.com/questions/6718787/levenshtein-distance-cost
 distance u v = memo ! (m, n)

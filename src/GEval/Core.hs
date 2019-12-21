@@ -516,7 +516,21 @@ gevalCoreOnSources (Mean (MultiLabelFMeasure beta)) _
       intoWords (RawItemTarget t) = Prelude.map unpack $ Data.Text.words t
       intoWords (PartiallyParsedItemTarget ts) = Prelude.map unpack ts
 
-gevalCoreOnSources (Mean _) _ = error $ "Mean/ meta-metric defined only for MultiLabel-F1 for the time being"
+gevalCoreOnSources (Mean WER) _
+  = gevalCoreWithoutInputOnItemTargets (Right . intoWords)
+                                       (Right . getWords)
+                                       ((uncurry (/.)) . (uncurry werStep))
+                                       averageC
+                                       id
+                                       noGraph
+    where
+      -- repeated as below, as it will be refactored into dependent types soon anyway
+      getWords (RawItemTarget t) = Prelude.map unpack $ selectByStandardThreshold $ parseIntoProbList t
+      getWords (PartiallyParsedItemTarget ts) = Prelude.map unpack ts
+      intoWords (RawItemTarget t) = Prelude.map unpack $ Data.Text.words t
+      intoWords (PartiallyParsedItemTarget ts) = Prelude.map unpack ts
+
+gevalCoreOnSources (Mean _) _ = error $ "Mean/ meta-metric defined only for MultiLabel-F1 and WER for the time being"
 
 -- only MultiLabel-F1 handled for JSONs for the time being...
 gevalCoreOnSources (MultiLabelFMeasure beta) _ = gevalCoreWithoutInputOnItemTargets (Right . intoWords)
@@ -586,9 +600,17 @@ gevalCoreOnSources GLEU _ = gevalCoreWithoutInput (Right . Prelude.map Prelude.w
   where gleuFinal (m, t) = m /. t
         gleuCombine (refs, sen) = gleuStep refs sen
         gleuAgg = CC.foldl gleuFuse (0, 0)
-        gleuFuse (a1, a2) (b1, b2) = (a1+b1, a2+b2)
+        gleuFuse (a1, a2) (b1, b2) = (a1 + b1, a2 + b2)
 
-gevalCoreOnSources WER _ = gevalCoreWithoutInput (Right . Prelude.words . unpack) (Right . Prelude.words . unpack) (uncurry werStep) averageC id noGraph
+gevalCoreOnSources WER _ = gevalCoreWithoutInput (Right . Prelude.words . unpack)
+                                                 (Right . Prelude.words . unpack)
+                                                 (uncurry werStep)
+                                                 werAgg
+                                                 werFinal
+                                                 noGraph
+  where werAgg = CC.foldl werFuse (0, 0)
+        werFuse (a1, a2) (b1, b2) = (a1 + b1, a2 + b2)
+        werFinal (errors, ref) = errors /. ref
 
 gevalCoreOnSources Accuracy _ = gevalCoreWithoutInput (Right . strip) (Right . strip) hitOrMiss averageC id noGraph
                       where hitOrMiss (exp, got) =
