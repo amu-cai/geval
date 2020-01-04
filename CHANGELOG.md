@@ -1,4 +1,8 @@
 
+## 1.27.0.0
+
+* Results are formatted in cross-tables (if possible)
+
 ## 1.26.0.0
 
 * Change the meaning of WER (WER is calculated for the whole set now
