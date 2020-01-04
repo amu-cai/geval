@@ -2,7 +2,9 @@
 
 module Data.SplitIntoCrossTabs
        (splitIntoCrossTabs,
+        splitIntoTablesWithValues,
         CrossTab(..),
+        TableWithValues(..),
         TextFrag(..))
        where
 
@@ -13,10 +15,13 @@ import qualified Data.Map.Ordered as OM
 import qualified Data.Set as S
 import qualified Data.Foldable as F
 import qualified Data.Map as M
+import qualified Data.Map.Lazy as LM
 
 import Debug.Trace
 
 import Data.List (unfoldr, sortBy, maximumBy, minimumBy)
+
+data TableWithValues a = TableWithValues [Text] [(Text, [a])]
 
 data CrossTab = SingleItem Text | CrossTab [TextFrag] [TextFrag]
   deriving (Show, Eq)
@@ -24,6 +29,26 @@ data CrossTab = SingleItem Text | CrossTab [TextFrag] [TextFrag]
 data TextFrag = Prefix Text | Suffix Text
   deriving (Show, Eq, Ord)
 
+splitIntoTablesWithValues :: Text
+                            -> Text
+                            -> LM.Map Text a -- ^ map from which values will be taken,
+                                            -- deliberately a lazy map so that
+                                            -- values could be shown one by one
+                            -> [Text]
+                            -> [TableWithValues a]
+splitIntoTablesWithValues defaultMainHeader defaultSecondaryHeader mapping =
+  joinSingleItems . map (convertIntoTableWithValues defaultMainHeader defaultSecondaryHeader mapping) . splitIntoCrossTabs
+  where joinSingleItems (TableWithValues h@[_, _] arows : TableWithValues [_, _] brows : rest) =
+          joinSingleItems (TableWithValues h (arows ++ brows) : rest)
+        joinSingleItems (e : rest) = e : joinSingleItems rest
+        joinSingleItems [] = []
+
+convertIntoTableWithValues :: Text -> Text -> LM.Map Text a -> CrossTab -> TableWithValues a
+convertIntoTableWithValues defaultMainHeader defaultSecondaryHeader mapping (SingleItem t) =
+  TableWithValues [defaultMainHeader, defaultSecondaryHeader] [(t, [mapping LM.! t])]
+convertIntoTableWithValues defaultMainHeader defaultSecondaryHeader mapping (CrossTab rowNames columnNames) =
+  TableWithValues (T.empty : (map toText columnNames)) (map processRow rowNames)
+  where processRow rowName = (toText rowName, map (\colName -> mapping LM.! (combineFrags rowName colName)) columnNames)
 
 splitIntoCrossTabs :: [Text] -> [CrossTab]
 splitIntoCrossTabs inputs =
@@ -102,6 +127,10 @@ crossTabSize (CrossTab rows columns) = length rows * length columns
 toSet :: CrossTab -> S.Set Text
 toSet (SingleItem t) = S.singleton t
 toSet (CrossTab rowNames columnNames) = S.fromList [rName `combineFrags` cName | rName <- rowNames, cName <- columnNames]
+
+toText :: TextFrag -> Text
+toText (Prefix prefix) = T.stripEnd prefix
+toText (Suffix prefix) = T.stripStart prefix
 
 combineFrags :: TextFrag -> TextFrag -> Text
 combineFrags (Prefix prefix) (Suffix suffix) = prefix <> suffix
