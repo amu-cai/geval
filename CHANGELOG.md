@@ -1,4 +1,8 @@
 
+## 1.28.0.0
+
+* Add `s` flag for substitution
+
 ## 1.27.0.0
 
 * Results are formatted in cross-tables (if possible)
