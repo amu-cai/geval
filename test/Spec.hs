@@ -339,6 +339,8 @@ main = hspec $ do
   describe "Preprocessing operations" $ do
     it "F1 with preprocessing" $ do
       runGEvalTest "f1-with-preprocessing" `shouldReturnAlmost` 0.57142857142857
+    it "Regexp substition" $ do
+      runGEvalTest "accuracy-with-flags" `shouldReturnAlmost` 0.8
   describe "evaluating single lines" $ do
     it "RMSE" $ do
       (MetricOutput v _) <- gevalCoreOnSingleLines RMSE id RawItemTarget
