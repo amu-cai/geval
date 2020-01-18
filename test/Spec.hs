@@ -64,6 +64,8 @@ import qualified Data.Vector.Unboxed as DVU
 import qualified Statistics.Matrix.Types as SMT
 import Data.Statistics.Loess (loess)
 import Data.Statistics.Calibration (calibration)
+import Data.CartesianStrings (parseCartesianString)
+import Data.SplitIntoCrossTabs (splitIntoCrossTabs, CrossTab(..), TextFrag(..))
 
 informationRetrievalBookExample :: [(String, Int)]
 informationRetrievalBookExample = [("o", 2), ("o", 2), ("d", 2), ("x", 3), ("d", 3),
@@ -127,6 +129,8 @@ main = hspec $ do
       runGEvalTest "accuracy-simple" `shouldReturnAlmost` 0.6
     it "with probs" $
       runGEvalTest "accuracy-probs" `shouldReturnAlmost` 0.4
+    it "sorted" $
+      runGEvalTest "accuracy-on-sorted" `shouldReturnAlmost` 0.75
   describe "F-measure" $ do
     it "simple example" $
       runGEvalTest "f-measure-simple" `shouldReturnAlmost` 0.57142857
@@ -326,12 +330,17 @@ main = hspec $ do
       runGEvalTest "multilabel-f1-with-probs" `shouldReturnAlmost` 0.615384615384615
     it "labels given with probs and numbers" $ do
       runGEvalTest "multilabel-f1-with-probs-and-numbers" `shouldReturnAlmost` 0.6666666666666
+  describe "Mean/MultiLabel-F" $ do
+    it "simple" $ do
+      runGEvalTest "mean-multilabel-f1-simple" `shouldReturnAlmost` 0.5
   describe "MultiLabel-Likelihood" $ do
     it "simple" $ do
       runGEvalTest "multilabel-likelihood-simple" `shouldReturnAlmost` 0.115829218528827
   describe "Preprocessing operations" $ do
     it "F1 with preprocessing" $ do
       runGEvalTest "f1-with-preprocessing" `shouldReturnAlmost` 0.57142857142857
+    it "Regexp substition" $ do
+      runGEvalTest "accuracy-with-flags" `shouldReturnAlmost` 0.8
   describe "evaluating single lines" $ do
     it "RMSE" $ do
       (MetricOutput (SimpleRun v) _) <- gevalCoreOnSingleLines RMSE id RawItemTarget
@@ -439,6 +448,7 @@ main = hspec $ do
             gesTestName = "test-A",
             gesSelector = Nothing,
             gesOutFile = "out.tsv",
+            gesAltOutFiles = Nothing,
             gesExpectedFile = "expected.tsv",
             gesInputFile = "in.tsv",
             gesMetrics = [EvaluationScheme Likelihood []],
@@ -666,6 +676,41 @@ main = hspec $ do
       calibration [True, False] [0.0, 1.0] `shouldBeAlmost` 0.0
       calibration [True, False, False, True, False] [0.0, 1.0, 1.0, 0.5, 0.5] `shouldBeAlmost` 0.0
       calibration [False, True, True, True, True, False, False, True, False] [0.25, 0.25, 0.0, 0.25, 0.25, 1.0, 1.0, 0.5, 0.5] `shouldBeAlmost` 0.0
+  describe "Cartesian strings" $ do
+    it "singleton" $ do
+      (parseCartesianString "foo") `shouldBe` ["foo"]
+    it "simple" $ do
+      parseCartesianString "a-{foo,bar,baz}-b" `shouldBe` ["a-foo-b", "a-bar-b", "a-baz-b"]
+    it "3x2" $ do
+      parseCartesianString "a-{foo,bar,baz}-{b,c}" `shouldBe` ["a-foo-b", "a-foo-c", "a-bar-b",
+                                                               "a-bar-c", "a-baz-b", "a-baz-c" ]
+    it "3x2x3" $ do
+      parseCartesianString "{foo,bar,ba}-{b,c}-{0,1,2}x" `shouldBe` ["foo-b-0x", "foo-b-1x", "foo-b-2x",
+                                                                      "foo-c-0x", "foo-c-1x", "foo-c-2x",
+                                                                      "bar-b-0x", "bar-b-1x", "bar-b-2x",
+                                                                      "bar-c-0x", "bar-c-1x", "bar-c-2x",
+                                                                      "ba-b-0x", "ba-b-1x", "ba-b-2x",
+                                                                      "ba-c-0x", "ba-c-1x", "ba-c-2x" ]
+  describe "cross-tabs" $ do
+    it "singleton" $ do
+      splitIntoCrossTabs ["abababab"] `shouldBe` [SingleItem "abababab"]
+    it "too small" $ do
+      splitIntoCrossTabs ["aabb", "aacc"] `shouldBe` [SingleItem "aabb", SingleItem "aacc"]
+    it "two tables" $ do
+      splitIntoCrossTabs ["yABC", "xx00", "yABD", "ZC", "xx11", "yy00", "yy11", "ZD"] `shouldBe` [
+                                         CrossTab [Prefix "yAB", Prefix "Z"] [Suffix "C", Suffix "D"],
+                                         CrossTab [Prefix "xx", Prefix "yy"] [Suffix "00", Suffix "11"]]
+    it "simple" $ do
+      splitIntoCrossTabs ["aabsolutely",
+                          "aaafoo",
+                          "other",
+                          "aaabaz",
+                          "aaabaq",
+                          "bbbfoo",
+                          "bbbbaz",
+                          "bbbbaq"] `shouldBe` [SingleItem "aabsolutely",
+                                                CrossTab [Suffix "foo", Suffix "baz", Suffix "baq"] [Prefix "aaa", Prefix "bbb"],
+                                                SingleItem "other"]
 
 checkConduitPure conduit inList expList = do
   let outList = runConduitPure $ CC.yieldMany inList .| conduit .| CC.sinkList

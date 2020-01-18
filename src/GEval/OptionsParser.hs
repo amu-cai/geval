@@ -39,6 +39,7 @@ import GEval.Validation
 import Data.List (intercalate)
 
 import Data.Conduit.SmartSource
+import Data.CartesianStrings
 
 fullOptionsParser = info (helper <*> optionsParser)
        (fullDesc
@@ -94,6 +95,10 @@ optionsParser = GEvalOptions
                 (flag' ListMetrics
                     ( long "list-metrics"
                       <> help "List all metrics with their descriptions"))
+                <|>
+                (flag' OracleItemBased
+                    ( long "oracle-item-based"
+                      <> help "Generate the best possible output considering outputs given by --out-file and --alt-out-file options (and peeking into the expected file)."))
                 )
 
    <*> ((flag' FirstTheWorst
@@ -151,6 +156,10 @@ specParser = GEvalSpecification
     <> showDefault
     <> metavar "OUT"
     <> help "The name of the file to be evaluated" )
+  <*> (optional $ some $ strOption
+        ( long "alt-out-file"
+          <> metavar "OUT"
+          <> help "Alternative output file, makes sense only for some options, e.g. --oracle-item-based"))
   <*> strOption
   ( long "expected-file"
     <> short 'e'
@@ -249,14 +258,12 @@ sel (Just m) _ = m
 
 
 metricReader :: Parser [EvaluationScheme]
-metricReader = many $ option auto         -- actually `some` should be used instead of `many`, the problem is that
-               ( long "metric"            -- --metric might be in the config.txt file...
-                 <> short 'm'
-                 <> metavar "METRIC"
-                 <> help ("Metric to be used, e.g.:" ++ helpMetricParameterMetricsList))
-
-
---                   RMSE, MSE, MAE, SMAPE, Pearson, Spearman, Accuracy, LogLoss, Likelihood, F-measure (specify as F1, F2, F0.25, etc.), macro F-measure (specify as Macro-F1, Macro-F2, Macro-F0.25, etc.), multi-label F-measure (specify as MultiLabel-F1, MultiLabel-F2, MultiLabel-F0.25, etc.), MultiLabel-Likelihood, MAP, BLEU, GLEU (\"Google GLEU\" not the grammar correction metric), WER, NMI, ClippEU, LogLossHashed, LikelihoodHashed, BIO-F1, BIO-F1-Labels, TokenAccuracy, soft F-measure (specify as Soft-F1, Soft-F2, Soft-F0.25), probabilistic soft F-measure (specify as Probabilistic-Soft-F1, Probabilistic-Soft-F2, Probabilistic-Soft-F0.25) or CharMatch" )
+metricReader = concatCartesianStrings <$>
+  (many $ option auto         -- actually `some` should be used instead of `many`, the problem is that
+    ( long "metric"           -- --metric might be in the config.txt file...
+      <> short 'm'
+      <> metavar "METRIC"
+      <> help ("Metric to be used, e.g.:" ++ helpMetricParameterMetricsList)))
 
 altMetricReader :: Parser (Maybe EvaluationScheme)
 altMetricReader = optional $ option auto
@@ -361,6 +368,9 @@ runGEval''' (Just Validate) _ _ spec _ _ = do
   return Nothing
 runGEval''' (Just ListMetrics) _ _ _ _ _ = do
   listMetrics
+  return Nothing
+runGEval''' (Just OracleItemBased) _ _ spec _ _ = do
+  runOracleItemBased spec
   return Nothing
 
 getGraphFilename :: Int -> FilePath -> FilePath

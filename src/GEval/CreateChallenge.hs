@@ -19,6 +19,9 @@ import Control.Exception
 import Control.Monad.Trans.Resource
 import Data.String.Here
 
+import Data.List (intercalate)
+import Data.List.Split (splitOn)
+
 createChallenge :: Bool -> FilePath -> GEvalSpecification -> IO ()
 createChallenge withDataFiles expectedDirectory spec = do
   D.createDirectoryIfMissing False expectedDirectory
@@ -31,7 +34,7 @@ createChallenge withDataFiles expectedDirectory spec = do
   if withDataFiles
     then
      do
-      createFile (trainDirectory </> "train.tsv") $ trainContents metric
+      createTrainFiles metric trainDirectory expectedFile
 
       createFile (devDirectory </> "in.tsv") $ devInContents metric
       createFile (devDirectory </> expectedFile) $ devExpectedContents metric
@@ -50,12 +53,23 @@ createChallenge withDataFiles expectedDirectory spec = do
         testDirectory = expectedDirectory </> testName
         expectedFile = gesExpectedFile spec
 
+createTrainFiles :: Metric -> FilePath -> FilePath -> IO ()
+createTrainFiles metric@(LogLossHashed _) trainDirectory _ = createSingleTrainFile metric trainDirectory
+createTrainFiles metric@(LikelihoodHashed _) trainDirectory _ = createSingleTrainFile metric trainDirectory
+createTrainFiles metric trainDirectory expectedFile = do
+  createFile (trainDirectory </> "in.tsv") $ trainInContents metric
+  createFile (trainDirectory </> expectedFile) $ trainExpectedContents metric
+
+createSingleTrainFile metric trainDirectory =
+  createFile (trainDirectory </> "train.tsv") $ trainContents metric
+
 createFile :: FilePath -> String -> IO ()
 createFile filePath contents = do
   whenM (D.doesFileExist filePath) $ throwM $ FileAlreadyThere filePath
   writeFile filePath contents
 
 readmeMDContents :: Metric -> String -> String
+readmeMDContents (Mean metric) testName = readmeMDContents metric testName
 readmeMDContents GLEU testName = readmeMDContents BLEU testName
 readmeMDContents BLEU testName = [i|
 GEval sample machine translation challenge
@@ -413,7 +427,22 @@ configContents schemes precision testName = unwords (Prelude.map (\scheme -> ("-
     where precisionOpt Nothing = ""
           precisionOpt (Just p) = " --precision " ++ (show p)
 
+-- Originally train content was in one file, to avoid large changes
+-- for the time being we are using the original function.
+
+trainInContents :: Metric -> String
+trainInContents metric = unlines
+                         $ map (intercalate "\t")
+                         $ map tail
+                         $ map (splitOn "\t")
+                         $ lines
+                         $ trainContents metric
+
+trainExpectedContents :: Metric -> String
+trainExpectedContents metric = unlines $ map head $ map (splitOn "\t") $ lines $ trainContents metric
+
 trainContents :: Metric -> String
+trainContents (Mean metric) = trainContents metric
 trainContents GLEU = trainContents BLEU
 trainContents BLEU = [hereLit|alussa loi jumala taivaan ja maan	he mea hanga na te atua i te timatanga te rangi me te whenua
 ja maa oli autio ja tyhjä , ja pimeys oli syvyyden päällä	a kahore he ahua o te whenua , i takoto kau ; he pouri ano a runga i te mata o te hohonu
@@ -482,7 +511,7 @@ trainContents LogLoss = [hereLit|0.0	Hell, no!!!
 trainContents BIOF1Labels = trainContents BIOF1
 trainContents BIOF1 = [hereLit|O O O B-surname/BOND O B-firstname/JAMES B-surname/BOND	My name is Bond , James Bond
 O O O O O	There is no name here
-B-firstname/JOHN I-surname/VON I-surname/NEUMANN	John von Nueman
+B-firstname/JOHN B-surname/VON I-surname/NEUMANN	John von Nueman
 |]
 trainContents TokenAccuracy = [hereLit|* V N	I like cats
 * * V * N	I can see the rainbow
@@ -500,17 +529,20 @@ Love and hate	LOVE HATE
 I am sad	SADNESS
 I am so sad and hateful	SADNESS HATE
 |]
-trainContents (Soft2DFMeasure _) = trainContents ClippEU
-trainContents ClippEU = [hereLit|2/0,0,10,150	foo.djvu
+trainContents (Soft2DFMeasure _) = [hereLit|2/0,0,10,150	foo.djvu
 1/30,40,100,1000	bar.djvu
 |]
-trainContents _ = [hereLit|0.06        0.39    0       0.206
-1.00   1.00    1       0.017
-317.8  5.20    67      0.048
-14.6   19.22   27      0.047
+trainContents ClippEU = [hereLit|1/30,40,100,1000/10	bar.djvu
+2/30,40,500,600/10	foo.djvu
+|]
+trainContents _ = [hereLit|0.06	0.39	0	0.206
+1.00	1.00	1	0.017
+317.8	5.20	67	0.048
+14.6	19.22	27	0.047
 |]
 
 devInContents :: Metric -> String
+devInContents (Mean metric) = devInContents metric
 devInContents GLEU = devInContents BLEU
 devInContents BLEU = [hereLit|ja jumala sanoi : " tulkoon valkeus " , ja valkeus tuli
 ja jumala näki , että valkeus oli hyvä ; ja jumala erotti valkeuden pimeydestä
@@ -578,6 +610,7 @@ devInContents _ = [hereLit|0.72	0	0.007
 |]
 
 devExpectedContents :: Metric -> String
+devExpectedContents (Mean metric) = devExpectedContents metric
 devExpectedContents GLEU = devExpectedContents BLEU
 devExpectedContents BLEU = [hereLit|a ka ki te atua , kia marama : na ka marama
 a ka kite te atua i te marama , he pai : a ka wehea e te atua te marama i te pouri
@@ -647,6 +680,7 @@ devExpectedContents _ = [hereLit|0.82
 |]
 
 testInContents :: Metric -> String
+testInContents (Mean metric) = testInContents metric
 testInContents GLEU = [hereLit|Alice has a black
 |]
 testInContents BLEU = [hereLit|ja jumala kutsui valkeuden päiväksi , ja pimeyden hän kutsui yöksi
@@ -717,6 +751,7 @@ testInContents _ = [hereLit|0.72	0	0.007
 |]
 
 testExpectedContents :: Metric -> String
+testExpectedContents (Mean metric) = testExpectedContents metric
 testExpectedContents BLEU = [hereLit|na ka huaina e te atua te marama ko te awatea , a ko te pouri i huaina e ia ko te po
 a ko te ahiahi , ko te ata , he ra kotahi
 |]

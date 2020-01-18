@@ -76,16 +76,13 @@ validationChallenge challengeDirectory spec = do
   checkCorrectFile gitignoreFile
   checkCorrectFile readmeFile
   testDirectories <- findTestDirs challengeDirectory
-  checkTestDirectories mainMetric testDirectories
-  checkTrainDirectory mainMetric challengeDirectory
-
-  mapM_ (runOnTest spec) testDirectories
+  checkTestDirectories spec testDirectories
+  checkTrainDirectory spec challengeDirectory
 
   where
     configFile = challengeDirectory </> "config.txt"
     gitignoreFile = challengeDirectory </> ".gitignore"
     readmeFile = challengeDirectory </> "README.md"
-    mainMetric = evaluationSchemeMetric $ head $ gesMetrics spec
 
 checkCorrectFile :: FilePath -> IO ()
 checkCorrectFile filePath = do
@@ -147,7 +144,8 @@ never :: FindClause Bool
 never = depth ==? 0
 
 testDirFilter :: FindClause Bool
-testDirFilter = (SFF.fileType ==? Directory) &&? (SFF.fileName ~~? "dev-*" ||? SFF.fileName ~~? "test-*")
+testDirFilter = (SFF.fileType ==? Directory) &&? (SFF.fileName ~~? "dev-*"
+                                                  ||? SFF.fileName ~~? "test-*")
 
 fileFilter :: String -> FindClause Bool
 fileFilter fileName = (SFF.fileType ==? RegularFile) &&? (SFF.fileName ~~? fileName ||? SFF.fileName ~~? fileName ++ exts)
@@ -155,12 +153,12 @@ fileFilter fileName = (SFF.fileType ==? RegularFile) &&? (SFF.fileName ~~? fileN
     exts = Prelude.concat [ "(", intercalate "|" compressedFilesHandled, ")" ]
 
 
-checkTestDirectories :: Metric -> [FilePath] -> IO ()
+checkTestDirectories :: GEvalSpecification -> [FilePath] -> IO ()
 checkTestDirectories _ [] = throwM NoTestDirectories
-checkTestDirectories metric directories = mapM_ (checkTestDirectory metric) directories
+checkTestDirectories spec directories = mapM_ (checkTestDirectory spec) directories
 
-checkTestDirectory :: Metric -> FilePath -> IO ()
-checkTestDirectory metric directoryPath = do
+checkTestDirectory :: GEvalSpecification -> FilePath -> IO ()
+checkTestDirectory spec directoryPath = do
   inputFiles <- findInputFiles directoryPath
   when (null inputFiles) $ throw $ NoInputFile inputFile
   when (length inputFiles > 1) $ throw $ TooManyInputFiles inputFiles
@@ -180,21 +178,29 @@ checkTestDirectory metric directoryPath = do
 
   outputFiles <- findOutputFiles directoryPath
   unless (null outputFiles) $ throw $ OutputFileDetected outputFiles
+
+  runOnTest spec directoryPath
+
   where
+    metric = evaluationSchemeMetric $ head $ gesMetrics spec
     inputFile = directoryPath </> defaultInputFile
+
     expectedFile = directoryPath </> defaultExpectedFile
 
-checkTrainDirectory :: Metric -> FilePath -> IO ()
-checkTrainDirectory metric challengeDirectory = do
+checkTrainDirectory :: GEvalSpecification -> FilePath -> IO ()
+checkTrainDirectory spec challengeDirectory = do
   let trainDirectory = challengeDirectory </> "train"
   whenM (doesDirectoryExist trainDirectory) $ do
     trainFiles <- findTrainFiles trainDirectory
-    when (null trainFiles) $ throw $ NoInputFile "train.tsv"
-    when (length trainFiles > 1) $ throw $ TooManyTrainFiles trainFiles
-    let [trainFile] = trainFiles
-    checkCorrectFile trainFile
-    when (fixedNumberOfColumnsInInput metric && fixedNumberOfColumnsInExpected metric) $ do
-      checkColumns trainFile
+    if (not $ null trainFiles)
+    then
+     do
+      putStrLn "WARNING: Found old-style train file `train.tsv`, whereas the same convention as in"
+      putStrLn "WARNING: test directories if preferred (`in.tsv` and `expected.tsv`)."
+      putStrLn "WARNING: (Though, there might still be some cases when `train.tsv` is needed, e.g. for training LMs.)"
+    else
+     do
+      runOnTest spec trainDirectory
 
 checkColumns :: FilePath -> IO ()
 checkColumns filePath = do

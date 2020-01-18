@@ -1,4 +1,39 @@
 
+## 1.28.0.0
+
+* Add `s` flag for substitution
+
+## 1.27.0.0
+
+* Results are formatted in cross-tables (if possible)
+
+## 1.26.0.0
+
+* Change the meaning of WER (WER is calculated for the whole set now
+  - similar to the way BLEU is calculated)
+* Use `Mean/WER` if you want the old meaning (average of per-item results)
+
+## 1.25.0.0
+
+* Add --oracle-item-based
+
+## 1.24.0.0
+
+* Introduce metric priorities
+* Use "Cartesian" strings in metrics
+
+## 1.23.0.0
+
+* New style of train data is preferred
+  - `in.tsv` and `expected.tsv` instead of `train.tsv`
+  - though this is not required as sometimes training data look different than test data
+  - `--validate` option was changed accordingly
+
+## 1.22.1.0
+
+* Add "Mean/" meta-metric (for the time being working only with MultiLabel-F-measure)
+* Add :S flag
+
 ## 1.22.0.0
 
 * Add SegmentAccuracy

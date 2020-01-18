@@ -8,7 +8,8 @@ module GEval.Metric
    bestPossibleValue,
    perfectOutLineFromExpectedLine,
    fixedNumberOfColumnsInExpected,
-   fixedNumberOfColumnsInInput)
+   fixedNumberOfColumnsInInput,
+   metricCompare)
   where
 
 import Data.Word
@@ -28,7 +29,12 @@ data Metric = RMSE | MSE | Pearson | Spearman | BLEU | GLEU | WER | Accuracy | C
               | LogLossHashed Word32 | CharMatch | MAP | LogLoss | Likelihood
               | BIOF1 | BIOF1Labels | TokenAccuracy | SegmentAccuracy | LikelihoodHashed Word32 | MAE | SMAPE | MultiLabelFMeasure Double
               | MultiLabelLogLoss | MultiLabelLikelihood
-              | SoftFMeasure Double | ProbabilisticMultiLabelFMeasure Double | ProbabilisticSoftFMeasure Double | Soft2DFMeasure Double
+              | SoftFMeasure Double | ProbabilisticMultiLabelFMeasure Double
+              | ProbabilisticSoftFMeasure Double | Soft2DFMeasure Double
+              -- it would be better to avoid infinite recursion here
+              -- `Mean (Mean BLEU)` is not useful, but as it would mean
+              -- a larger refactor, we will postpone this
+              | Mean Metric
               deriving (Eq)
 
 instance Show Metric where
@@ -73,8 +79,12 @@ instance Show Metric where
   show (MultiLabelFMeasure beta) = "MultiLabel-F" ++ (show beta)
   show MultiLabelLogLoss = "MultiLabel-Logloss"
   show MultiLabelLikelihood = "MultiLabel-Likelihood"
+  show (Mean metric) = "Mean/" ++ (show metric)
 
 instance Read Metric where
+  readsPrec p ('M':'e':'a':'n':'/':theRest) = case readsPrec p theRest of
+    [(metric, theRest)] -> [(Mean metric, theRest)]
+    _ -> []
   readsPrec _ ('R':'M':'S':'E':theRest) = [(RMSE, theRest)]
   readsPrec _ ('M':'S':'E':theRest) = [(MSE, theRest)]
   readsPrec _ ('P':'e':'a':'r':'s':'o':'n':theRest) = [(Pearson, theRest)]
@@ -162,6 +172,12 @@ getMetricOrdering SMAPE = TheLowerTheBetter
 getMetricOrdering (MultiLabelFMeasure _) = TheHigherTheBetter
 getMetricOrdering MultiLabelLogLoss = TheLowerTheBetter
 getMetricOrdering MultiLabelLikelihood = TheHigherTheBetter
+getMetricOrdering (Mean metric) = getMetricOrdering metric
+
+metricCompare :: Metric -> MetricValue -> MetricValue -> Ordering
+metricCompare metric a b = metricCompare' (getMetricOrdering metric) a b
+  where metricCompare' TheHigherTheBetter a b = a `compare` b
+        metricCompare' TheLowerTheBetter a b = b `compare` a
 
 bestPossibleValue :: Metric -> MetricValue
 bestPossibleValue metric = case getMetricOrdering metric of
@@ -169,18 +185,21 @@ bestPossibleValue metric = case getMetricOrdering metric of
   TheHigherTheBetter -> 1.0
 
 fixedNumberOfColumnsInExpected :: Metric -> Bool
+fixedNumberOfColumnsInExpected (Mean metric) = fixedNumberOfColumnsInExpected metric
 fixedNumberOfColumnsInExpected MAP = False
 fixedNumberOfColumnsInExpected BLEU = False
 fixedNumberOfColumnsInExpected GLEU = False
 fixedNumberOfColumnsInExpected _ = True
 
 fixedNumberOfColumnsInInput :: Metric -> Bool
+fixedNumberOfColumnsInInput (Mean metric) = fixedNumberOfColumnsInInput metric
 fixedNumberOfColumnsInInput (SoftFMeasure _) = False
 fixedNumberOfColumnsInInput (ProbabilisticSoftFMeasure _) = False
 fixedNumberOfColumnsInInput (Soft2DFMeasure _) = False
 fixedNumberOfColumnsInInput _ = True
 
 perfectOutLineFromExpectedLine :: Metric -> Text -> Text
+perfectOutLineFromExpectedLine (Mean metric) t = perfectOutLineFromExpectedLine metric t
 perfectOutLineFromExpectedLine (LogLossHashed _) t = t <> ":1.0"
 perfectOutLineFromExpectedLine (LikelihoodHashed _) t = t <> ":1.0"
 perfectOutLineFromExpectedLine BLEU t = getFirstColumn t

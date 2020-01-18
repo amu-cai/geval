@@ -16,11 +16,14 @@ module GEval.LineByLine
         runDiffGeneralized,
         LineRecord(..),
         ResultOrdering(..),
-        justTokenize
+        justTokenize,
+        worstFeaturesPipeline,
+        runOracleItemBased
        ) where
 
 import GEval.Core
 import GEval.Common
+import GEval.EvaluationScheme
 import Text.Tokenizer
 
 import Data.Conduit.AutoDecompress (doNothing)
@@ -33,10 +36,11 @@ import Data.Text
 import Data.Text.Encoding
 import Data.Conduit.Rank
 import Data.Maybe (fromMaybe)
+import Data.Either (rights)
 
 import qualified Data.Vector as V
 
-import Data.List (sortBy, sortOn, sort, concat)
+import Data.List (sortBy, sortOn, sort, concat, maximumBy)
 
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Resource
@@ -83,7 +87,6 @@ parseReferenceEntry :: Text -> (Integer, Text)
 parseReferenceEntry line = (read $ unpack refId, t)
   where [refId, t] = splitOn "\t" line
 
-
 runLineByLine :: ResultOrdering -> Maybe String -> GEvalSpecification -> BlackBoxDebuggingOptions -> IO ()
 runLineByLine ordering featureFilter spec bbdo = runLineByLineGeneralized ordering spec consum
    where consum :: Maybe References -> ConduitT LineRecord Void (ResourceT IO) ()
@@ -107,28 +110,26 @@ runFeatureFilter (Just feature) spec bbdo mReferences = CC.map (\l -> (fakeRank,
         checkFeature feature (_, LineWithFactors _ _ fs) = feature `elem` (Prelude.map show fs)
 
 runWorstFeatures :: ResultOrdering -> GEvalSpecification -> BlackBoxDebuggingOptions -> IO ()
-runWorstFeatures ordering spec bbdo = runLineByLineGeneralized ordering' spec (\mReferences -> worstFeaturesPipeline False spec bbdo mReferences)
+runWorstFeatures ordering spec bbdo = runLineByLineGeneralized ordering' spec (\mReferences -> worstFeaturesPipeline False spec bbdo mReferences consumFeatures)
   where ordering' = forceSomeOrdering ordering
 
+consumFeatures = CL.map (encodeUtf8 . formatFeatureWithPValue)
+                 .| CC.unlinesAscii
+                 .| CC.stdout
 
-
-worstFeaturesPipeline :: Bool -> GEvalSpecification -> BlackBoxDebuggingOptions -> Maybe References -> ConduitT LineRecord Void (ResourceT IO) ()
-worstFeaturesPipeline reversed spec bbdo mReferences = rank (lessByMetric reversed $ gesMainMetric spec)
+worstFeaturesPipeline :: Bool
+                        -> GEvalSpecification
+                        -> BlackBoxDebuggingOptions
+                        -> Maybe References
+                        -> ConduitT FeatureWithPValue Void (ResourceT IO) ()
+                        -> ConduitT LineRecord Void (ResourceT IO) ()
+worstFeaturesPipeline reversed spec bbdo mReferences consum = rank (lessByMetric reversed $ gesMainMetric spec)
                                       .| evalStateC 0 (extractFeaturesAndPValues spec bbdo mReferences)
                                       .| CC.filter (\(FeatureWithPValue _ p _ _) -> not $ isNaN p) -- NaN values would poison sorting
                                       .| gobbleAndDo (sortBy featureOrder)
                                       .| filtreCartesian (bbdoCartesian bbdo)
-                                      .| CL.map (encodeUtf8 . formatFeatureWithPValue)
-                                      .| CC.unlinesAscii
-                                      .| CC.stdout
-  where  formatOutput (LineRecord inp exp out _ score) = Data.Text.intercalate "\t" [
-           formatScore score,
-           escapeTabs inp,
-           escapeTabs exp,
-           escapeTabs out]
-         formatScore :: MetricValue -> Text
-         formatScore = Data.Text.pack . printf "%f"
-         featureOrder (FeatureWithPValue _ p1 _ _) (FeatureWithPValue _ p2 _ _) =
+                                      .| consum
+  where  featureOrder (FeatureWithPValue _ p1 _ _) (FeatureWithPValue _ p2 _ _) =
            p1 `compare` p2
 
 -- for commands like --worst-features we need some ordering (KeepTheOriginalOrder
@@ -359,8 +360,9 @@ runLineByLineGeneralized ordering spec consum = do
   (inputFilePath, expectedFilePath, outFilePath) <- checkAndGetFilesSingleOut True spec
   gevalLineByLineCore metric mSelector preprocess inputFilePath expectedFilePath outFilePath (sorter ordering .| consum mReferences)
   where metric = gesMainMetric spec
+        scheme = gesMainScheme spec
         mSelector = gesSelector spec
-        preprocess = gesPreprocess spec
+        preprocess = (gesPreprocess spec) . (applyPreprocessingOperations scheme)
         sorter KeepTheOriginalOrder = doNothing
         sorter ordering = gobbleAndDo $ sortBy (sortOrder ordering (getMetricOrdering metric))
         sortOrder FirstTheWorst TheHigherTheBetter = compareScores
@@ -393,6 +395,31 @@ runDiff ordering featureFilter otherOut spec bbdo = runDiffGeneralized ordering 
         formatScoreDiff :: Double -> Text
         formatScoreDiff = Data.Text.pack . printf "%f"
 
+runOracleItemBased :: GEvalSpecification -> IO ()
+runOracleItemBased spec = runMultiOutputGeneralized spec consum
+  where consum = CL.map picker .| format
+        picker = maximumBy (\(LineRecord _ _ _ _ scoreA) (LineRecord _ _ _ _ scoreB) -> metricCompare metric scoreA scoreB)
+        format = CL.map (encodeUtf8 . formatOutput)
+                 .| CC.unlinesAscii
+                 .| CC.stdout
+        formatOutput (LineRecord _ _ out _ _) = out
+        metric = gesMainMetric spec
+
+runMultiOutputGeneralized :: GEvalSpecification -> ConduitT [LineRecord] Void (ResourceT IO) () -> IO ()
+runMultiOutputGeneralized spec consum = do
+  (inputSource, expectedSource, outSource) <- checkAndGetFilesSingleOut True spec
+  let (Just altOuts) = gesAltOutFiles spec
+  altSourceSpecs' <- mapM (getSmartSourceSpec ((gesOutDirectory spec) </> (gesTestName spec)) "out.tsv") altOuts
+  let altSourceSpecs = rights altSourceSpecs'
+  let sourceSpecs = (outSource:altSourceSpecs)
+  let sources = Prelude.map (gevalLineByLineSource metric mSelector preprocess inputSource expectedSource) sourceSpecs
+  runResourceT $ runConduit $
+    (sequenceSources sources .| consum)
+  where metric = gesMainMetric spec
+        scheme = gesMainScheme spec
+        preprocess = (gesPreprocess spec) . (applyPreprocessingOperations scheme)
+        mSelector = gesSelector spec
+
 runMostWorseningFeatures :: ResultOrdering -> FilePath -> GEvalSpecification -> BlackBoxDebuggingOptions -> IO ()
 runMostWorseningFeatures ordering otherOut spec bbdo  = runDiffGeneralized ordering' otherOut spec consum
   where ordering' = forceSomeOrdering ordering
@@ -402,7 +429,7 @@ runMostWorseningFeatures ordering otherOut spec bbdo  = runDiffGeneralized order
           FirstTheBest -> True
         consum :: Maybe References -> ConduitT (LineRecord, LineRecord) Void (ResourceT IO) ()
         consum = \mReferences -> CC.map prepareFakeLineRecord
-                                .| (worstFeaturesPipeline reversed spec bbdo mReferences)
+                                .| (worstFeaturesPipeline reversed spec bbdo mReferences consumFeatures)
         prepareFakeLineRecord :: (LineRecord, LineRecord) -> LineRecord
         prepareFakeLineRecord (LineRecord _ _ _ _ scorePrev, LineRecord inp exp out c score) =
           LineRecord inp exp out c (score - scorePrev)

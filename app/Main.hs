@@ -16,6 +16,8 @@ import System.Exit
 
 import Data.Conduit.SmartSource
 
+import Data.SplitIntoCrossTabs
+
 import System.FilePath
 
 import Data.List (intercalate, sort)
@@ -23,6 +25,7 @@ import Data.List (intercalate, sort)
 import qualified Data.Text as T
 
 import Data.Map.Strict as M
+import qualified Data.Map.Lazy as LM
 import Data.Set as S
 
 main :: IO ()
@@ -79,7 +82,27 @@ showTheResult' opts [val] = putStrLn $ formatTheResult (gesPrecision $ geoSpec o
 showTheResult' opts [] = do
   hPutStrLn stderr "no metric given, use --metric option"
   exitFailure
-showTheResult' opts vals =  mapM_ putStrLn $ Prelude.map (formatTheMetricAndResult (gesPrecision $ geoSpec opts)) $ zip (gesMetrics $ geoSpec opts) vals
+showTheResult' opts vals =  mapM_ putStrLn
+                            $ intercalate [""]
+                            $ Prelude.map (formatCrossTable (gesPrecision $ geoSpec opts))
+                            $ splitIntoTablesWithValues (T.pack "metric") (T.pack "value") mapping metricLabels
+  where mapping = LM.fromList $ zip metricLabels vals
+        metricLabels = Prelude.map T.pack $ Prelude.map evaluationSchemeName $ gesMetrics $ geoSpec opts
+
+formatCrossTable :: Maybe Int -> TableWithValues MetricResult -> [String]
+formatCrossTable mPrecision (TableWithValues [_, _] body) =
+  -- actually we won't print metric/value header
+  -- (1) to keep backward-compatible with the previous version
+  -- (2) to be concise
+  Prelude.map (formatCrossTableLine mPrecision) body
+formatCrossTable mPrecision (TableWithValues header body) =
+  (intercalate "\t" $ Prelude.map T.unpack header) : Prelude.map (formatCrossTableLine mPrecision) body
+
+
+
+formatCrossTableLine :: Maybe Int -> (T.Text, [MetricResult]) -> String
+formatCrossTableLine mPrecision (rowName, values) =
+  intercalate "\t" ((T.unpack rowName):Prelude.map (formatTheResult mPrecision) values)
 
 formatSourceSpec :: SourceSpec -> String
 formatSourceSpec (FilePathSpec fp) = dropExtensions $ takeFileName fp

@@ -1,1 +1,1 @@
---metric WER
+--metric Mean/WER

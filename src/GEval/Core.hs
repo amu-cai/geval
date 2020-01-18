@@ -39,6 +39,7 @@ module GEval.Core
       checkMultipleOuts,
       checkMultipleOutsCore,
       gesMainMetric,
+      gesMainScheme,
       gesPreprocess,
       getDataDecoder,
       threeLineSource,
@@ -160,6 +161,7 @@ data GEvalSpecification = GEvalSpecification
                             gesTestName :: String,
                             gesSelector :: Maybe Selector,
                             gesOutFile :: String,
+                            gesAltOutFiles :: Maybe [String],
                             gesExpectedFile :: String,
                             gesInputFile :: String,
                             gesMetrics :: [EvaluationScheme],
@@ -177,6 +179,11 @@ gesMainMetric spec = case gesMetrics spec of
   (scheme:_) -> evaluationSchemeMetric scheme
   otherwise -> error "no metric given"
 
+gesMainScheme :: GEvalSpecification -> EvaluationScheme
+gesMainScheme spec = case gesMetrics spec of
+  (scheme:_) -> scheme
+  otherwise -> error "no metric given"
+
 gesPreprocess :: GEvalSpecification -> (Text -> Text)
 gesPreprocess spec = tokenizeTabSeparatedWithSpaces (gesTokenizer spec)
 
@@ -191,6 +198,7 @@ data GEvalSpecialCommand = Init
                            | Diff FilePath | MostWorseningFeatures FilePath
                            | PrintVersion | JustTokenize | Submit
                            | Validate | ListMetrics
+                           | OracleItemBased
 
 data ResultOrdering = KeepTheOriginalOrder | FirstTheWorst | FirstTheBest
 
@@ -209,6 +217,7 @@ defaultGEvalSpecification = GEvalSpecification {
   gesTestName = defaultTestName,
   gesSelector = Nothing,
   gesOutFile = defaultOutFile,
+  gesAltOutFiles = Nothing,
   gesExpectedFile = defaultExpectedFile,
   gesInputFile = defaultInputFile,
   gesMetrics = [EvaluationScheme defaultMetric []],
@@ -453,6 +462,37 @@ gevalCoreOnSources CharMatch inputLineSource = helper inputLineSource
 gevalCoreOnSources (LogLossHashed nbOfBits) _ = helperLogLossHashed nbOfBits id
 gevalCoreOnSources (LikelihoodHashed nbOfBits) _ = helperLogLossHashed nbOfBits logLossToLikehood
 
+
+gevalCoreOnSources (Mean (MultiLabelFMeasure beta)) _
+  = gevalCoreWithoutInputOnItemTargets (Right . intoWords)
+                                       (Right . getWords)
+                                       ((fMeasureOnCounts beta) . (getCounts (==)))
+                                       averageC
+                                       id
+                                       noGraph
+    where
+      -- repeated as below, as it will be refactored into dependent types soon anyway
+      getWords (RawItemTarget t) = Prelude.map unpack $ selectByStandardThreshold $ parseIntoProbList t
+      getWords (PartiallyParsedItemTarget ts) = Prelude.map unpack ts
+      intoWords (RawItemTarget t) = Prelude.map unpack $ Data.Text.words t
+      intoWords (PartiallyParsedItemTarget ts) = Prelude.map unpack ts
+
+gevalCoreOnSources (Mean WER) _
+  = gevalCoreWithoutInputOnItemTargets (Right . intoWords)
+                                       (Right . getWords)
+                                       ((uncurry (/.)) . (uncurry werStep))
+                                       averageC
+                                       id
+                                       noGraph
+    where
+      -- repeated as below, as it will be refactored into dependent types soon anyway
+      getWords (RawItemTarget t) = Prelude.map unpack $ selectByStandardThreshold $ parseIntoProbList t
+      getWords (PartiallyParsedItemTarget ts) = Prelude.map unpack ts
+      intoWords (RawItemTarget t) = Prelude.map unpack $ Data.Text.words t
+      intoWords (PartiallyParsedItemTarget ts) = Prelude.map unpack ts
+
+gevalCoreOnSources (Mean _) _ = error $ "Mean/ meta-metric defined only for MultiLabel-F1 and WER for the time being"
+
 -- only MultiLabel-F1 handled for JSONs for the time being...
 gevalCoreOnSources (MultiLabelFMeasure beta) _ = gevalCoreWithoutInputOnItemTargets (Right . intoWords)
                                                                             (Right . getWords)
@@ -511,9 +551,12 @@ gevalCoreOnSources BLEU _ = gevalCoreWithoutInput SABLEU bleuAgg bleuFinal noGra
 gevalCoreOnSources GLEU _ = gevalCoreWithoutInput SAGLEU gleuAgg gleuFinal noGraph
   where gleuFinal (m, t) = m /. t
         gleuAgg = CC.foldl gleuFuse (0, 0)
-        gleuFuse (a1, a2) (b1, b2) = (a1+b1, a2+b2)
+        gleuFuse (a1, a2) (b1, b2) = (a1 + b1, a2 + b2)
 
-gevalCoreOnSources WER _ = gevalCoreWithoutInput SAWER averageC id noGraph
+gevalCoreOnSources WER _ = gevalCoreWithoutInput SAWER werAgg werFinal noGraph
+  where werAgg = CC.foldl werFuse (0, 0)
+        werFuse (a1, a2) (b1, b2) = (a1 + b1, a2 + b2)
+        werFinal (errors, ref) = errors /. ref
 
 gevalCoreOnSources Accuracy _ = gevalCoreWithoutInput SAAccuracy averageC id noGraph
 
@@ -753,7 +796,10 @@ continueGEvalCalculations SAGLEU GLEU = defineContinuation gleuAgg gleuFinal noG
         gleuAgg = CC.foldl gleuFuse (0, 0)
         gleuFuse (a1, a2) (b1, b2) = (a1+b1, a2+b2)
 
-continueGEvalCalculations SAWER WER = defineContinuation averageC id noGraph
+continueGEvalCalculations SAWER WER = defineContinuation werAgg werFinal noGraph
+  where werAgg = CC.foldl werFuse (0, 0)
+        werFuse (a1, a2) (b1, b2) = (a1 + b1, a2 + b2)
+        werFinal (errors, ref) = errors /. ref
 
 continueGEvalCalculations SAAccuracy Accuracy = defineContinuation averageC id noGraph
 

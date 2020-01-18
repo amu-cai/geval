@@ -222,6 +222,7 @@ type family ItemIntermediateRepresentationType (t :: AMetric) :: * where
   ItemIntermediateRepresentationType ALogLossHashed = (Text, Text)
   ItemIntermediateRepresentationType ALikelihoodHashed = (Text, Text)
   ItemIntermediateRepresentationType ACharMatch = (Text, Text)
+  ItemIntermediateRepresentationType AWER = (Int, Int)
   ItemIntermediateRepresentationType t = Double
 
 itemStep :: SAMetric t -> (ParsedExpectedType t, ParsedOutputType t) -> ItemIntermediateRepresentationType t
