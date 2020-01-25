@@ -51,6 +51,7 @@ library
                      , Data.Statistics.Calibration
                      , Data.CartesianStrings
                      , Data.SplitIntoCrossTabs
+                     , Data.Conduit.Bootstrap
                      , Paths_geval
   build-depends:       base >= 4.7 && < 5
                      , cond
@@ -105,6 +106,7 @@ library
                      , utf8-string
                      , singletons
                      , ordered-containers
+                     , random
   default-language:    Haskell2010
 
 executable geval

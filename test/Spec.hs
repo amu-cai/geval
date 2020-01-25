@@ -1,5 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 import Test.Hspec
 
@@ -29,6 +30,7 @@ import GEval.FeatureExtractor
 import GEval.Selector
 import GEval.CreateChallenge
 import GEval.Validation
+import Data.Conduit.Bootstrap
 
 import Data.Map.Strict
 import Data.Conduit.List (consume)
@@ -539,6 +541,16 @@ main = hspec $ do
                                  (1.5, 3.0),
                                  (3.0, 2.0),
                                  (4.0, 1.0)]
+  describe "bootstrap conduit" $ do
+    it "sanity test" $ do
+      let nbOfSamples = 1000
+      let listChecked :: [Int] = [0..10]
+
+      (runResourceT $ runConduit (CL.sourceList listChecked .| CC.product)) `shouldReturn` 0
+
+      results <- runResourceT $ runConduit (CL.sourceList listChecked .| bootstrapC nbOfSamples CC.product)
+      Prelude.length results `shouldBe` nbOfSamples
+      (Prelude.length (Prelude.filter (> 0) results)) `shouldNotBe` 0
   describe "tokenizer" $ do
     it "simple utterance with '13a' tokenizer" $ do
       tokenize (Just V13a) "To be or not to be, that's the question." `shouldBe`
