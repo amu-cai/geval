@@ -100,6 +100,7 @@ import Text.Tokenizer
 import GEval.Selector
 import GEval.Annotation
 import GEval.BlackBoxDebugging
+import Data.Conduit.Bootstrap
 
 import qualified Data.HashMap.Strict as M
 import qualified Data.Vector as V
@@ -256,6 +257,7 @@ gevalOnSingleOut gevalSpec inputSource expectedSource outSource = do
   vals <- Prelude.mapM (\scheme -> gevalCore (evaluationSchemeMetric scheme)
                                            mSelector
                                            (preprocess . applyPreprocessingOperations scheme)
+                                           (gesBootstrapResampling gevalSpec)
                                            inputSource
                                            expectedSource
                                            outSource) schemes
@@ -412,16 +414,20 @@ singleLineAsLineSource (LineInFile sourceSpec lineNo line) itemDecoder preproces
 gevalCore :: Metric           -- ^ evaluation metric
           -> Maybe Selector   -- ^ selector to be used
           -> (Text -> Text)    -- ^ preprocessing function (e.g. tokenization)
+          -> (Maybe Int)      -- ^ number of bootstrap samples
           -> SourceSpec       -- ^ source specification for the input values
           -> SourceSpec       -- ^ source specification for the expected output
           -> SourceSpec       -- ^ source specification for the output
           -> IO (MetricOutput) -- ^ metric value for the output against the expected output
-gevalCore metric mSelector preprocess inputSource expectedSource outSource = do
+gevalCore metric mSelector preprocess mBootstrapResampling inputSource expectedSource outSource = do
   whenM (isEmptyFileSource outSource) $ throwM $ EmptyOutput
-  gevalCoreOnSources metric
-                     (fileAsLineSource inputSource mSelector preprocess)
-                     (fileAsLineSource expectedSource mSelector preprocess)
-                     (fileAsLineSource outSource mSelector preprocess)
+  go metric
+     (fileAsLineSource inputSource mSelector preprocess)
+     (fileAsLineSource expectedSource mSelector preprocess)
+     (fileAsLineSource outSource mSelector preprocess)
+  where go = case mBootstrapResampling of
+               Nothing -> gevalCoreOnSources
+               Just bootstrapResampling -> gevalBootstrapOnSources bootstrapResampling
 
 isEmptyFileSource :: SourceSpec -> IO Bool
 isEmptyFileSource (FilePathSpec filePath) = isEmptyFile filePath
@@ -430,6 +436,31 @@ isEmptyFileSource _ = return False
 logLossToLikehood logLoss = exp (-logLoss)
 
 data LineInFile = LineInFile SourceSpec Word32 Text
+
+gevalBootstrapOnSources :: (MonadIO m, MonadThrow m, MonadUnliftIO m) =>
+                          Int                         -- ^ number of samples
+                          -> Metric                    -- ^ evaluation metric
+                          -> LineSource (ResourceT m)  -- ^ source of the input values
+                          -> LineSource (ResourceT m)  -- ^ source to read the expected output
+                          -> LineSource (ResourceT m)  -- ^ source to read the output
+                          -> m (MetricOutput)           -- ^ metric values for the output against the expected output
+gevalBootstrapOnSources numberOfSamples metric inputLineStream expectedLineStream outLineStream = do
+    case toSing $ toHelper metric of
+                SomeSing smetric -> gevalRunPipeline parserSpec (trans step) finalPipeline context
+                                     where parserSpec = (ParserSpecWithoutInput (liftOp expParser) (liftOp outParser))
+                                           context = (WithoutInput expectedLineStream outLineStream)
+                                           step = itemStep smetric
+                                           expParser = expectedParser smetric
+                                           outParser = outputParser smetric
+                                           finalPipeline = fixer (bootstrapC numberOfSamples $ continueGEvalCalculations smetric metric)
+                                           trans :: ((a, b) -> c) -> ParsedRecord (WithoutInput m a b) -> c
+                                           trans step (ParsedRecordWithoutInput x y) = step (x, y)
+
+fixer :: ConduitT c Void (ResourceT m) [MetricOutput] -> ConduitT c Void (ResourceT m) MetricOutput
+fixer c = do
+  outputs <- c
+  let values = Prelude.map (\(MetricOutput (SimpleRun v) _) -> v) outputs
+  return $ MetricOutput (BootstrapResampling values) Nothing
 
 -- | Runs evaluation for a given metric using the sources given
 -- for input, expected output and output. Returns the metric value.

@@ -116,6 +116,8 @@ main = hspec $ do
       runGEvalTest "bleu-empty" `shouldReturnAlmost` 0.0000
     it "with tokenization" $
       runGEvalTest "bleu-with-tokenization" `shouldReturnAlmost` 0.6501914150070065
+    it "with bootstrap" $
+      runGEvalTest "bleu-complex-bootstrap" `shouldReturnAlmost` 0.7061420723046241
   describe "GLEU" $ do
     it "simple example" $
       runGEvalTest "gleu-simple" `shouldReturnAlmost` 0.462962962962963
@@ -751,6 +753,7 @@ testMatchFun _ _ = False
 
 extractVal :: (Either (ParserResult GEvalOptions) (Maybe [(SourceSpec, [MetricResult])])) -> IO MetricValue
 extractVal (Right (Just ([(_, (SimpleRun val):_)]))) = return val
+extractVal (Right (Just ([(_, (BootstrapResampling vals):_)]))) = return (sum vals / fromIntegral (Prelude.length vals))
 extractVal (Right Nothing) = return $ error "no metrics???"
 extractVal (Right (Just [])) = return $ error "emtpy metric list???"
 extractVal (Left result) = do
