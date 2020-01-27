@@ -553,6 +553,11 @@ main = hspec $ do
       results <- runResourceT $ runConduit (CL.sourceList listChecked .| bootstrapC nbOfSamples CC.product)
       Prelude.length results `shouldBe` nbOfSamples
       (Prelude.length (Prelude.filter (> 0) results)) `shouldNotBe` 0
+    it "test gettings bounds" $ do
+      let sample = [3.0, 11.0, 2.0, 4.0, 15.0,  12.0, 2013.5, 19.0, 17.0, -10000.0,
+                    16.0, 13.0, 6.0, 7.0, 8.0,  5.0, 9.0, 10.0, 14.0, 18]
+      getConfidenceBounds defaultConfidenceLevel sample `shouldBe` (-10000.0, 2013.5)
+      getConfidenceBounds 0.9 sample `shouldBe` (2.0, 19.0)
   describe "tokenizer" $ do
     it "simple utterance with '13a' tokenizer" $ do
       tokenize (Just V13a) "To be or not to be, that's the question." `shouldBe`
