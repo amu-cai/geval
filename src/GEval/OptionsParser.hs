@@ -206,7 +206,7 @@ specParser = GEvalSpecification
         )
       )
   <*> ( optional $ option auto
-        (long "bootstrap-resampling"
+        (long "bootstrap"
           <> short 'B'
           <> metavar "NUMBER-OF-SAMPLES"
           <> help "Tests on NUMBER-OF-SAMPLES bootstrap samples rather than just on the whole test set" ))
