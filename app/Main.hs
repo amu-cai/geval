@@ -28,6 +28,8 @@ import Data.Map.Strict as M
 import qualified Data.Map.Lazy as LM
 import Data.Set as S
 
+import Data.Conduit.Bootstrap (defaultConfidenceLevel, getConfidenceBounds)
+
 main :: IO ()
 main = do
   args <- getArgs
@@ -114,6 +116,12 @@ formatTheMetricAndResult mPrecision (scheme, val) = (evaluationSchemeName scheme
 
 formatTheResult :: Maybe Int -> MetricResult -> String
 formatTheResult mPrecision (SimpleRun val) = formatSimpleResult mPrecision val
+formatTheResult mPrecision (BootstrapResampling vals) = (formatSimpleResult mPrecision pointEstimate)
+                                                        ++ "±"
+                                                        ++ (formatSimpleResult mPrecision errorBound)
+    where pointEstimate = (upperBound + lowerBound) / 2.0
+          errorBound = (upperBound - lowerBound) / 2.0
+          (lowerBound, upperBound) = getConfidenceBounds defaultConfidenceLevel vals
 
 formatSimpleResult :: Maybe Int -> MetricValue -> String
 formatSimpleResult Nothing = show
