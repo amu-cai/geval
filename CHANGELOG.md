@@ -1,4 +1,8 @@
 
+## 1.29.0.0
+
+* Bootstrap resampling for most metrics
+
 ## 1.28.0.0
 
 * Add `s` flag for substitution
