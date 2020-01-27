@@ -407,6 +407,17 @@ singleLineAsLineSource :: LineInFile -> (Text -> ItemTarget) -> (Text -> Text) -
 singleLineAsLineSource (LineInFile sourceSpec lineNo line) itemDecoder preprocess =
   LineSource (CL.sourceList [line]) itemDecoder preprocess sourceSpec lineNo
 
+handleBootstrap :: Metric -> Bool
+handleBootstrap (Mean _) = False
+handleBootstrap CharMatch = False
+handleBootstrap (LogLossHashed _) = False
+handleBootstrap (LikelihoodHashed _ ) = False
+handleBootstrap Pearson = False
+handleBootstrap Spearman = False
+handleBootstrap (ProbabilisticMultiLabelFMeasure beta) = False
+handleBootstrap (ProbabilisticSoftFMeasure beta) = False
+handleBootstrap _ = True
+
 -- | Runs evaluation for a given metric using the sources specified
 -- for input, expected output and output. Returns the metric value.
 -- Throws @GEvalException@ if something was wrong in the data (e.g.
@@ -427,7 +438,9 @@ gevalCore metric mSelector preprocess mBootstrapResampling inputSource expectedS
      (fileAsLineSource outSource mSelector preprocess)
   where go = case mBootstrapResampling of
                Nothing -> gevalCoreOnSources
-               Just bootstrapResampling -> gevalBootstrapOnSources bootstrapResampling
+               Just bootstrapResampling -> if handleBootstrap metric
+                                          then gevalBootstrapOnSources bootstrapResampling
+                                          else gevalCoreOnSources
 
 isEmptyFileSource :: SourceSpec -> IO Bool
 isEmptyFileSource (FilePathSpec filePath) = isEmptyFile filePath
