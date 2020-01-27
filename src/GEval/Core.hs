@@ -714,10 +714,13 @@ gevalRunPipeline' parserSpec itemStep finalPipeline context = do
        <*> (ZipSource $ recordSource context parserSpec)) .| CL.map (checkStep (Proxy :: Proxy m) itemStep)) .| CL.catMaybes .| finalPipeline)
 
 
+
 continueGEvalCalculations :: (MonadIO m) =>
                             SAMetric t
                             -> Metric
                             -> ConduitT (ItemIntermediateRepresentationType t) Void (ResourceT m) MetricOutput
+
+continueGEvalCalculations SAMultiLabelFMeasure (MultiLabelFMeasure beta) = defineContinuation countAgg (fMeasureOnCounts beta) noGraph
 
 continueGEvalCalculations SALikelihood Likelihood = defineContinuation averageC logLossToLikehood noGraph
 
