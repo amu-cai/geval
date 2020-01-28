@@ -25,6 +25,7 @@ getMetricValue (MetricOutput v _) = v
 
 extractSimpleRunValue :: MetricResult -> MetricValue
 extractSimpleRunValue (SimpleRun v) = v
+extractSimpleRunValue (BootstrapResampling (v:_)) = v
 
 getGraphSeries :: MetricOutput -> Maybe GraphSeries
 getGraphSeries (MetricOutput _ gs) = gs
