@@ -52,6 +52,7 @@ library
                      , Data.CartesianStrings
                      , Data.SplitIntoCrossTabs
                      , Data.Conduit.Bootstrap
+                     , GEval.Formatting
                      , Paths_geval
   build-depends:       base >= 4.7 && < 5
                      , cond

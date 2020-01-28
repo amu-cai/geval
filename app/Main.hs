@@ -5,11 +5,10 @@ import GEval.EvaluationScheme
 import GEval.Common
 import GEval.OptionsParser
 import GEval.ParseParams
+import GEval.Formatting
 
 import System.Environment
 import Options.Applicative
-
-import Text.Printf
 
 import System.IO
 import System.Exit
@@ -112,17 +111,3 @@ formatSourceSpec spec = show spec
 
 formatTheMetricAndResult :: Maybe Int -> (EvaluationScheme, MetricResult) -> String
 formatTheMetricAndResult mPrecision (scheme, val) = (evaluationSchemeName scheme) ++ "\t" ++ (formatTheResult mPrecision val)
-
-
-formatTheResult :: Maybe Int -> MetricResult -> String
-formatTheResult mPrecision (SimpleRun val) = formatSimpleResult mPrecision val
-formatTheResult mPrecision (BootstrapResampling vals) = (formatSimpleResult mPrecision pointEstimate)
-                                                        ++ "±"
-                                                        ++ (formatSimpleResult mPrecision errorBound)
-    where pointEstimate = (upperBound + lowerBound) / 2.0
-          errorBound = (upperBound - lowerBound) / 2.0
-          (lowerBound, upperBound) = getConfidenceBounds defaultConfidenceLevel vals
-
-formatSimpleResult :: Maybe Int -> MetricValue -> String
-formatSimpleResult Nothing = show
-formatSimpleResult (Just prec) = printf "%0.*f" prec
