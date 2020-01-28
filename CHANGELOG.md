@@ -1,4 +1,8 @@
 
+## 1.31.0.0
+
+* Fix validation of challenges with Bootstrap resampling
+
 ## 1.30.0.0
 
 * Automatically set precision when in Bootstrap mode
