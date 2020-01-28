@@ -1,4 +1,8 @@
 
+## 1.30.0.0
+
+* Automatically set precision when in Bootstrap mode
+
 ## 1.29.0.0
 
 * Bootstrap resampling for most metrics
