@@ -121,6 +121,10 @@ optionsParser = GEvalOptions
                  ( long "plot-graph"
                    <> metavar "FILE-PATH"
                    <> help "Plot an extra graph, applicable only for Probabilistic-MultiLabel/Soft-F-score (LOESS function for calibration)"))
+   <*> switch
+     ( long "mark-worst-features"
+       <> help "Mark worst features when in the line-by-line mode")
+
 
 precisionArgParser :: Parser Int
 precisionArgParser = option auto
@@ -322,6 +326,7 @@ runGEval'' opts = runGEval''' (geoSpecialCommand opts)
                               (geoSpec opts)
                               (geoBlackBoxDebugginsOptions opts)
                               (geoGraphFile opts)
+                              (geoMarkWorstFeatures opts)
 
 runGEval''' :: Maybe GEvalSpecialCommand
               -> ResultOrdering
@@ -329,8 +334,9 @@ runGEval''' :: Maybe GEvalSpecialCommand
               -> GEvalSpecification
               -> BlackBoxDebuggingOptions
               -> Maybe FilePath
+              -> Bool
               -> IO (Maybe [(SourceSpec, [MetricResult])])
-runGEval''' Nothing _ _ spec _ mGraphFile = do
+runGEval''' Nothing _ _ spec _ mGraphFile _ = do
   vals' <- geval spec
   let vals = map (\(s, val) -> (s, map getMetricValue val)) vals'
   case mGraphFile of
@@ -339,37 +345,39 @@ runGEval''' Nothing _ _ spec _ mGraphFile = do
       mapM_ (\(ix, d) -> (plotGraph (getGraphFilename ix graphFile) d)) $ zip [0..] graphsData
     Nothing -> return ()
   return $ Just vals
-runGEval''' (Just Init) _ _ spec _ _ = do
+runGEval''' (Just Init) _ _ spec _ _ _ = do
   initChallenge spec
   return Nothing
-runGEval''' (Just PrintVersion) _ _ _ _ _ = do
+runGEval''' (Just PrintVersion) _ _ _ _ _ _ = do
   putStrLn ("geval " ++ showVersion version)
   return Nothing
-runGEval''' (Just LineByLine) ordering featureFilter spec bbdo _ = do
-  runLineByLine ordering featureFilter spec bbdo
+runGEval''' (Just LineByLine) ordering featureFilter spec bbdo _ markWorstFeatures = do
+  if markWorstFeatures
+  then runLineByLineWithWorstFeatures ordering featureFilter spec bbdo
+  else runLineByLine ordering featureFilter spec bbdo
   return Nothing
-runGEval''' (Just WorstFeatures) ordering _ spec bbdo _ = do
+runGEval''' (Just WorstFeatures) ordering _ spec bbdo _ _ = do
   runWorstFeatures ordering spec bbdo
   return Nothing
-runGEval''' (Just (Diff otherOut)) ordering featureFilter spec bbdo _ = do
+runGEval''' (Just (Diff otherOut)) ordering featureFilter spec bbdo _ _ = do
   runDiff ordering featureFilter otherOut spec bbdo
   return Nothing
-runGEval''' (Just (MostWorseningFeatures otherOut)) ordering _ spec bbdo _ = do
+runGEval''' (Just (MostWorseningFeatures otherOut)) ordering _ spec bbdo _ _ = do
   runMostWorseningFeatures ordering otherOut spec bbdo
   return Nothing
-runGEval''' (Just JustTokenize) _ _ spec _ _ = do
+runGEval''' (Just JustTokenize) _ _ spec _ _ _ = do
   justTokenize (gesTokenizer spec)
   return Nothing
-runGEval''' (Just Submit) _ _ spec _ _ = do
+runGEval''' (Just Submit) _ _ spec _ _ _ = do
   submit (gesGonitoHost spec) (gesToken spec) (gesGonitoGitAnnexRemote spec)
   return Nothing
-runGEval''' (Just Validate) _ _ spec _ _ = do
+runGEval''' (Just Validate) _ _ spec _ _ _ = do
   validateChallenge spec
   return Nothing
-runGEval''' (Just ListMetrics) _ _ _ _ _ = do
+runGEval''' (Just ListMetrics) _ _ _ _ _ _ = do
   listMetrics
   return Nothing
-runGEval''' (Just OracleItemBased) _ _ spec _ _ = do
+runGEval''' (Just OracleItemBased) _ _ spec _ _ _ = do
   runOracleItemBased spec
   return Nothing
 

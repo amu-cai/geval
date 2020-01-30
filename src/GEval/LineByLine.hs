@@ -9,6 +9,7 @@
 
 module GEval.LineByLine
        (runLineByLine,
+        runLineByLineWithWorstFeatures,
         runWorstFeatures,
         runLineByLineGeneralized,
         runDiff,
@@ -26,6 +27,8 @@ import GEval.Common
 import GEval.EvaluationScheme
 import Text.Tokenizer
 
+import System.IO
+
 import Data.Conduit.AutoDecompress (doNothing)
 
 import Data.Conduit
@@ -35,12 +38,12 @@ import qualified Data.Conduit.Text as CT
 import Data.Text
 import Data.Text.Encoding
 import Data.Conduit.Rank
-import Data.Maybe (fromMaybe)
+import Data.Maybe (fromMaybe, catMaybes)
 import Data.Either (rights)
 
 import qualified Data.Vector as V
 
-import Data.List (sortBy, sortOn, sort, concat, maximumBy)
+import Data.List (sortBy, sortOn, sort, concat, maximumBy, intersperse)
 
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Resource
@@ -48,6 +51,7 @@ import Data.Conduit.Lift
 import Control.Monad.State.Strict
 
 import Data.Monoid ((<>))
+import Data.Monoid.Utils (mintercalate)
 
 import GEval.FeatureExtractor
 import GEval.BlackBoxDebugging
@@ -70,6 +74,8 @@ import Data.Conduit.Binary (sourceFile)
 import qualified Data.HashMap.Strict as H
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
+
+import Rainbow (Chunk, (&), magenta, cyan, fore, bold, yellow, brightYellow, red, brightRed, chunk, chunksToByteStrings, byteStringMakerFromEnvironment, byteStringMakerFromHandle, ByteString)
 
 data LineRecord = LineRecord Text Text Text Word32 MetricValue
                   deriving (Eq, Show)
@@ -99,7 +105,103 @@ runLineByLine ordering featureFilter spec bbdo = runLineByLineGeneralized orderi
          formatScore :: MetricValue -> Text
          formatScore = Data.Text.pack . printf "%f"
 
-runFeatureFilter :: (Monad m, FeatureSource s) => Maybe String -> GEvalSpecification -> BlackBoxDebuggingOptions -> Maybe References -> ConduitT s s m ()
+data LineSpan = UnmarkedSpan Text | MarkedSpan Double Text
+  deriving (Eq, Show)
+
+runLineByLineWithWorstFeatures :: ResultOrdering -> Maybe String -> GEvalSpecification -> BlackBoxDebuggingOptions -> IO ()
+runLineByLineWithWorstFeatures ordering featureFilter spec bbdo = do
+  maker <- byteStringMakerFromEnvironment
+  let consum = CL.map (recordToBytes maker) .| CC.unlinesAscii .| CC.stdout
+  runLineByLineWithWorstFeaturesGeneralized ordering featureFilter spec bbdo consum
+
+recordToBytes :: (Chunk Text -> [ByteString] -> [ByteString]) -> SpanLineRecord -> ByteString
+recordToBytes maker (SpanLineRecord inSpans expSpans outSpans score) =
+  mintercalate "\t" [lineToBytes maker inSpans,
+                     lineToBytes maker expSpans,
+                     lineToBytes maker outSpans,
+                     encodeUtf8 $ formatScore score]
+  where formatScore :: MetricValue -> Text
+        formatScore = Data.Text.pack . printf "%f"
+
+
+lineToBytes :: (Chunk Text -> [ByteString] -> [ByteString]) -> [LineSpan] -> ByteString
+lineToBytes maker spans =
+  mconcat
+  $ chunksToByteStrings maker
+  $ Data.List.intersperse (chunk " ")
+  $ Prelude.map spanToRainbowChunk $ spans
+
+spanToRainbowChunk :: LineSpan -> Chunk Text
+spanToRainbowChunk (UnmarkedSpan t) = chunk t
+spanToRainbowChunk (MarkedSpan p t) = markedChunk p c
+  where c = chunk t
+
+markedChunk :: Double -> Chunk Text -> Chunk Text
+markedChunk pValue c
+  | pValue < 0.000000000000001 = bold c & fore brightRed
+  | pValue < 0.000000000001 = c & fore red
+  | pValue < 0.000001 = c & fore magenta
+  | pValue < 0.001 = bold c
+  | otherwise = c
+
+markBadFeatures :: (M.Map PeggedFactor Double) -> (Maybe Tokenizer) -> BlackBoxDebuggingOptions -> Text -> Text -> [LineSpan]
+markBadFeatures worstFeaturesMap mTokenizer bbdo field line =
+  catMaybes
+  $ Prelude.map (featureToLineSpan worstFeaturesMap)
+  $ extractFactors mTokenizer bbdo Nothing field line
+
+markBadFeaturesInTabbed :: (M.Map PeggedFactor Double) -> (Maybe Tokenizer) -> BlackBoxDebuggingOptions -> Text -> Text -> [LineSpan]
+markBadFeaturesInTabbed worstFeaturesMap mTokenizer bbdo field line =
+  catMaybes
+  $ Prelude.map (featureToLineSpan worstFeaturesMap)
+  $ extractFactorsFromTabbed mTokenizer bbdo Nothing field line
+
+
+doMarking worstFeaturesMap mTokenizer bbdo (LineRecord inpLine expLine outLine _ score) =
+  SpanLineRecord (markBadFeaturesInTabbed worstFeaturesMap mTokenizer bbdo "in" inpLine)
+                 (markBadFeatures worstFeaturesMap mTokenizer bbdo "exp" expLine)
+                 (markBadFeatures worstFeaturesMap mTokenizer bbdo "out" outLine)
+                 score
+
+featureToLineSpan :: (M.Map PeggedFactor Double) -> PeggedFactor -> Maybe LineSpan
+featureToLineSpan worstFeaturesMap pf = featureToLineSpan' (M.lookup pf worstFeaturesMap) pf
+  where featureToLineSpan' Nothing pf = UnmarkedSpan <$> toTextualContent pf
+        featureToLineSpan' (Just pValue) pf = MarkedSpan pValue <$> toTextualContent pf
+
+data SpanLineRecord = SpanLineRecord [LineSpan] [LineSpan] [LineSpan] MetricValue
+  deriving (Eq, Show)
+
+runLineByLineWithWorstFeaturesGeneralized :: ResultOrdering
+                                            -> Maybe String
+                                            -> GEvalSpecification
+                                            -> BlackBoxDebuggingOptions
+                                            -> ConduitT SpanLineRecord Void (ResourceT IO) r
+                                            -> IO r
+runLineByLineWithWorstFeaturesGeneralized ordering featureFilter spec bbdo consum = do
+  hPutStrLn stderr "Looking for worst features..."
+  worstFeatures <- runLineByLineGeneralized ordering' spec (\mReferences -> worstFeaturesPipeline False spec bbdo mReferences (CL.take 100))
+  let worstFeaturesMap = M.fromList
+                         $ catMaybes
+                         $ Prelude.map featureToFactor
+                         $ Prelude.map (\(FeatureWithPValue feature pValue _ _) -> (feature, pValue)) worstFeatures
+
+  runLineByLineGeneralized ordering spec (consum' worstFeaturesMap)
+   where consum' worstFeaturesMap = (\mReferences -> (runFeatureFilter featureFilter spec bbdo mReferences
+                                                     .| CL.map (doMarking worstFeaturesMap mTokenizer bbdo)
+                                                     .| consum))
+         ordering' = forceSomeOrdering ordering
+         mTokenizer = gesTokenizer spec
+
+featureToFactor :: (Feature, Double) -> Maybe (PeggedFactor, Double)
+featureToFactor ((UnaryFeature (PeggedExistentialFactor namespace (SimpleAtomicFactor factor))), p) =
+  Just (PeggedFactor namespace (SimpleExistentialFactor (SimpleAtomicFactor factor)), p)
+featureToFactor _ = Nothing
+
+runFeatureFilter :: (Monad m, FeatureSource s) => Maybe String
+                                                -> GEvalSpecification
+                                                -> BlackBoxDebuggingOptions
+                                                -> Maybe References
+                                                -> ConduitT s s m ()
 runFeatureFilter Nothing _ _ _ = doNothing
 runFeatureFilter (Just feature) spec bbdo mReferences = CC.map (\l -> (fakeRank, l))
                                                         .| featureExtractor mTokenizer bbdo mReferences
@@ -121,8 +223,8 @@ worstFeaturesPipeline :: Bool
                         -> GEvalSpecification
                         -> BlackBoxDebuggingOptions
                         -> Maybe References
-                        -> ConduitT FeatureWithPValue Void (ResourceT IO) ()
-                        -> ConduitT LineRecord Void (ResourceT IO) ()
+                        -> ConduitT FeatureWithPValue Void (ResourceT IO) a
+                        -> ConduitT LineRecord Void (ResourceT IO) a
 worstFeaturesPipeline reversed spec bbdo mReferences consum = rank (lessByMetric reversed $ gesMainMetric spec)
                                       .| evalStateC 0 (extractFeaturesAndPValues spec bbdo mReferences)
                                       .| CC.filter (\(FeatureWithPValue _ p _ _) -> not $ isNaN p) -- NaN values would poison sorting

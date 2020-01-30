@@ -195,7 +195,7 @@ getExpectedDirectory spec = fromMaybe outDirectory $ gesExpectedDirectory spec
 -- | Special command, not just running the regular evaluation.
 -- See OptionsParser.hs for more information.
 data GEvalSpecialCommand = Init
-                           | LineByLine | WorstFeatures
+                           | LineByLine | LineByLineWithWorstFeatures | WorstFeatures
                            | Diff FilePath | MostWorseningFeatures FilePath
                            | PrintVersion | JustTokenize | Submit
                            | Validate | ListMetrics
@@ -209,7 +209,8 @@ data GEvalOptions = GEvalOptions
                       geoFilter :: Maybe String,
                       geoSpec :: GEvalSpecification,
                       geoBlackBoxDebugginsOptions :: BlackBoxDebuggingOptions,
-                      geoGraphFile :: Maybe FilePath }
+                      geoGraphFile :: Maybe FilePath,
+                      geoMarkWorstFeatures :: Bool }
 
 
 defaultGEvalSpecification = GEvalSpecification {

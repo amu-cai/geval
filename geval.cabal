@@ -108,6 +108,8 @@ library
                      , singletons
                      , ordered-containers
                      , random
+                     , rainbow
+                     , hpqtypes
   default-language:    Haskell2010
 
 executable geval

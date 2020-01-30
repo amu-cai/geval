@@ -19,6 +19,7 @@ module GEval.FeatureExtractor
    FeatureNamespace(..),
    References(..),
    ReferencesData(..),
+   toTextualContent,
    filterExistentialFactors)
   where
 
@@ -223,3 +224,21 @@ filterExistentialFactors :: [PeggedFactor] -> [PeggedExistentialFactor]
 filterExistentialFactors factors = catMaybes $ Prelude.map toExistential factors
   where toExistential (PeggedFactor namespace (SimpleExistentialFactor factor)) = Just $ PeggedExistentialFactor namespace factor
         toExistential _ = Nothing
+
+class WithTextualContent a where
+  toTextualContent :: a -> Maybe Text
+
+instance WithTextualContent PeggedFactor where
+  toTextualContent (PeggedFactor _ factor) = toTextualContent factor
+
+instance WithTextualContent SimpleFactor where
+  toTextualContent (SimpleExistentialFactor eFactor) = toTextualContent eFactor
+  toTextualContent (NumericalFactor _ _) = Nothing
+
+instance WithTextualContent ExistentialFactor where
+  toTextualContent (SimpleAtomicFactor aFactor) = toTextualContent aFactor
+  toTextualContent (BigramFactor _ _) = Nothing
+
+instance WithTextualContent AtomicFactor where
+  toTextualContent (TextFactor t) = Just t
+  toTextualContent (ShapeFactor _) = Nothing
