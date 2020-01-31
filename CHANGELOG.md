@@ -1,4 +1,8 @@
 
+## 1.32.0.0
+
+* Add option to mark worst features
+
 ## 1.31.0.0
 
 * Fix validation of challenges with Bootstrap resampling

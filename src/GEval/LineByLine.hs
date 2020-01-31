@@ -10,6 +10,8 @@
 module GEval.LineByLine
        (runLineByLine,
         runLineByLineWithWorstFeatures,
+        SpanLineRecord(..),
+        LineSpan(..),
         runWorstFeatures,
         runLineByLineGeneralized,
         runDiff,
