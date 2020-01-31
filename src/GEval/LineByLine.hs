@@ -118,10 +118,11 @@ runLineByLineWithWorstFeatures ordering featureFilter spec bbdo = do
 
 recordToBytes :: (Chunk Text -> [ByteString] -> [ByteString]) -> SpanLineRecord -> ByteString
 recordToBytes maker (SpanLineRecord inSpans expSpans outSpans score) =
-  mintercalate "\t" [lineToBytes maker inSpans,
+  mintercalate "\t" [encodeUtf8 $ formatScore score,
+                     lineToBytes maker inSpans,
                      lineToBytes maker expSpans,
-                     lineToBytes maker outSpans,
-                     encodeUtf8 $ formatScore score]
+                     lineToBytes maker outSpans]
+
   where formatScore :: MetricValue -> Text
         formatScore = Data.Text.pack . printf "%f"
 
