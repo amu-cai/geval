@@ -408,7 +408,10 @@ singleLineAsLineSource :: LineInFile -> (Text -> ItemTarget) -> (Text -> Text) -
 singleLineAsLineSource (LineInFile sourceSpec lineNo line) itemDecoder preprocess =
   LineSource (CL.sourceList [line]) itemDecoder preprocess sourceSpec lineNo
 
+-- some metrics are handled by Bootstrap due to legacy issues,
+-- fix on the way
 handleBootstrap :: Metric -> Bool
+handleBootstrap (Mean (MultiLabelFMeasure _)) = True
 handleBootstrap (Mean _) = False
 handleBootstrap CharMatch = False
 handleBootstrap (LogLossHashed _) = False
@@ -458,6 +461,22 @@ gevalBootstrapOnSources :: (MonadIO m, MonadThrow m, MonadUnliftIO m) =>
                           -> LineSource (ResourceT m)  -- ^ source to read the expected output
                           -> LineSource (ResourceT m)  -- ^ source to read the output
                           -> m (MetricOutput)           -- ^ metric values for the output against the expected output
+
+-- for the time being hardcoded
+gevalBootstrapOnSources numberOfSamples (Mean (MultiLabelFMeasure beta)) inputLineStream expectedLineStream outLineStream = do
+  gevalRunPipeline parserSpec (trans step) finalPipeline context
+  where parserSpec = (ParserSpecWithoutInput (liftOp expParser) (liftOp outParser))
+        context = (WithoutInput expectedLineStream outLineStream)
+        step = itemStep SAMultiLabelFMeasure
+        expParser = expectedParser SAMultiLabelFMeasure
+        outParser = outputParser SAMultiLabelFMeasure
+        finalPipeline = fixer (
+          CL.map (fMeasureOnCounts beta)
+          .| (bootstrapC numberOfSamples
+              $ continueGEvalCalculations SAMSE MSE))
+        trans :: ((a, b) -> c) -> ParsedRecord (WithoutInput m a b) -> c
+        trans step (ParsedRecordWithoutInput x y) = step (x, y)
+
 gevalBootstrapOnSources numberOfSamples metric inputLineStream expectedLineStream outLineStream = do
     case toSing $ toHelper metric of
                 SomeSing smetric -> gevalRunPipeline parserSpec (trans step) finalPipeline context
