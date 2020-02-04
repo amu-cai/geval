@@ -285,6 +285,9 @@ main = hspec $ do
       runGEvalTest "soft-f1-simple" `shouldReturnAlmost` 0.33333333333333
     it "perfect test" $ do
       runGEvalTest "soft-f1-perfect" `shouldReturnAlmost` 1.0
+  describe "FLC-F1" $ do
+    it "simple test" $ do
+      runGEvalTest "flc-f1-simple" `shouldReturnAlmost` 0.394231
   describe "Probabilistic-Soft-F1" $ do
     it "simple test" $ do
       runGEvalTest "probabilistic-soft-f1-simple" `shouldReturnAlmost` 0.33333333333333
