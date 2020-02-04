@@ -288,6 +288,8 @@ main = hspec $ do
   describe "FLC-F1" $ do
     it "simple test" $ do
       runGEvalTest "flc-f1-simple" `shouldReturnAlmost` 0.394231
+    it "test with multi overlap" $ do
+      runGEvalTest "flc-f1-multi-overlap" `shouldReturnAlmost` 0.588364
   describe "Probabilistic-Soft-F1" $ do
     it "simple test" $ do
       runGEvalTest "probabilistic-soft-f1-simple" `shouldReturnAlmost` 0.33333333333333
