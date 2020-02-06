@@ -638,6 +638,9 @@ generalizedProbabilisticFMeasure beta metric = gevalCoreWithoutInput metric
 countAgg :: (Num n, Num v, Monad m) => ConduitM (n, v, v) o m (n, v, v)
 countAgg = CC.foldl countFolder (fromInteger 0, fromInteger 0, fromInteger 0)
 
+countFragAgg :: (Num n, Num v, Monad m) => ConduitM (n, n, v, v) o m (n, n, v, v)
+countFragAgg = CC.foldl countFragFolder (fromInteger 0, fromInteger 0, fromInteger 0, fromInteger 0)
+
 gevalCoreByCorrelationMeasure :: (MonadUnliftIO m, MonadThrow m, MonadIO m) =>
                                 (V.Vector (Double, Double) -> Double) -> -- ^ correlation function
                                 LineSource (ResourceT m) ->  -- ^ source to read the expected output
@@ -811,6 +814,10 @@ continueGEvalCalculations SAMacroFMeasure (MacroFMeasure beta) = defineContinuat
 
 continueGEvalCalculations SASoftFMeasure (SoftFMeasure beta) = defineContinuation countAgg
                                                                      (fMeasureOnCounts beta)
+                                                                     noGraph
+
+continueGEvalCalculations SAFLCFMeasure (FLCFMeasure beta) = defineContinuation countFragAgg
+                                                                     (fMeasureOnFragCounts beta)
                                                                      noGraph
 
 continueGEvalCalculations SASoft2DFMeasure (Soft2DFMeasure beta) = defineContinuation (CC.map (fMeasureOnCounts beta) .| averageC)

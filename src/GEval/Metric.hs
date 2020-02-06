@@ -31,6 +31,7 @@ data Metric = RMSE | MSE | Pearson | Spearman | BLEU | GLEU | WER | Accuracy | C
               | MultiLabelLogLoss | MultiLabelLikelihood
               | SoftFMeasure Double | ProbabilisticMultiLabelFMeasure Double
               | ProbabilisticSoftFMeasure Double | Soft2DFMeasure Double
+              | FLCFMeasure Double
               -- it would be better to avoid infinite recursion here
               -- `Mean (Mean BLEU)` is not useful, but as it would mean
               -- a larger refactor, we will postpone this
@@ -53,6 +54,7 @@ instance Show Metric where
   show (ProbabilisticMultiLabelFMeasure beta) = "Probabilistic-MultiLabel-F" ++ (show beta)
   show (ProbabilisticSoftFMeasure beta) = "Probabilistic-Soft-F" ++ (show beta)
   show (Soft2DFMeasure beta) = "Soft2D-F" ++ (show beta)
+  show (FLCFMeasure beta) = "FLC-F" ++ (show beta)
   show NMI = "NMI"
   show (LogLossHashed nbOfBits) = "LogLossHashed" ++ (if
                                                        nbOfBits == defaultLogLossHashedSize
@@ -95,6 +97,9 @@ instance Read Metric where
   readsPrec _ ('A':'c':'c':'u':'r':'a':'c':'y':theRest) = [(Accuracy, theRest)]
   readsPrec _ ('C':'l':'i':'p':'p':'E':'U':theRest) = [(ClippEU, theRest)]
   readsPrec _ ('N':'M':'I':theRest) = [(NMI, theRest)]
+  readsPrec p ('F':'L':'C':'-':'F':theRest) = case readsPrec p theRest of
+    [(beta, theRest)] -> [(FLCFMeasure beta, theRest)]
+    _ -> []
   readsPrec p ('F':theRest) = case readsPrec p theRest of
     [(beta, theRest)] -> [(FMeasure beta, theRest)]
     _ -> []
@@ -156,6 +161,7 @@ getMetricOrdering (SoftFMeasure _) = TheHigherTheBetter
 getMetricOrdering (ProbabilisticMultiLabelFMeasure _) = TheHigherTheBetter
 getMetricOrdering (ProbabilisticSoftFMeasure _) = TheHigherTheBetter
 getMetricOrdering (Soft2DFMeasure _) = TheHigherTheBetter
+getMetricOrdering (FLCFMeasure _) = TheHigherTheBetter
 getMetricOrdering NMI = TheHigherTheBetter
 getMetricOrdering (LogLossHashed _) = TheLowerTheBetter
 getMetricOrdering (LikelihoodHashed _) = TheHigherTheBetter

@@ -28,6 +28,15 @@ data Annotation = Annotation T.Text IS.IntSet
 data ObtainedAnnotation = ObtainedAnnotation Annotation Double
                           deriving (Eq, Show)
 
+instance Coverable Annotation where
+  coveredScore (Annotation labelA intSetA) (Annotation labelB intSetB)
+    | labelA == labelB = (intSetLength intersect) /. (intSetLength intSetA)
+    where intSetLength = Prelude.length . IS.toList
+          intersect = intSetA `IS.intersection` intSetB
+  disjoint (Annotation labelA intSetA) (Annotation labelB intSetB)
+    | labelA == labelB = intSetA `IS.disjoint` intSetB
+    | otherwise = True
+
 instance EntityWithProbability ObtainedAnnotation where
   type BareEntity ObtainedAnnotation = Annotation
   getBareEntity (ObtainedAnnotation annotation _) = annotation
@@ -38,6 +47,7 @@ instance EntityWithProbability ObtainedAnnotation where
     where intSetLength = Prelude.length . IS.toList
           intersect = intSetA `IS.intersection` intSetB
 
+instance CoverableEntityWithProbability ObtainedAnnotation
 
 parseObtainedAnnotations :: T.Text -> Either String [ObtainedAnnotation]
 parseObtainedAnnotations t = parseOnly (obtainedAnnotationsParser <* endOfInput) t

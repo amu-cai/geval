@@ -50,6 +50,7 @@ singletons [d|data AMetric = ARMSE | AMSE | APearson | ASpearman | ABLEU | AGLEU
                              | ABIOF1 | ABIOF1Labels | ATokenAccuracy | ASegmentAccuracy | ALikelihoodHashed | AMAE | ASMAPE | AMultiLabelFMeasure
                              | AMultiLabelLogLoss | AMultiLabelLikelihood
                              | ASoftFMeasure | AProbabilisticMultiLabelFMeasure | AProbabilisticSoftFMeasure | ASoft2DFMeasure
+                             | AFLCFMeasure
                              deriving (Eq)
              |]
 
@@ -83,6 +84,7 @@ toHelper (MultiLabelFMeasure _) = AMultiLabelFMeasure
 toHelper MultiLabelLogLoss = AMultiLabelLogLoss
 toHelper MultiLabelLikelihood = AMultiLabelLikelihood
 toHelper (SoftFMeasure _) = ASoftFMeasure
+toHelper (FLCFMeasure _) = AFLCFMeasure
 toHelper (ProbabilisticMultiLabelFMeasure _) = AProbabilisticMultiLabelFMeasure
 toHelper (ProbabilisticSoftFMeasure _) = AProbabilisticSoftFMeasure
 toHelper (Soft2DFMeasure _) = ASoft2DFMeasure
@@ -104,6 +106,7 @@ type family ParsedExpectedType (t :: AMetric) :: * where
   ParsedExpectedType AFMeasure = Bool
   ParsedExpectedType AMacroFMeasure = Maybe Text
   ParsedExpectedType ASoftFMeasure = [Annotation]
+  ParsedExpectedType AFLCFMeasure = [Annotation]
   ParsedExpectedType AProbabilisticMultiLabelFMeasure = [Text]
   ParsedExpectedType AProbabilisticSoftFMeasure = [Annotation]
   ParsedExpectedType ASoft2DFMeasure = [LabeledClipping]
@@ -137,6 +140,7 @@ expectedParser SAClippEU = controlledParse lineClippingSpecsParser
 expectedParser SAFMeasure = zeroOneParser
 expectedParser SAMacroFMeasure = justStrip
 expectedParser SASoftFMeasure = parseAnnotations
+expectedParser SAFLCFMeasure = parseAnnotations
 expectedParser SAProbabilisticMultiLabelFMeasure = intoWords
 expectedParser SAProbabilisticSoftFMeasure = parseAnnotations
 expectedParser SASoft2DFMeasure = controlledParse lineLabeledClippingsParser
@@ -163,6 +167,7 @@ type family ParsedOutputType (t :: AMetric) :: * where
   ParsedOutputType AClippEU = [Clipping]
   ParsedOutputType AMacroFMeasure = Maybe Text
   ParsedOutputType ASoftFMeasure = [ObtainedAnnotation]
+  ParsedOutputType AFLCFMeasure = [ObtainedAnnotation]
   ParsedOutputType AProbabilisticSoftFMeasure = [ObtainedAnnotation]
   ParsedOutputType AProbabilisticMultiLabelFMeasure = [WordWithProb]
   ParsedOutputType AMultiLabelLikelihood = ProbList
@@ -182,6 +187,7 @@ outputParser SAClippEU = controlledParse lineClippingsParser
 outputParser SAFMeasure = probToZeroOneParser
 outputParser SAMacroFMeasure = Right . predictedParser . strip
 outputParser SASoftFMeasure = parseObtainedAnnotations
+outputParser SAFLCFMeasure = parseObtainedAnnotations
 outputParser SAProbabilisticMultiLabelFMeasure = (Right . (\(ProbList es) -> es) . parseIntoProbList)
 outputParser SAProbabilisticSoftFMeasure = parseObtainedAnnotations
 outputParser SASoft2DFMeasure = expectedParser SASoft2DFMeasure
@@ -208,6 +214,7 @@ type family ItemIntermediateRepresentationType (t :: AMetric) :: * where
   ItemIntermediateRepresentationType AFMeasure = (Int, Int, Int)
   ItemIntermediateRepresentationType AMacroFMeasure = (Maybe Text, Maybe Text, Maybe Text)
   ItemIntermediateRepresentationType ASoftFMeasure = (Double, Int, Int)
+  ItemIntermediateRepresentationType AFLCFMeasure = (Double, Double, Int, Int)
   ItemIntermediateRepresentationType ASoft2DFMeasure = (Integer, Integer, Integer)
   ItemIntermediateRepresentationType AClippEU = (Int, Int, Int)
   ItemIntermediateRepresentationType ANMI = (Text, Text)
@@ -238,6 +245,7 @@ itemStep SAClippEU = clippEUMatchStep
 itemStep SAFMeasure = getCount
 itemStep SAMacroFMeasure = getClassesInvolved
 itemStep SASoftFMeasure = getSoftCounts
+itemStep SAFLCFMeasure = getFragCounts
 itemStep SAProbabilisticMultiLabelFMeasure = getProbabilisticCounts
 itemStep SAProbabilisticSoftFMeasure = getProbabilisticCounts
 itemStep SASoft2DFMeasure = getSoft2DCounts
@@ -354,6 +362,15 @@ getSoft2DCounts (expected, got) = (tpArea, expArea, gotArea)
   where tpArea = coveredBy expected got
         expArea = totalArea expected
         gotArea = totalArea got
+
+getFragCounts :: CoverableEntityWithProbability e => ([BareEntity e], [e]) -> (Double, Double, Int, Int)
+getFragCounts (expected, got)
+  | allDisjoint (Prelude.map getBareEntity got) = (
+      recallScoreTotal expected got,
+      precisionScoreTotal got expected,
+      Prelude.length expected,
+      Prelude.length got)
+  | otherwise = (0, 0, Prelude.length expected, Prelude.length got)
 
 countHitsAndTotals :: ([Text], [Text]) -> (Int, Int)
 countHitsAndTotals (es, os) =

@@ -1,8 +1,11 @@
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE FlexibleContexts #-}
 
 module GEval.Probability
        (Probability, getP, isProbability, mkProbability, probabilityOne, probabilityZero,
-        EntityWithProbability, getProbability, getProbabilityAsDouble, getBareEntity, matchScore, BareEntity)
+        Coverable, coveredScore, coveredScoreTotal, disjoint, allDisjoint, CoverableEntityWithProbability,
+        EntityWithProbability, getProbability, getProbabilityAsDouble, getBareEntity, matchScore, BareEntity,
+        precisionScoreTotal, recallScoreTotal)
        where
 
 newtype Probability = P { getP :: Double }
@@ -30,3 +33,24 @@ class EntityWithProbability e where
   getProbabilityAsDouble = getP . getProbability
   getBareEntity :: e -> BareEntity e
   matchScore :: BareEntity e -> e -> Double
+
+class Coverable b where
+  coveredScore :: b -> b -> Double
+  coveredScoreTotal :: [b] -> [b] -> Double
+  coveredScoreTotal items otherItems = sum $ [coveredScore b b' | b <- items, b' <- otherItems]
+  disjoint :: b -> b -> Bool
+
+
+allDisjoint :: Coverable b => [b] -> Bool
+allDisjoint [] = True
+allDisjoint (head:tail) = all (disjoint head) tail && allDisjoint tail
+
+class (Show e, EntityWithProbability e, Coverable (BareEntity e)) => CoverableEntityWithProbability e where
+  precisionScore :: e -> BareEntity e -> Double
+  precisionScore got expected = coveredScore (getBareEntity got) expected
+  precisionScoreTotal :: [e] -> [BareEntity e] -> Double
+  precisionScoreTotal gots expecteds = coveredScoreTotal (map getBareEntity gots) expecteds
+  recallScore :: BareEntity e -> e -> Double
+  recallScore expected got = coveredScore expected (getBareEntity got)
+  recallScoreTotal :: [BareEntity e] -> [e] -> Double
+  recallScoreTotal expecteds gots = coveredScoreTotal expecteds (map getBareEntity gots)

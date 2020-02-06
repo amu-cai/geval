@@ -3,10 +3,11 @@
 
 module GEval.PrecisionRecall(calculateMAPForOneResult,
                              weightedHarmonicMean, fMeasure, f1Measure, f2Measure, precision, recall,
-                             fMeasureOnCounts, f1MeasureOnCounts, f2MeasureOnCounts, countFolder,
+                             fMeasureOnCounts, fMeasureOnFragCounts, f1MeasureOnCounts, f2MeasureOnCounts, countFolder,
                              precisionAndRecall, precisionAndRecallFromCounts,
                              maxMatch, maxMatchOnOrdered, getCounts, weightedMaxMatch, weightedMaxMatching,
-                             getProbabilisticCounts)
+                             getProbabilisticCounts,
+                             countFragFolder)
        where
 
 import GEval.Common
@@ -59,12 +60,20 @@ f1MeasureOnCounts = fMeasureOnCounts 1.0
 
 fMeasureOnCounts :: (ConvertibleToDouble n, Integral v) => Double -> (n, v, v) -> Double
 fMeasureOnCounts beta (tp, nbExpected, nbGot) =
-  (1 + betaSquared) * p * r `safeDoubleDiv` (betaSquared * p + r)
-  where betaSquared = beta ^ 2
-        (p, r) = precisionAndRecallFromCounts (tp, nbExpected, nbGot)
+  weightedHarmonicMean beta p r
+  where (p, r) = precisionAndRecallFromCounts (tp, nbExpected, nbGot)
+
+fMeasureOnFragCounts :: (ConvertibleToDouble n, Integral v) => Double -> (n, n, v, v) -> Double
+fMeasureOnFragCounts beta (rC, pC, nbExpected, nbGot) =
+  weightedHarmonicMean beta p r
+  where r = rC /. nbExpected
+        p = pC /. nbGot
 
 countFolder :: (Num n, Num v) => (n, v, v) -> (n, v, v) -> (n, v, v)
 countFolder (a1, a2, a3) (b1, b2, b3) = (a1+b1, a2+b2, a3+b3)
+
+countFragFolder :: (Num n, Num v) => (n, n, v, v) -> (n, n, v, v) -> (n, n, v, v)
+countFragFolder (a1, a2, a3, a4) (b1, b2, b3, b4) = (a1+b1, a2+b2, a3+b3, a4+b4)
 
 getCounts :: (a -> b -> Bool) -> ([a], [b]) -> (Int, Int, Int)
 getCounts matchingFun (expected, got) = (maxMatch matchingFun expected got,
