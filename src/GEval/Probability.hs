@@ -45,7 +45,7 @@ allDisjoint :: Coverable b => [b] -> Bool
 allDisjoint [] = True
 allDisjoint (head:tail) = all (disjoint head) tail && allDisjoint tail
 
-class (Show e, EntityWithProbability e, Coverable (BareEntity e)) => CoverableEntityWithProbability e where
+class (EntityWithProbability e, Coverable (BareEntity e)) => CoverableEntityWithProbability e where
   precisionScore :: e -> BareEntity e -> Double
   precisionScore got expected = coveredScore (getBareEntity got) expected
   precisionScoreTotal :: [e] -> [BareEntity e] -> Double
