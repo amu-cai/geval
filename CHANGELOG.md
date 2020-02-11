@@ -1,4 +1,8 @@
 
+## 1.32.2.0
+
+* Fix bug in cross-tabs
+
 ## 1.32.0.0
 
 * Add option to mark worst features
