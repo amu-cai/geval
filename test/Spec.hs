@@ -716,6 +716,12 @@ main = hspec $ do
                                                                       "ba-b-0x", "ba-b-1x", "ba-b-2x",
                                                                       "ba-c-0x", "ba-c-1x", "ba-c-2x" ]
   describe "cross-tabs" $ do
+    it "tricky" $ do
+      splitIntoCrossTabs ["AAAfoo",
+                          "AAAbar", "BBBbar", "CCCbar",
+                          "AAAbaz", "BBBbaz", "CCCbaz" ] `shouldBe ` [
+                                SingleItem "AAAfoo",
+                                CrossTab [Prefix "AAAba", Prefix "BBBba", Prefix "CCCba"] [Suffix "r", Suffix "z"]]
     it "singleton" $ do
       splitIntoCrossTabs ["abababab"] `shouldBe` [SingleItem "abababab"]
     it "too small" $ do

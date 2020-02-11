@@ -8,6 +8,7 @@ module Data.SplitIntoCrossTabs
         TextFrag(..))
        where
 
+
 import qualified Data.Text as T
 import Data.Text (Text)
 import qualified Data.Set.Ordered as OS
@@ -16,12 +17,12 @@ import qualified Data.Set as S
 import qualified Data.Foldable as F
 import qualified Data.Map as M
 import qualified Data.Map.Lazy as LM
-
-import Debug.Trace
+import Data.Maybe (fromMaybe)
 
 import Data.List (unfoldr, sortBy, maximumBy, minimumBy)
 
 data TableWithValues a = TableWithValues [Text] [(Text, [a])]
+  deriving (Show)
 
 data CrossTab = SingleItem Text | CrossTab [TextFrag] [TextFrag]
   deriving (Show, Eq)
@@ -29,7 +30,12 @@ data CrossTab = SingleItem Text | CrossTab [TextFrag] [TextFrag]
 data TextFrag = Prefix Text | Suffix Text
   deriving (Show, Eq, Ord)
 
-splitIntoTablesWithValues :: Text
+
+informativeLookup m e = case m LM.!? e of
+  Just x -> x
+  Nothing -> error ("Cannot find " ++ (show e) ++ " in " ++ (show m))
+
+splitIntoTablesWithValues :: Show a => Text
                             -> Text
                             -> LM.Map Text a -- ^ map from which values will be taken,
                                             -- deliberately a lazy map so that
@@ -43,12 +49,12 @@ splitIntoTablesWithValues defaultMainHeader defaultSecondaryHeader mapping =
         joinSingleItems (e : rest) = e : joinSingleItems rest
         joinSingleItems [] = []
 
-convertIntoTableWithValues :: Text -> Text -> LM.Map Text a -> CrossTab -> TableWithValues a
+convertIntoTableWithValues :: Show a => Text -> Text -> LM.Map Text a -> CrossTab -> TableWithValues a
 convertIntoTableWithValues defaultMainHeader defaultSecondaryHeader mapping (SingleItem t) =
   TableWithValues [defaultMainHeader, defaultSecondaryHeader] [(t, [mapping LM.! t])]
 convertIntoTableWithValues defaultMainHeader defaultSecondaryHeader mapping (CrossTab rowNames columnNames) =
   TableWithValues (T.empty : (map toText columnNames)) (map processRow rowNames)
-  where processRow rowName = (toText rowName, map (\colName -> mapping LM.! (combineFrags rowName colName)) columnNames)
+  where processRow rowName = (toText rowName, map (\colName -> mapping `informativeLookup` (combineFrags rowName colName)) columnNames)
 
 splitIntoCrossTabs :: [Text] -> [CrossTab]
 splitIntoCrossTabs inputs =
@@ -98,6 +104,9 @@ entryComparator (r1, (_, s1)) (r2, (_, s2)) = (OS.size s2 `compare` OS.size s1)
                                                       `thenCmp`
                                                     (r1 `compare` r2)
 
+-- OS.|/\ is broken
+(|/\) osetA osetB = OS.filter ((flip OS.member) osetB) osetA
+
 findTheBestCrossTabForTextPart :: CrossTab -> [(Int, (TextFrag, OS.OSet TextFrag))] -> (TextFrag, OS.OSet TextFrag) -> CrossTab
 findTheBestCrossTabForTextPart defaultCrossTab entries chosenEntry@(t, tset) = if crossTabSize bestCrossTabFound > 1
                                                                                then bestCrossTabFound
@@ -106,11 +115,11 @@ findTheBestCrossTabForTextPart defaultCrossTab entries chosenEntry@(t, tset) = i
         entriesOrderedByIntersection =
           sortBy entryComparator
           $ filter (\(_, (_, tset')) -> OS.size tset' >= 2)
-          $ map (\(r, (t', tset')) -> (r, (t', tset' OS.|/\ tset))) entries
+          $ map (\(r, (t', tset')) -> (r, (t', tset' |/\ tset))) entries
         step (_, (t', tset')) currentTab@(CrossTab frags common) = selectedTab
             where newTab = CrossTab newT (F.toList newCommon)
                   newT = t':frags
-                  newCommon = (OS.fromList common) OS.|/\ tset'
+                  newCommon = (OS.fromList common) |/\ tset'
                   selectedTab = if crossTabSize newTab >= crossTabSize currentTab
                                 then newTab
                                 else currentTab

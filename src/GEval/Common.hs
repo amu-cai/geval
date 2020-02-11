@@ -17,6 +17,7 @@ data MetricResult = SimpleRun MetricValue | BootstrapResampling [MetricValue]
 
 instance Show MetricResult where
   show (SimpleRun val) = show val
+  show (BootstrapResampling vals) = show vals
 
 data MetricOutput = MetricOutput MetricResult (Maybe GraphSeries)
 
