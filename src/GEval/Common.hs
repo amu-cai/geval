@@ -126,6 +126,7 @@ data GEvalException = NoExpectedFile FilePath
                       | UnexpectedData Word32 String
                       | UnexpectedMultipleOutputs
                       | OtherException String
+                      | NoHeaderFile FilePath
                       deriving (Eq)
 
 instance Exception GEvalException
@@ -147,6 +148,7 @@ instance Show GEvalException where
   show (UnexpectedData lineNo message) = "Line " ++ (show lineNo) ++ ": Unexpected data [" ++ message ++ "]"
   show UnexpectedMultipleOutputs = "Multiple outputs are not possible in this mode, use -o option to select an output file"
   show (OtherException message) = message
+  show (NoHeaderFile filePath) = somethingWrongWithFilesMessage "No file with header specification" filePath
 
 somethingWrongWithFilesMessage :: String -> FilePath -> String
 somethingWrongWithFilesMessage msg filePath = Prelude.concat

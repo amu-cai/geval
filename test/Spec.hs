@@ -446,6 +446,9 @@ main = hspec $ do
   describe "automatic decompression" $ do
     it "more complex test" $ do
       runGEvalTest "charmatch-complex-compressed" `shouldReturnAlmost` 0.1923076923076923
+  describe "headers" $ do
+    it "simple" $ do
+      runGEvalTest "mse-simple-headers" `shouldReturnAlmost` 0.4166666666666667
   describe "handling jsonl format" $ do
     it "simple test" $
       runGEvalTestExtraOptions ["-e", "expected.jsonl" ] "jsonl-simple" `shouldReturnAlmost` 0.571428571428
@@ -467,7 +470,9 @@ main = hspec $ do
             gesToken = Nothing,
             gesGonitoGitAnnexRemote = Nothing,
             gesReferences = Nothing,
-            gesBootstrapResampling = Nothing }
+            gesBootstrapResampling = Nothing,
+            gesInHeader = Nothing,
+            gesOutHeader = Nothing }
     it "simple test" $ do
       results <- runLineByLineGeneralized KeepTheOriginalOrder sampleChallenge (const Data.Conduit.List.consume)
       Prelude.map (\(LineRecord inp _ _ _ _) -> inp) results `shouldBe` ["foo",

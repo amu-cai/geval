@@ -214,7 +214,14 @@ specParser = GEvalSpecification
           <> short 'B'
           <> metavar "NUMBER-OF-SAMPLES"
           <> help "Tests on NUMBER-OF-SAMPLES bootstrap samples rather than just on the whole test set" ))
-
+  <*> ( optional . strOption $
+        ( long "in-header"
+          <> metavar "FILE"
+          <> help "One-line TSV file specifying a list of field names for input files"))
+  <*> ( optional . strOption $
+        ( long "out-header"
+          <> metavar "FILE"
+          <> help "One-line TSV file specifying a list of field names for output and expected files"))
 
 defaultMinFrequency :: Integer
 defaultMinFrequency = 1

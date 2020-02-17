@@ -53,6 +53,7 @@ library
                      , Data.SplitIntoCrossTabs
                      , Data.Conduit.Bootstrap
                      , GEval.Formatting
+                     , Data.Conduit.Header
                      , Paths_geval
   build-depends:       base >= 4.7 && < 5
                      , cond

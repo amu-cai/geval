@@ -44,7 +44,11 @@ module GEval.Core
       getDataDecoder,
       threeLineSource,
       extensionsHandled,
-      isEmptyFile
+      isEmptyFile,
+      FileProcessingOptions(..),
+      readHeaderFileWrapper,
+      getInHeader,
+      getOutHeader
     ) where
 
 import Debug.Trace
@@ -82,6 +86,7 @@ import Control.Monad ((<=<), filterM)
 import Data.Attoparsec.Text (parseOnly)
 
 import Data.Conduit.SmartSource
+import Data.Conduit.Header
 
 import qualified Data.IntSet as IS
 
@@ -172,7 +177,9 @@ data GEvalSpecification = GEvalSpecification
                             gesToken :: Maybe String,
                             gesGonitoGitAnnexRemote :: Maybe String,
                             gesReferences :: Maybe String,
-                            gesBootstrapResampling :: Maybe Int }
+                            gesBootstrapResampling :: Maybe Int,
+                            gesInHeader :: Maybe String,
+                            gesOutHeader :: Maybe String }
 
 
 gesMainMetric :: GEvalSpecification -> Metric
@@ -191,6 +198,16 @@ gesPreprocess spec = tokenizeTabSeparatedWithSpaces (gesTokenizer spec)
 getExpectedDirectory :: GEvalSpecification -> FilePath
 getExpectedDirectory spec = fromMaybe outDirectory $ gesExpectedDirectory spec
                             where outDirectory = gesOutDirectory spec
+
+getInHeader :: GEvalSpecification -> Maybe FilePath
+getInHeader spec = getHeader spec gesInHeader
+
+getOutHeader :: GEvalSpecification -> Maybe FilePath
+getOutHeader spec = getHeader spec gesOutHeader
+
+getHeader spec selector = case selector spec of
+  Just headerFile -> Just $ getExpectedDirectory spec </> headerFile
+  Nothing -> Nothing
 
 -- | Special command, not just running the regular evaluation.
 -- See OptionsParser.hs for more information.
@@ -229,7 +246,9 @@ defaultGEvalSpecification = GEvalSpecification {
   gesToken = Nothing,
   gesGonitoGitAnnexRemote = Nothing,
   gesReferences = Nothing,
-  gesBootstrapResampling = Nothing }
+  gesBootstrapResampling = Nothing,
+  gesInHeader = Nothing,
+  gesOutHeader = Nothing }
 
 isEmptyFile :: FilePath -> IO (Bool)
 isEmptyFile path = do
@@ -255,9 +274,13 @@ noGraph = const Nothing
 
 gevalOnSingleOut :: GEvalSpecification -> SourceSpec -> SourceSpec -> SourceSpec -> IO (SourceSpec, [MetricOutput])
 gevalOnSingleOut gevalSpec inputSource expectedSource outSource = do
+  mInHeader <- readHeaderFileWrapper $ getInHeader gevalSpec
+  mOutHeader <- readHeaderFileWrapper $ getOutHeader gevalSpec
   vals <- Prelude.mapM (\scheme -> gevalCore (evaluationSchemeMetric scheme)
                                            mSelector
                                            (preprocess . applyPreprocessingOperations scheme)
+                                           mInHeader
+                                           mOutHeader
                                            (gesBootstrapResampling gevalSpec)
                                            inputSource
                                            expectedSource
@@ -266,6 +289,15 @@ gevalOnSingleOut gevalSpec inputSource expectedSource outSource = do
   where schemes = gesMetrics gevalSpec
         preprocess = gesPreprocess gevalSpec
         mSelector = gesSelector gevalSpec
+
+
+readHeaderFileWrapper :: Maybe FilePath -> IO (Maybe TabularHeader)
+readHeaderFileWrapper Nothing = return Nothing
+readHeaderFileWrapper (Just headerFilePath) = do
+  mHeader <- readHeaderFile headerFilePath
+  case mHeader of
+    Just header -> return $ Just header
+    Nothing -> throwM $ NoHeaderFile headerFilePath
 
 checkAndGetFilesSingleOut :: Bool -> GEvalSpecification -> IO (SourceSpec, SourceSpec, SourceSpec)
 checkAndGetFilesSingleOut forceInput gevalSpec = do
@@ -369,9 +401,18 @@ getInputSourceIfNeeded forced metrics directory inputFilePath
          Right sourceSpec -> return sourceSpec
    | otherwise = return NoSource
 
-fileAsLineSource :: SourceSpec -> Maybe Selector -> (Text -> Text) -> LineSource (ResourceT IO)
-fileAsLineSource spec mSelector preprocess =
-  LineSource ((smartSource spec) .| autoDecompress .| CT.decodeUtf8Lenient .| CT.lines) (select (getDataFormat spec) mSelector) preprocess spec 1
+data FileProcessingOptions = FileProcessingOptions {
+  fileProcessingOptionsSelector :: Maybe Selector,
+  fileProcessingOptionsPreprocess :: (Text -> Text),
+  fileProcessingOptionsHeader :: Maybe TabularHeader }
+
+
+fileAsLineSource :: SourceSpec -> FileProcessingOptions -> LineSource (ResourceT IO)
+fileAsLineSource spec options =
+  LineSource ((smartSource spec) .| autoDecompress .| CT.decodeUtf8Lenient .| CT.lines .| processHeader mHeader) (select (getDataFormat spec) mSelector) preprocess spec 1
+  where mSelector = fileProcessingOptionsSelector options
+        preprocess = fileProcessingOptionsPreprocess options
+        mHeader = fileProcessingOptionsHeader options
 
 getDataDecoder :: LineSource (ResourceT IO) -> (Text -> ItemTarget)
 getDataDecoder (LineSource _ dd _ _ _) = dd
@@ -429,22 +470,32 @@ handleBootstrap _ = True
 gevalCore :: Metric           -- ^ evaluation metric
           -> Maybe Selector   -- ^ selector to be used
           -> (Text -> Text)    -- ^ preprocessing function (e.g. tokenization)
+          -> (Maybe TabularHeader)  -- ^ header for input
+          -> (Maybe TabularHeader)  -- ^ header for output/expected files
           -> (Maybe Int)      -- ^ number of bootstrap samples
           -> SourceSpec       -- ^ source specification for the input values
           -> SourceSpec       -- ^ source specification for the expected output
           -> SourceSpec       -- ^ source specification for the output
           -> IO (MetricOutput) -- ^ metric value for the output against the expected output
-gevalCore metric mSelector preprocess mBootstrapResampling inputSource expectedSource outSource = do
+gevalCore metric mSelector preprocess mInHeader mOutHeader mBootstrapResampling inputSource expectedSource outSource = do
   whenM (isEmptyFileSource outSource) $ throwM $ EmptyOutput
   go metric
-     (fileAsLineSource inputSource mSelector preprocess)
-     (fileAsLineSource expectedSource mSelector preprocess)
-     (fileAsLineSource outSource mSelector preprocess)
+     (fileAsLineSource inputSource inOptions)
+     (fileAsLineSource expectedSource outOptions)
+     (fileAsLineSource outSource outOptions)
   where go = case mBootstrapResampling of
                Nothing -> gevalCoreOnSources
                Just bootstrapResampling -> if handleBootstrap metric
                                           then gevalBootstrapOnSources bootstrapResampling
                                           else gevalCoreOnSources
+        outOptions = FileProcessingOptions {
+          fileProcessingOptionsSelector = mSelector,
+          fileProcessingOptionsPreprocess = preprocess,
+          fileProcessingOptionsHeader = mOutHeader }
+        inOptions = FileProcessingOptions {
+          fileProcessingOptionsSelector = mSelector,
+          fileProcessingOptionsPreprocess = preprocess,
+          fileProcessingOptionsHeader = mInHeader }
 
 isEmptyFileSource :: SourceSpec -> IO Bool
 isEmptyFileSource (FilePathSpec filePath) = isEmptyFile filePath

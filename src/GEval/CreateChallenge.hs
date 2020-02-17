@@ -31,6 +31,8 @@ createChallenge withDataFiles expectedDirectory spec = do
   createFile (expectedDirectory </> ".gitignore") $ gitignoreContents
   createFile (expectedDirectory </> "README.md") $ readmeMDContents metric testName
   createFile (expectedDirectory </> configFileName) $ configContents metrics precision testName
+  createHeaderFile expectedDirectory "in-header.tsv" $ inHeaderContents metric
+  createHeaderFile expectedDirectory "out-header.tsv" $ outHeaderContents metric
   if withDataFiles
     then
      do
@@ -52,6 +54,10 @@ createChallenge withDataFiles expectedDirectory spec = do
         devDirectory = expectedDirectory </> "dev-0"
         testDirectory = expectedDirectory </> testName
         expectedFile = gesExpectedFile spec
+
+createHeaderFile _ _ Nothing = return ()
+createHeaderFile expectedDirectory headerFile (Just fields) = do
+  createFile (expectedDirectory </> headerFile) $ (intercalate "\t" fields) ++ "\n"
 
 createTrainFiles :: Metric -> FilePath -> FilePath -> IO ()
 createTrainFiles metric@(LogLossHashed _) trainDirectory _ = createSingleTrainFile metric trainDirectory
@@ -423,9 +429,17 @@ configContents schemes precision testName = unwords (Prelude.map (\scheme -> ("-
                                         " --test-name " ++ testName
                                      else
                                      "") ++
-                                 (precisionOpt precision)
+                                 (precisionOpt precision) ++
+                                 inHeaderOpts ++
+                                 outHeaderOpts
     where precisionOpt Nothing = ""
           precisionOpt (Just p) = " --precision " ++ (show p)
+          ((EvaluationScheme mainMetric _):_) = schemes
+          inHeaderOpts = getHeaderOpts "in-header" inHeaderContents
+          outHeaderOpts = getHeaderOpts "out-header" outHeaderContents
+          getHeaderOpts opt selector = case selector mainMetric of
+            Just _ -> " --" ++ opt ++ " " ++ (opt <.> "tsv")
+            Nothing -> ""
 
 -- Originally train content was in one file, to avoid large changes
 -- for the time being we are using the original function.
@@ -823,6 +837,79 @@ testExpectedContents _ = [hereLit|0.11
 17.2
 |]
 
+inHeaderContents :: Metric -> Maybe [String]
+inHeaderContents (Mean metric) = inHeaderContents metric
+inHeaderContents GLEU = Nothing
+inHeaderContents BLEU = Nothing
+inHeaderContents Accuracy = Just ["Temperature", "Wind", "Rain"]
+inHeaderContents (FMeasure _) = Just ["seismic",
+                                      "seismoacoustic",
+                                      "shift",
+                                      "genergy",
+                                      "gpuls",
+                                      "gdenergy",
+                                      "gdpuls",
+                                      "ghazard",
+                                      "nbumps",
+                                      "nbumps2",
+                                      "nbumps3",
+                                      "nbumps4",
+                                      "nbumps5",
+                                      "nbumps6",
+                                      "nbumps7",
+                                      "nbumps89",
+                                      "energy",
+                                      "maxenergy",
+                                      "class"]
+inHeaderContents (MacroFMeasure _) = Just ["FirstName"]
+inHeaderContents (ProbabilisticSoftFMeasure b) = inHeaderContents (SoftFMeasure b)
+inHeaderContents (SoftFMeasure _) = Just ["Text"]
+inHeaderContents NMI = Just ["Utterance"]
+inHeaderContents (LikelihoodHashed b) = inHeaderContents (LogLossHashed b)
+inHeaderContents (LogLossHashed _) = Just ["LeftContext", "RightContext"]
+inHeaderContents CharMatch = Just ["Text"]
+inHeaderContents MAP = Just ["Dialect", "PolishPhrase"]
+inHeaderContents Likelihood = inHeaderContents LogLoss
+inHeaderContents LogLoss = Just ["Text"]
+inHeaderContents BIOF1Labels = inHeaderContents BIOF1
+inHeaderContents BIOF1 = Just ["Text"]
+inHeaderContents TokenAccuracy = Just ["TokenizedText"]
+inHeaderContents SegmentAccuracy = Just ["Segment"]
+inHeaderContents (ProbabilisticMultiLabelFMeasure beta) = inHeaderContents (MultiLabelFMeasure beta)
+inHeaderContents (MultiLabelFMeasure _) = Just ["Text"]
+inHeaderContents MultiLabelLikelihood = inHeaderContents MultiLabelLogLoss
+inHeaderContents MultiLabelLogLoss = Just ["Utterance"]
+inHeaderContents (Soft2DFMeasure _) = inHeaderContents ClippEU
+inHeaderContents ClippEU = Just ["DjvuFilePath"]
+inHeaderContents _ = Just ["OrbitalPeriod", "OrbitalEccentricity", "NumberOfMoons"]
+
+outHeaderContents :: Metric -> Maybe [String]
+outHeaderContents (Mean metric) = outHeaderContents metric
+outHeaderContents BLEU = Nothing
+outHeaderContents GLEU = Nothing
+outHeaderContents Accuracy = Just ["ShouldYouKidForWalk"]
+outHeaderContents (FMeasure _) = Just ["IsSeismicBump"]
+outHeaderContents (MacroFMeasure _) = Just ["LanguageCode"]
+outHeaderContents (ProbabilisticSoftFMeasure b) = outHeaderContents (SoftFMeasure b)
+outHeaderContents (SoftFMeasure _) = Just ["NamesFound"]
+outHeaderContents NMI = Just ["LanguageCode"]
+outHeaderContents (LikelihoodHashed b) = outHeaderContents (LogLossHashed b)
+outHeaderContents (LogLossHashed _) = Just ["GuessedWord"]
+outHeaderContents CharMatch = Just ["NormalizedText"]
+outHeaderContents MAP = Nothing
+outHeaderContents Likelihood = outHeaderContents LogLoss
+outHeaderContents LogLoss = Just ["Probability"]
+outHeaderContents BIOF1Labels = outHeaderContents BIOF1
+outHeaderContents BIOF1 = Just ["BIOOutput"]
+outHeaderContents TokenAccuracy = Just ["PartsOfSpeech"]
+outHeaderContents SegmentAccuracy = Just ["PartsOfSpeech"]
+outHeaderContents (ProbabilisticMultiLabelFMeasure beta) = outHeaderContents (MultiLabelFMeasure beta)
+outHeaderContents (MultiLabelFMeasure _) = Just ["Entities"]
+outHeaderContents MultiLabelLikelihood = outHeaderContents MultiLabelLogLoss
+outHeaderContents MultiLabelLogLoss = Just ["Emotion"]
+outHeaderContents (Soft2DFMeasure _) = Just ["Rectangle"]
+outHeaderContents ClippEU = Just ["Rectangle"]
+outHeaderContents _ = Just ["Mass"]
 
 gitignoreContents :: String
 gitignoreContents = [hereLit|

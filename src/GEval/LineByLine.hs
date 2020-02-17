@@ -73,6 +73,8 @@ import Data.Statistics.Kendall (kendallZ)
 
 import Data.Conduit.Binary (sourceFile)
 
+import Data.Conduit.Header
+
 import qualified Data.HashMap.Strict as H
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
@@ -463,7 +465,10 @@ runLineByLineGeneralized ordering spec consum = do
       return $ Just references
     Nothing -> return Nothing
   (inputFilePath, expectedFilePath, outFilePath) <- checkAndGetFilesSingleOut True spec
-  gevalLineByLineCore metric mSelector preprocess inputFilePath expectedFilePath outFilePath (sorter ordering .| consum mReferences)
+  mInHeader <- readHeaderFileWrapper $ getInHeader spec
+  mOutHeader <- readHeaderFileWrapper $ getOutHeader spec
+  let mOutHeader = Nothing
+  gevalLineByLineCore metric mSelector preprocess mInHeader mOutHeader inputFilePath expectedFilePath outFilePath (sorter ordering .| consum mReferences)
   where metric = gesMainMetric spec
         scheme = gesMainScheme spec
         mSelector = gesSelector spec
@@ -517,7 +522,9 @@ runMultiOutputGeneralized spec consum = do
   altSourceSpecs' <- mapM (getSmartSourceSpec ((gesOutDirectory spec) </> (gesTestName spec)) "out.tsv") altOuts
   let altSourceSpecs = rights altSourceSpecs'
   let sourceSpecs = (outSource:altSourceSpecs)
-  let sources = Prelude.map (gevalLineByLineSource metric mSelector preprocess inputSource expectedSource) sourceSpecs
+  mInHeader <- readHeaderFileWrapper $ getInHeader spec
+  mOutHeader <- readHeaderFileWrapper $ getOutHeader spec
+  let sources = Prelude.map (gevalLineByLineSource metric mSelector preprocess mInHeader mOutHeader inputSource expectedSource) sourceSpecs
   runResourceT $ runConduit $
     (sequenceSources sources .| consum)
   where metric = gesMainMetric spec
@@ -545,13 +552,15 @@ runDiffGeneralized :: ResultOrdering -> FilePath -> GEvalSpecification -> (Maybe
 runDiffGeneralized ordering otherOut spec consum = do
   (inputSource, expectedSource, outSource) <- checkAndGetFilesSingleOut True spec
   ooss <- getSmartSourceSpec ((gesOutDirectory spec) </> (gesTestName spec)) "out.tsv" otherOut
+  mInHeader <- readHeaderFileWrapper $ getInHeader spec
+  mOutHeader <- readHeaderFileWrapper $ getOutHeader spec
   case ooss of
     Left NoSpecGiven -> throwM $ NoOutFile otherOut
     Left (NoFile fp) -> throwM $ NoOutFile fp
     Left (NoDirectory d) -> throwM $ NoOutFile otherOut
     Right otherOutSource -> do
-      let sourceA = gevalLineByLineSource metric mSelector preprocess inputSource expectedSource otherOutSource
-      let sourceB = gevalLineByLineSource metric mSelector preprocess inputSource expectedSource outSource
+      let sourceA = gevalLineByLineSource metric mSelector preprocess mInHeader mOutHeader inputSource expectedSource otherOutSource
+      let sourceB = gevalLineByLineSource metric mSelector preprocess mInHeader mOutHeader inputSource expectedSource outSource
       runResourceT $ runConduit $
         ((getZipSource $ (,)
           <$> ZipSource sourceA
@@ -573,27 +582,44 @@ runDiffGeneralized ordering otherOut spec consum = do
 escapeTabs :: Text -> Text
 escapeTabs = Data.Text.replace "\t" "<tab>"
 
-gevalLineByLineCore :: Metric -> Maybe Selector -> (Text -> Text) -> SourceSpec -> SourceSpec -> SourceSpec -> ConduitT LineRecord Void (ResourceT IO) a -> IO a
-gevalLineByLineCore metric mSelector preprocess inputSource expectedSource outSource consum =
+gevalLineByLineCore :: Metric -> Maybe Selector -> (Text -> Text) -> (Maybe TabularHeader) -> (Maybe TabularHeader) -> SourceSpec -> SourceSpec -> SourceSpec -> ConduitT LineRecord Void (ResourceT IO) a -> IO a
+gevalLineByLineCore metric mSelector preprocess mInHeader mOutHeader inputSource expectedSource outSource consum =
   runResourceT $ runConduit $
-     ((gevalLineByLineSource metric mSelector preprocess inputSource expectedSource outSource) .| consum)
+     ((gevalLineByLineSource metric mSelector preprocess mInHeader mOutHeader inputSource expectedSource outSource) .| consum)
 
-gevalLineByLineSource :: Metric -> Maybe Selector -> (Text -> Text) -> SourceSpec -> SourceSpec -> SourceSpec -> ConduitT () LineRecord (ResourceT IO) ()
-gevalLineByLineSource metric mSelector preprocess inputSource expectedSource outSource =
+gevalLineByLineSource :: Metric
+                        -> Maybe Selector
+                        -> (Text -> Text)
+                        -> (Maybe TabularHeader)
+                        -> (Maybe TabularHeader)
+                        -> SourceSpec
+                        -> SourceSpec
+                        -> SourceSpec
+                        -> ConduitT () LineRecord (ResourceT IO) ()
+gevalLineByLineSource metric mSelector preprocess mInHeader mOutHeader inputSource expectedSource outSource =
   (getZipSource $ (,)
        <$> ZipSource (CL.sourceList [1..])
        <*> (ZipSource $ threeLineSource context)) .| CL.mapM (checkStepM evaluateLine) .| CL.catMaybes
   where context = (WithInput inputLineSource expectedLineSource outputLineSource)
-        -- preparing sources, `id` means that no preprocessing is done (to avoid double preprocessing)
-        inputLineSource = fileAsLineSource inputSource mSelector id
-        expectedLineSource = fileAsLineSource expectedSource mSelector id
-        outputLineSource = fileAsLineSource outSource mSelector id
+        inputLineSource = fileAsLineSource inputSource inOptions
+        expectedLineSource = fileAsLineSource expectedSource outOptions
+        outputLineSource = fileAsLineSource outSource outOptions
         justLine (LineInFile _ _ l) = l
         evaluateLine (lineNo, ParsedRecordWithInput inp exp out) = do
           s <- liftIO $ gevalCoreOnSingleLines metric preprocess (getDataDecoder inputLineSource) (LineInFile inputSource lineNo inp)
                                                                 (getDataDecoder expectedLineSource) (LineInFile expectedSource lineNo exp)
                                                                 (getDataDecoder outputLineSource) (LineInFile outSource lineNo out)
           return $ LineRecord inp exp out lineNo (extractSimpleRunValue $ getMetricValue s)
+        -- preparing sources, `id` means that no preprocessing is done (to avoid double preprocessing)
+        outOptions = FileProcessingOptions {
+          fileProcessingOptionsSelector = mSelector,
+          fileProcessingOptionsPreprocess = id,
+          fileProcessingOptionsHeader = mOutHeader }
+        inOptions = FileProcessingOptions {
+          fileProcessingOptionsSelector = mSelector,
+          fileProcessingOptionsPreprocess = id,
+          fileProcessingOptionsHeader = mInHeader }
+
 
 justTokenize :: Maybe Tokenizer -> IO ()
 justTokenize Nothing = error "a tokenizer must be specified with --tokenizer option"
