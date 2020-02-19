@@ -534,9 +534,9 @@ be given to generate another type of toy challenge:
 challenge to be submitted. The suggested way to do this will be
 presented as a [Makefile](https://en.wikipedia.org/wiki/Makefile), but
 of course you could use any other scripting language and the commands
-should be clear if you know Bash and some basic facts about Makefile:
+should be clear if you know Bash and some basic facts about Makefiles:
 
-* a Makefile consists of rules, each rule specify how to build a _target_ out _dependencies_ using
+* a Makefile consists of rules, each rule specifies how to build a _target_ out of _dependencies_ using
   shell commands
 * `$@` is the (first) target, whereas `$<` — the first dependency
 * the indentation should be done with TABs, not spaces!
@@ -550,10 +550,14 @@ SHELL=/bin/bash
 # the directory where the challenge will be created
 output_directory=...
 
-# let's define which files are necessary, other files will be created if needed
+# let's define which files are necessary, other files will be created if needed;
+# we'll compress the input files with xz and leave `expected.tsv` files uncompressed
+# (but you could decide otherwise)
 all: $(output_directory)/train/in.tsv.xz $(output_directory)/train/expected.tsv \
      $(output_directory)/dev-0/in.tsv.xz $(output_directory)/dev-0/expected.tsv \
      $(output_directory)/test-A/in.tsv.xz $(output_directory)/test-A/expected.tsv
+    # always validate the challenge
+    geval --validate --expected-directory $(output_directory)
 
 $(output_directory)/config.txt:
     mkdir -p $(output_directory)
@@ -564,7 +568,7 @@ $(output_directory)/config.txt:
     rm -f $(output_directory)/{train,dev-0,test-A}/{in,expected}.tsv
 
 # a "total" TSV containing all the data, we'll split it later
-all-data.tsv.xz: some-other-files
+all-data.tsv.xz: prepare.py some-other-files
     # the data are generated using your script, let's say prepare.py and
     # some other files (of course, it depends on your task);
     # the file will be compressed with xz
@@ -577,7 +581,7 @@ all-data.tsv.xz: some-other-files
 # but _stable_ manner, the set into which an item is assigned should depend on the MD5 sum
 # of some field in the input data (a field unlikely to change). Let's assume
 # that you created a script `filter.py` that takes as an argument a regular expression that will be applied
-# for the MD5 sum (written in the hexadecimal format).
+# to the MD5 sum (written in the hexadecimal format).
 
 $(output_directory)/train/in.tsv.xz $(output_directory)/train/expected.tsv: all-data.tsv.xz filter.py config.txt
     # 1. xzcat for decompression
@@ -588,11 +592,11 @@ $(output_directory)/train/in.tsv.xz $(output_directory)/train/expected.tsv: all-
     xzcat $< | ./filter.py '[0-9abcd]$' | tee >(cut -f 1 > $(output_directory)/train/expected.tsv) | cut -f 2- | xz > $@
 
 $(output_directory)/dev-0/in.tsv.xz $(output_directory)/dev-0/expected.tsv: all-data.tsv.xz filter.py config.txt
-    # 1/16 of items for dev-0 set
+    # 1/16 of items goes to dev-0 set
     xzcat $< | ./filter.py 'e$' | tee >(cut -f 1 > $(output_directory)/dev-0/expected.tsv) | cut -f 2- | xz > $@
 
 $(output_directory)/test-A/in.tsv.xz $(output_directory)/test-A/expected.tsv: all-data.tsv.xz filter.py config.txt
-    # ( other)1/16 of items for test-A set
+    # (other) 1/16 of items goes to test-A set
     xzcat $< | ./filter.py 'f$' | tee >(cut -f 1 > $(output_directory)/test-A/expected.tsv) | cut -f 2- | xz > $@
 
 # wiping out the challenge, if you are desperate
