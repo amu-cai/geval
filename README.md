@@ -503,8 +503,7 @@ have the following structure:
 * `train/expected.tsv` —  the target values
 * `dev-0/` — subdirectory with a development set (a sample test set,
   which won't be used for the final evaluation)
-* `dev-0/in.tsv` — input data (the same format as `train/train.tsv`,
-  but without the first column)
+* `dev-0/in.tsv` — input data
 * `dev-0/expected.tsv` — values to be guessed
 * `dev-1/`, `dev-2`, ... — other dev sets (if supplied)
 * `test-A/` — subdirectory with the test set
