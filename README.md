@@ -554,9 +554,17 @@ output_directory=...
 # (but you could decide otherwise)
 all: $(output_directory)/train/in.tsv.xz $(output_directory)/train/expected.tsv \
      $(output_directory)/dev-0/in.tsv.xz $(output_directory)/dev-0/expected.tsv \
-     $(output_directory)/test-A/in.tsv.xz $(output_directory)/test-A/expected.tsv
+     $(output_directory)/test-A/in.tsv.xz $(output_directory)/test-A/expected.tsv \
+     $(output_directory)/README.md
     # always validate the challenge
     geval --validate --expected-directory $(output_directory)
+
+# we need to replace the default README.md, we assume that it
+# is kept as challenge-readme.md in the repo with this Makefile;
+# note that the title from README.md will be taken as the title of the challenge
+# and the first paragraph — as a short description
+$(output_directory)/README.md: challenge-readme.md
+    cp $< $@
 
 $(output_directory)/config.txt:
     mkdir -p $(output_directory)
