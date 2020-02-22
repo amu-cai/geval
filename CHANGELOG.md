@@ -1,4 +1,8 @@
 
+## 1.33.0.0
+
+* Handle headers in TSV files
+
 ## 1.32.2.0
 
 * Fix bug in cross-tabs
