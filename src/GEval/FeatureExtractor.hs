@@ -19,6 +19,7 @@ module GEval.FeatureExtractor
    FeatureNamespace(..),
    References(..),
    ReferencesData(..),
+   FeatureIndex(..),
    toTextualContent,
    filterExistentialFactors)
   where
@@ -38,6 +39,8 @@ import Control.Error.Util (hush)
 import Data.Attoparsec.Text
 import Data.Attoparsec.Combinator
 import Control.Applicative
+
+import Data.Conduit.Header
 
 import qualified Data.HashMap.Strict as H
 
@@ -131,12 +134,19 @@ instance Show AtomicFactor where
   show (TextFactor t) = unpack t
   show (ShapeFactor (WordShape t)) = 'S':'H':'A':'P':'E':':':(unpack t)
 
-data FeatureNamespace = FeatureNamespace Text | FeatureTabbedNamespace Text Int
+data FeatureIndex = ColumnByNumber Int | ColumnByName Text
+  deriving (Eq, Ord)
+
+instance Show FeatureIndex where
+  show (ColumnByNumber ix) = show ix
+  show (ColumnByName name) = unpack name
+
+data FeatureNamespace = FeatureNamespace Text | FeatureTabbedNamespace Text FeatureIndex
                         deriving (Eq, Ord)
 
 instance Show FeatureNamespace where
   show (FeatureNamespace namespace) = unpack namespace
-  show (FeatureTabbedNamespace namespace column) = ((unpack namespace) ++ "<" ++ (show column) ++ ">")
+  show (FeatureTabbedNamespace namespace columnIndex) = ((unpack namespace) ++ "<" ++ (show columnIndex) ++ ">")
 
 data References = References (H.HashMap Integer Text)
 
@@ -205,11 +215,15 @@ extractFactorsFromField mTokenizer bbdo mReferenceData namespace record =
 extractFactors :: (Maybe Tokenizer) -> BlackBoxDebuggingOptions -> Maybe ReferencesData -> Text -> Text -> [PeggedFactor]
 extractFactors mTokenizer bbdo mReferencesData namespace record = extractFactorsFromField mTokenizer bbdo mReferencesData (FeatureNamespace namespace) record
 
-extractFactorsFromTabbed :: (Maybe Tokenizer) -> BlackBoxDebuggingOptions -> Maybe ReferencesData -> Text -> Text -> [PeggedFactor]
-extractFactorsFromTabbed mTokenizer bbdo mReferencesData namespace record =
+extractFactorsFromTabbed :: (Maybe Tokenizer) -> BlackBoxDebuggingOptions -> Maybe ReferencesData -> Text -> Text -> Maybe TabularHeader -> [PeggedFactor]
+extractFactorsFromTabbed mTokenizer bbdo mReferencesData namespace record mHeader =
   Data.List.concat
   $ Prelude.map (\(n, t) -> extractFactorsFromField mTokenizer bbdo mReferencesData (FeatureTabbedNamespace namespace n) t)
-  $ Prelude.zip [1..] (splitOn "\t" record)
+  $ Prelude.zip (generateColumnNames mHeader) (splitOn "\t" record)
+
+generateColumnNames :: Maybe TabularHeader -> [FeatureIndex]
+generateColumnNames Nothing = Data.List.map ColumnByNumber [1..]
+generateColumnNames (Just (TabularHeader fields)) = Data.List.map ColumnByName fields
 
 addCartesianFactors :: BlackBoxDebuggingOptions -> [LineWithPeggedFactors] -> [LineWithFactors]
 addCartesianFactors bbdo linesWithPeggedFactors = addCartesianFactors' (bbdoCartesian bbdo) linesWithPeggedFactors

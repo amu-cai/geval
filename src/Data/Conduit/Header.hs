@@ -1,7 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 module Data.Conduit.Header
-       (processHeader, TabularHeader, readHeaderFile)
+       (processHeader, TabularHeader(..), readHeaderFile)
        where
 
 import Data.Text

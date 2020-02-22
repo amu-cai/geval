@@ -654,26 +654,26 @@ main = hspec $ do
          bbdoCartesian = False,
          bbdoMinCartesianFrequency = Nothing,
          bbdoConsiderNumericalFeatures = True }
-      (sort $ extractFactorsFromTabbed Nothing bbdo Nothing "in" "I like this\t34.3\ttests") `shouldBe` [
-         PeggedFactor (FeatureTabbedNamespace "in" 1)
+      (sort $ extractFactorsFromTabbed Nothing bbdo Nothing "in" "I like this\t34.3\ttests" Nothing) `shouldBe` [
+         PeggedFactor (FeatureTabbedNamespace "in" (ColumnByNumber 1))
                       (SimpleExistentialFactor (SimpleAtomicFactor (TextFactor "I"))),
-         PeggedFactor (FeatureTabbedNamespace "in" 1)
+         PeggedFactor (FeatureTabbedNamespace "in" (ColumnByNumber 1))
                       (SimpleExistentialFactor (SimpleAtomicFactor (TextFactor "like"))),
-         PeggedFactor (FeatureTabbedNamespace "in" 1)
+         PeggedFactor (FeatureTabbedNamespace "in" (ColumnByNumber 1))
                       (SimpleExistentialFactor (SimpleAtomicFactor (TextFactor "this"))),
-         PeggedFactor (FeatureTabbedNamespace "in" 1)
+         PeggedFactor (FeatureTabbedNamespace "in" (ColumnByNumber 1))
                       (SimpleExistentialFactor (BigramFactor (TextFactor "I") (TextFactor "like"))),
-         PeggedFactor (FeatureTabbedNamespace "in" 1)
+         PeggedFactor (FeatureTabbedNamespace "in" (ColumnByNumber 1))
                       (SimpleExistentialFactor (BigramFactor (TextFactor "like") (TextFactor "this"))),
-         PeggedFactor (FeatureTabbedNamespace "in" 1)
+         PeggedFactor (FeatureTabbedNamespace "in" (ColumnByNumber 1))
                       (NumericalFactor Nothing 11),
-         PeggedFactor (FeatureTabbedNamespace "in" 2)
+         PeggedFactor (FeatureTabbedNamespace "in" (ColumnByNumber 2))
                       (SimpleExistentialFactor (SimpleAtomicFactor (TextFactor "34.3"))),
-         PeggedFactor (FeatureTabbedNamespace "in" 2)
+         PeggedFactor (FeatureTabbedNamespace "in" (ColumnByNumber 2))
                       (NumericalFactor (Just 34.3) 4),
-         PeggedFactor (FeatureTabbedNamespace "in" 3)
+         PeggedFactor (FeatureTabbedNamespace "in" (ColumnByNumber 3))
                       (SimpleExistentialFactor (SimpleAtomicFactor (TextFactor "tests"))),
-         PeggedFactor (FeatureTabbedNamespace "in" 3)
+         PeggedFactor (FeatureTabbedNamespace "in" (ColumnByNumber 3))
                       (NumericalFactor Nothing 5) ]
   describe "Kendall's tau" $ do
     it "tau" $ do

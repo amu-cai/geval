@@ -98,9 +98,11 @@ parseReferenceEntry line = (read $ unpack refId, t)
   where [refId, t] = splitOn "\t" line
 
 runLineByLine :: ResultOrdering -> Maybe String -> GEvalSpecification -> BlackBoxDebuggingOptions -> IO ()
-runLineByLine ordering featureFilter spec bbdo = runLineByLineGeneralized ordering spec consum
-   where consum :: Maybe References -> ConduitT LineRecord Void (ResourceT IO) ()
-         consum = (\mReferences -> (runFeatureFilter featureFilter spec bbdo mReferences .| CL.map (encodeUtf8 . formatOutput) .| CC.unlinesAscii .| CC.stdout))
+runLineByLine ordering featureFilter spec bbdo = do
+  mInHeader <- readHeaderFileWrapper $ getInHeader spec
+  runLineByLineGeneralized ordering spec (consum mInHeader)
+   where consum :: Maybe TabularHeader -> Maybe References -> ConduitT LineRecord Void (ResourceT IO) ()
+         consum = (\mInHeader -> \mReferences -> (runFeatureFilter featureFilter spec bbdo mReferences mInHeader .| CL.map (encodeUtf8 . formatOutput) .| CC.unlinesAscii .| CC.stdout))
          formatOutput (LineRecord inp exp out _ score) = Data.Text.intercalate "\t" [
            formatScore score,
            escapeTabs inp,
@@ -155,15 +157,15 @@ markBadFeatures worstFeaturesMap mTokenizer bbdo field line =
   $ Prelude.map (featureToLineSpan worstFeaturesMap)
   $ extractFactors mTokenizer bbdo Nothing field line
 
-markBadFeaturesInTabbed :: (M.Map PeggedFactor Double) -> (Maybe Tokenizer) -> BlackBoxDebuggingOptions -> Text -> Text -> [LineSpan]
-markBadFeaturesInTabbed worstFeaturesMap mTokenizer bbdo field line =
+markBadFeaturesInTabbed :: (M.Map PeggedFactor Double) -> (Maybe Tokenizer) -> BlackBoxDebuggingOptions -> Text -> Text -> Maybe TabularHeader -> [LineSpan]
+markBadFeaturesInTabbed worstFeaturesMap mTokenizer bbdo field line mInHeader =
   catMaybes
   $ Prelude.map (featureToLineSpan worstFeaturesMap)
-  $ extractFactorsFromTabbed mTokenizer bbdo Nothing field line
+  $ extractFactorsFromTabbed mTokenizer bbdo Nothing field line mInHeader
 
 
-doMarking worstFeaturesMap mTokenizer bbdo (LineRecord inpLine expLine outLine _ score) =
-  SpanLineRecord (markBadFeaturesInTabbed worstFeaturesMap mTokenizer bbdo "in" inpLine)
+doMarking worstFeaturesMap mTokenizer mInHeader bbdo (LineRecord inpLine expLine outLine _ score) =
+  SpanLineRecord (markBadFeaturesInTabbed worstFeaturesMap mTokenizer bbdo "in" inpLine mInHeader)
                  (markBadFeatures worstFeaturesMap mTokenizer bbdo "exp" expLine)
                  (markBadFeatures worstFeaturesMap mTokenizer bbdo "out" outLine)
                  score
@@ -184,16 +186,17 @@ runLineByLineWithWorstFeaturesGeneralized :: ResultOrdering
                                             -> IO r
 runLineByLineWithWorstFeaturesGeneralized ordering featureFilter spec bbdo consum = do
   hPutStrLn stderr "Looking for worst features..."
-  worstFeatures <- runLineByLineGeneralized ordering' spec (\mReferences -> worstFeaturesPipeline False spec bbdo mReferences (CL.take 100))
+  mInHeader <- readHeaderFileWrapper $ getInHeader spec
+  worstFeatures <- runLineByLineGeneralized ordering' spec (\mReferences -> worstFeaturesPipeline False spec bbdo mReferences mInHeader (CL.take 100))
   let worstFeaturesMap = M.fromList
                          $ catMaybes
                          $ Prelude.map featureToFactor
                          $ Prelude.map (\(FeatureWithPValue feature pValue _ _) -> (feature, pValue)) worstFeatures
-
-  runLineByLineGeneralized ordering spec (consum' worstFeaturesMap)
-   where consum' worstFeaturesMap = (\mReferences -> (runFeatureFilter featureFilter spec bbdo mReferences
-                                                     .| CL.map (doMarking worstFeaturesMap mTokenizer bbdo)
-                                                     .| consum))
+  mInHeader <- readHeaderFileWrapper $ getInHeader spec
+  runLineByLineGeneralized ordering spec (consum' worstFeaturesMap mInHeader)
+   where consum' worstFeaturesMap mInHeader = (\mReferences -> (runFeatureFilter featureFilter spec bbdo mReferences mInHeader
+                                                               .| CL.map (doMarking worstFeaturesMap mTokenizer mInHeader bbdo)
+                                                               .| consum))
          ordering' = forceSomeOrdering ordering
          mTokenizer = gesTokenizer spec
 
@@ -206,18 +209,21 @@ runFeatureFilter :: (Monad m, FeatureSource s) => Maybe String
                                                 -> GEvalSpecification
                                                 -> BlackBoxDebuggingOptions
                                                 -> Maybe References
+                                                -> Maybe TabularHeader
                                                 -> ConduitT s s m ()
-runFeatureFilter Nothing _ _ _ = doNothing
-runFeatureFilter (Just feature) spec bbdo mReferences = CC.map (\l -> (fakeRank, l))
-                                                        .| featureExtractor mTokenizer bbdo mReferences
-                                                        .| CC.filter (checkFeature feature)
-                                                        .| CC.map fst
+runFeatureFilter Nothing _ _ _ _ = doNothing
+runFeatureFilter (Just feature) spec bbdo mReferences mInHeader = CC.map (\l -> (fakeRank, l))
+                                                                  .| featureExtractor mTokenizer bbdo mReferences mInHeader
+                                                                  .| CC.filter (checkFeature feature)
+                                                                  .| CC.map fst
   where mTokenizer = gesTokenizer spec
         fakeRank = 0.0
         checkFeature feature (_, LineWithFactors _ _ fs) = feature `elem` (Prelude.map show fs)
 
 runWorstFeatures :: ResultOrdering -> GEvalSpecification -> BlackBoxDebuggingOptions -> IO ()
-runWorstFeatures ordering spec bbdo = runLineByLineGeneralized ordering' spec (\mReferences -> worstFeaturesPipeline False spec bbdo mReferences consumFeatures)
+runWorstFeatures ordering spec bbdo = do
+  mInHeader <- readHeaderFileWrapper $ getInHeader spec
+  runLineByLineGeneralized ordering' spec (\mReferences -> worstFeaturesPipeline False spec bbdo mReferences mInHeader consumFeatures)
   where ordering' = forceSomeOrdering ordering
 
 consumFeatures = CL.map (encodeUtf8 . formatFeatureWithPValue)
@@ -228,10 +234,11 @@ worstFeaturesPipeline :: Bool
                         -> GEvalSpecification
                         -> BlackBoxDebuggingOptions
                         -> Maybe References
+                        -> Maybe TabularHeader
                         -> ConduitT FeatureWithPValue Void (ResourceT IO) a
                         -> ConduitT LineRecord Void (ResourceT IO) a
-worstFeaturesPipeline reversed spec bbdo mReferences consum = rank (lessByMetric reversed $ gesMainMetric spec)
-                                      .| evalStateC 0 (extractFeaturesAndPValues spec bbdo mReferences)
+worstFeaturesPipeline reversed spec bbdo mReferences mInHeader consum = rank (lessByMetric reversed $ gesMainMetric spec)
+                                      .| evalStateC 0 (extractFeaturesAndPValues spec bbdo mReferences mInHeader)
                                       .| CC.filter (\(FeatureWithPValue _ p _ _) -> not $ isNaN p) -- NaN values would poison sorting
                                       .| gobbleAndDo (sortBy featureOrder)
                                       .| filtreCartesian (bbdoCartesian bbdo)
@@ -245,10 +252,10 @@ forceSomeOrdering :: ResultOrdering -> ResultOrdering
 forceSomeOrdering FirstTheBest = FirstTheBest
 forceSomeOrdering _ = FirstTheWorst
 
-extractFeaturesAndPValues :: Monad m => GEvalSpecification -> BlackBoxDebuggingOptions -> Maybe References -> ConduitT (Double, LineRecord) FeatureWithPValue (StateT Integer m) ()
-extractFeaturesAndPValues spec bbdo mReferences =
+extractFeaturesAndPValues :: Monad m => GEvalSpecification -> BlackBoxDebuggingOptions -> Maybe References -> Maybe TabularHeader -> ConduitT (Double, LineRecord) FeatureWithPValue (StateT Integer m) ()
+extractFeaturesAndPValues spec bbdo mReferences mInHeader =
   totalCounter
-  .| rankedFeatureExtractor spec bbdo mReferences
+  .| rankedFeatureExtractor spec bbdo mReferences mInHeader
   .| uScoresCounter (bbdoMinFrequency bbdo)
 
 
@@ -268,11 +275,11 @@ formatFeatureWithPValue (FeatureWithPValue f p avg c) =
                               (pack $ printf "%0.8f" avg),
                               (pack $ printf "%0.20f" p)]
 
-rankedFeatureExtractor :: Monad m => GEvalSpecification -> BlackBoxDebuggingOptions -> Maybe References -> ConduitT (Double, LineRecord) RankedFactor m ()
-rankedFeatureExtractor spec bbdo mReferences = featureExtractor mTokenizer bbdo mReferences
-                                               .| CC.map snd
-                                               .| CC.map unwrapFeatures
-                                               .| CC.concat
+rankedFeatureExtractor :: Monad m => GEvalSpecification -> BlackBoxDebuggingOptions -> Maybe References -> Maybe TabularHeader -> ConduitT (Double, LineRecord) RankedFactor m ()
+rankedFeatureExtractor spec bbdo mReferences mInHeader = featureExtractor mTokenizer bbdo mReferences mInHeader
+                                                         .| CC.map snd
+                                                         .| CC.map unwrapFeatures
+                                                         .| CC.concat
   where mTokenizer = gesTokenizer spec
         unwrapFeatures (LineWithFactors rank score fs) = Prelude.map (\f -> RankedFactor f rank score) fs
 
@@ -288,11 +295,11 @@ instance FeatureSource (LineRecord, LineRecord) where
   getScore (LineRecord _ _ _ _ scoreA, LineRecord _ _ _ _ scoreB) = scoreB - scoreA
   mainLineRecord (_, l) = l
 
-featureExtractor :: (Monad m, FeatureSource s) => Maybe Tokenizer -> BlackBoxDebuggingOptions -> Maybe References -> ConduitT (Double, s) (s, LineWithFactors) m ()
-featureExtractor mTokenizer bbdo mReferences = CC.map extract
+featureExtractor :: (Monad m, FeatureSource s) => Maybe Tokenizer -> BlackBoxDebuggingOptions -> Maybe References -> Maybe TabularHeader -> ConduitT (Double, s) (s, LineWithFactors) m ()
+featureExtractor mTokenizer bbdo mReferences mInHeader = CC.map extract
                                               .| finalFeatures (bbdoCartesian bbdo) (fromMaybe (bbdoMinFrequency bbdo) (bbdoMinCartesianFrequency bbdo))
   where extract (rank, line) =
-          (line, LineWithPeggedFactors rank (getScore line) $ getFeatures mTokenizer bbdo mReferences (mainLineRecord line))
+          (line, LineWithPeggedFactors rank (getScore line) $ getFeatures mTokenizer bbdo mReferences (mainLineRecord line) mInHeader)
 
 finalFeatures :: Monad m => Bool -> Integer -> ConduitT (a, LineWithPeggedFactors) (a, LineWithFactors) m ()
 finalFeatures False _ = CC.map (\(l, p) -> (l, peggedToUnaryLine p))
@@ -324,11 +331,11 @@ filtreCartesian True = CC.concatMapAccum step S.empty
 peggedToUnaryLine :: LineWithPeggedFactors -> LineWithFactors
 peggedToUnaryLine (LineWithPeggedFactors rank score fs) = LineWithFactors rank score (Prelude.map UnaryFactor fs)
 
-getFeatures :: Maybe Tokenizer -> BlackBoxDebuggingOptions -> Maybe References -> LineRecord -> [PeggedFactor]
-getFeatures mTokenizer bbdo mReferences (LineRecord inLine expLine outLine _ _) =
+getFeatures :: Maybe Tokenizer -> BlackBoxDebuggingOptions -> Maybe References -> LineRecord -> Maybe TabularHeader -> [PeggedFactor]
+getFeatures mTokenizer bbdo mReferences (LineRecord inLine expLine outLine _ _) mInHeader =
   Data.List.concat [
      extractFactors mTokenizer bbdo mReferencesData "exp" expLine,
-     extractFactorsFromTabbed mTokenizer bbdo mReferencesData "in" inLine,
+     extractFactorsFromTabbed mTokenizer bbdo mReferencesData "in" inLine mInHeader,
      extractFactors mTokenizer bbdo mReferencesData "out" outLine]
   where mReferencesData = case mReferences of
           Just references -> Just $ ReferencesData {
@@ -487,13 +494,15 @@ gobbleAndDo fun = do
   CC.yieldMany $ fun l
 
 runDiff :: ResultOrdering -> Maybe String -> FilePath -> GEvalSpecification -> BlackBoxDebuggingOptions -> IO ()
-runDiff ordering featureFilter otherOut spec bbdo = runDiffGeneralized ordering otherOut spec consum
-  where consum :: Maybe References -> ConduitT (LineRecord, LineRecord) Void (ResourceT IO) ()
-        consum = \mReferences -> CL.filter shouldBeShown
-                                .| runFeatureFilter featureFilter spec bbdo mReferences
-                                .| CL.map (encodeUtf8 . formatOutput)
-                                .| CC.unlinesAscii
-                                .| CC.stdout
+runDiff ordering featureFilter otherOut spec bbdo = do
+  mInHeader <- readHeaderFileWrapper $ getInHeader spec
+  runDiffGeneralized ordering otherOut spec (consum mInHeader)
+  where consum :: Maybe TabularHeader -> Maybe References -> ConduitT (LineRecord, LineRecord) Void (ResourceT IO) ()
+        consum = \mInHeader -> \mReferences -> CL.filter shouldBeShown
+                                             .| runFeatureFilter featureFilter spec bbdo mReferences mInHeader
+                                             .| CL.map (encodeUtf8 . formatOutput)
+                                             .| CC.unlinesAscii
+                                             .| CC.stdout
         shouldBeShown (LineRecord _ _ outA _ scoreA, LineRecord _ _ outB _ scoreB) =
           outA /= outB && scoreA /= scoreB
         formatOutput (LineRecord inp exp outA _ scoreA, LineRecord _ _ outB _ scoreB) = Data.Text.intercalate "\t" [
@@ -533,15 +542,17 @@ runMultiOutputGeneralized spec consum = do
         mSelector = gesSelector spec
 
 runMostWorseningFeatures :: ResultOrdering -> FilePath -> GEvalSpecification -> BlackBoxDebuggingOptions -> IO ()
-runMostWorseningFeatures ordering otherOut spec bbdo  = runDiffGeneralized ordering' otherOut spec consum
+runMostWorseningFeatures ordering otherOut spec bbdo = do
+  mInHeader <- readHeaderFileWrapper $ getInHeader spec
+  runDiffGeneralized ordering' otherOut spec (consum mInHeader)
   where ordering' = forceSomeOrdering ordering
         reversed = case ordering of
           KeepTheOriginalOrder -> False
           FirstTheWorst -> False
           FirstTheBest -> True
-        consum :: Maybe References -> ConduitT (LineRecord, LineRecord) Void (ResourceT IO) ()
-        consum = \mReferences -> CC.map prepareFakeLineRecord
-                                .| (worstFeaturesPipeline reversed spec bbdo mReferences consumFeatures)
+        consum :: Maybe TabularHeader -> Maybe References -> ConduitT (LineRecord, LineRecord) Void (ResourceT IO) ()
+        consum = \mInHeader -> \mReferences -> CC.map prepareFakeLineRecord
+                                             .| (worstFeaturesPipeline reversed spec bbdo mReferences mInHeader consumFeatures)
         prepareFakeLineRecord :: (LineRecord, LineRecord) -> LineRecord
         prepareFakeLineRecord (LineRecord _ _ _ _ scorePrev, LineRecord inp exp out c score) =
           LineRecord inp exp out c (score - scorePrev)
