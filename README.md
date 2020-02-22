@@ -583,8 +583,8 @@ output_directory=...
 all: $(output_directory)/train/in.tsv.xz $(output_directory)/train/expected.tsv \
      $(output_directory)/dev-0/in.tsv.xz $(output_directory)/dev-0/expected.tsv \
      $(output_directory)/test-A/in.tsv.xz $(output_directory)/test-A/expected.tsv \
-     $(output_directory)/README.md
-     $(output_directory)/in-header.tsv
+     $(output_directory)/README.md \
+     $(output_directory)/in-header.tsv \
      $(output_directory)/out-header.tsv
     # always validate the challenge
     geval --validate --expected-directory $(output_directory)
