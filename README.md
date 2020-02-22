@@ -480,6 +480,32 @@ So now you can see that the accuracy is over 78% and the likelihood
     in<1>:Brytania	2	0.53333333	0.01357876718525224600
     in<1>:rewolucja	2	0.53333333	0.01357876718525224600
 
+## Handling headers
+
+When dealing with TSV files, you often face a dilemma whether to add a
+header with field names as the first line of a TSV file or not:
+
+* a header makes a TSV more readable to humans, especially when you use tools like [Visidata](https://www.visidata.org/),
+  and when there is a lot of input columns (features)
+* … but, on the other hand, makes it much cumbersome to process with textutils (cat, sort, shuf, etc.) or similar tools.
+
+GEval can handle TSV with _and_ without headers. By default,
+headerless TSV are assumed, but you can specify column names for
+input and output/expected files with, respectively, `--in-header
+in-header.tsv` and `--out-header out-header.tsv` option.
+
+A header file (`in-header.tsv` or `out-header.tsv`) should be a one-line TSV line with column names.
+(Why this way? Because now you can combine this easily with data using, for instance, `cat in-header.tsv dev-0/in.tsv`.)
+
+Now GEval will work as follows:
+
+* when reading a file it will first check whether the first field in
+  the first line is the same as the first column name, if it is the
+  case, it will assume the given TSV file contains a header line (just make sure
+  this string is specific enough and won't mix up with data!),
+* otherwise, it will assume it is a headerless file,
+* anyway, the column names will be used for human-readable output, for
+  instance, when listing worst features.
 
 ## Preparing a Gonito challenge
 
@@ -497,6 +523,8 @@ have the following structure:
   metric is specified here (e.g. `--metric BLEU`), also non-default
   file names could be given here (e.g. `--test-name test-B` for a
   non-standard test subdirectory)
+* `in-header.tsv` — one-line TSV file with column names for input data (features),
+* `out-header.tsv` — one-line TSV file with column names for output/expected data, usually just one label,
 * `train/` — subdirectory with training data (if training data are
   supplied for a given Gonito challenge at all)
 * `train/in.tsv` — the input data for the training set
@@ -556,6 +584,8 @@ all: $(output_directory)/train/in.tsv.xz $(output_directory)/train/expected.tsv 
      $(output_directory)/dev-0/in.tsv.xz $(output_directory)/dev-0/expected.tsv \
      $(output_directory)/test-A/in.tsv.xz $(output_directory)/test-A/expected.tsv \
      $(output_directory)/README.md
+     $(output_directory)/in-header.tsv
+     $(output_directory)/out-header.tsv
     # always validate the challenge
     geval --validate --expected-directory $(output_directory)
 
@@ -563,7 +593,14 @@ all: $(output_directory)/train/in.tsv.xz $(output_directory)/train/expected.tsv 
 # is kept as challenge-readme.md in the repo with this Makefile;
 # note that the title from README.md will be taken as the title of the challenge
 # and the first paragraph — as a short description
-$(output_directory)/README.md: challenge-readme.md
+$(output_directory)/README.md: challenge-readme.md $(output_directory)/config.txt
+    cp $< $@
+
+# prepare header files (see above section on headers)
+$(output_directory)/in-header.tsv: in-header.tsv $(output_directory)/config.txt
+    cp $< $@
+
+$(output_directory)/out-header.tsv: out-header.tsv $(output_directory)/config.txt
     cp $< $@
 
 $(output_directory)/config.txt:
@@ -573,6 +610,7 @@ $(output_directory)/config.txt:
     # ... but we remove the `in/expected.tsv` files just in case
     # (we will overwrite this with our data anyway)
     rm -f $(output_directory)/{train,dev-0,test-A}/{in,expected}.tsv
+    rm $(output_directory)/{README.md,in-header.tsv,out-header.tsv}
 
 # a "total" TSV containing all the data, we'll split it later
 all-data.tsv.xz: prepare.py some-other-files
@@ -590,7 +628,7 @@ all-data.tsv.xz: prepare.py some-other-files
 # that you created a script `filter.py` that takes as an argument a regular expression that will be applied
 # to the MD5 sum (written in the hexadecimal format).
 
-$(output_directory)/train/in.tsv.xz $(output_directory)/train/expected.tsv: all-data.tsv.xz filter.py config.txt
+$(output_directory)/train/in.tsv.xz $(output_directory)/train/expected.tsv: all-data.tsv.xz filter.py $(output_directory)/config.txt
     # 1. xzcat for decompression
     # 2. ./filter.py will select 14/16=7/8 of items in a stable random manner
     # 3. tee >(...) is Bash magic to fork the ouptut into two streams
@@ -598,11 +636,11 @@ $(output_directory)/train/in.tsv.xz $(output_directory)/train/expected.tsv: all-
     # 5. xz will compress it back
     xzcat $< | ./filter.py '[0-9abcd]$' | tee >(cut -f 1 > $(output_directory)/train/expected.tsv) | cut -f 2- | xz > $@
 
-$(output_directory)/dev-0/in.tsv.xz $(output_directory)/dev-0/expected.tsv: all-data.tsv.xz filter.py config.txt
+$(output_directory)/dev-0/in.tsv.xz $(output_directory)/dev-0/expected.tsv: all-data.tsv.xz filter.py $(output_directory)/config.txt
     # 1/16 of items goes to dev-0 set
     xzcat $< | ./filter.py 'e$' | tee >(cut -f 1 > $(output_directory)/dev-0/expected.tsv) | cut -f 2- | xz > $@
 
-$(output_directory)/test-A/in.tsv.xz $(output_directory)/test-A/expected.tsv: all-data.tsv.xz filter.py config.txt
+$(output_directory)/test-A/in.tsv.xz $(output_directory)/test-A/expected.tsv: all-data.tsv.xz filter.py $(output_directory)/config.txt
     # (other) 1/16 of items goes to test-A set
     xzcat $< | ./filter.py 'f$' | tee >(cut -f 1 > $(output_directory)/test-A/expected.tsv) | cut -f 2- | xz > $@
 
