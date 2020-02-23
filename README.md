@@ -634,15 +634,15 @@ $(output_directory)/train/in.tsv.xz $(output_directory)/train/expected.tsv: all-
     # 3. tee >(...) is Bash magic to fork the ouptut into two streams
     # 4. cut will select the columns
     # 5. xz will compress it back
-    xzcat $< | ./filter.py '[0-9abcd]$' | tee >(cut -f 1 > $(output_directory)/train/expected.tsv) | cut -f 2- | xz > $@
+    xzcat $< | ./filter.py '[0-9abcd]$' | tee >(cut -f 1 > $(output_directory)/train/expected.tsv) | cut -f 2- | xz > $(output_directory)/train/in.tsv.xz
 
 $(output_directory)/dev-0/in.tsv.xz $(output_directory)/dev-0/expected.tsv: all-data.tsv.xz filter.py $(output_directory)/config.txt
     # 1/16 of items goes to dev-0 set
-    xzcat $< | ./filter.py 'e$' | tee >(cut -f 1 > $(output_directory)/dev-0/expected.tsv) | cut -f 2- | xz > $@
+    xzcat $< | ./filter.py 'e$' | tee >(cut -f 1 > $(output_directory)/dev-0/expected.tsv) | cut -f 2- | xz > $(output_directory)/train/in.tsv.xz
 
 $(output_directory)/test-A/in.tsv.xz $(output_directory)/test-A/expected.tsv: all-data.tsv.xz filter.py $(output_directory)/config.txt
     # (other) 1/16 of items goes to test-A set
-    xzcat $< | ./filter.py 'f$' | tee >(cut -f 1 > $(output_directory)/test-A/expected.tsv) | cut -f 2- | xz > $@
+    xzcat $< | ./filter.py 'f$' | tee >(cut -f 1 > $(output_directory)/test-A/expected.tsv) | cut -f 2- | xz > $(output_directory)/train/in.tsv.xz
 
 # wiping out the challenge, if you are desperate
 clean:
