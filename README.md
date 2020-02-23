@@ -664,7 +664,7 @@ repo (for the toy “planets” challenge) could be created as follows:
 
     cd planets  # output_directory in the Makefile above
     git init
-    git add .gitignore config.txt README.md {train,dev-0}/{in.tsv.xz,expected.tsv} test-A/in.tsv.xz
+    git add .gitignore config.txt README.md {train,dev-0}/{in.tsv.xz,expected.tsv} test-A/in.tsv.xz in-header.tsv out-header.tsv
     git commit -m 'init challenge'
     git remote add origin ssh://gitolite@gonito.net/planets # some repo you have access
     git push origin master
