@@ -78,17 +78,17 @@ If you see a message like this:
     compiler at the preprocessing stage. In this case, you can re-run configure
     with the verbosity flag -v3 to see the error messages.
 
-it means that you need to install lzma library on your operating
-system. The same might go for pkg-config. On macOS (it's more likely
+it means that you need to install `lzma` library on your operating
+system. The same might go for `pkg-config`. On macOS (it's more likely
 to happen on macOS, as these packages are usually installed out of the box on Linux), you need to run:
 
     brew install xz
     brew install pkg-config
 
-In case the lzma package is not installed on your Linux, you need to run (assuming Debian/Ubuntu):
+In case the `lzma` package is not installed on your Linux, you need to run (assuming Debian/Ubuntu):
 
-    sudo apt-get install pkg-config liblzma-dev libpq-dev libpcre3-dev
-
+    sudo apt-get install pkg-config liblzma-dev libpq-dev libpcre3-dev libcairo2-dev libbz2-dev
+    
 #### Windows issues
 
 If you see this message on Windows during executing `stack test` command:
