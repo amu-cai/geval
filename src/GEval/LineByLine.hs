@@ -53,7 +53,6 @@ import Data.Conduit.Lift
 import Control.Monad.State.Strict
 
 import Data.Monoid ((<>))
-import Data.Monoid.Utils (mintercalate)
 
 import GEval.FeatureExtractor
 import GEval.BlackBoxDebugging
@@ -122,7 +121,7 @@ runLineByLineWithWorstFeatures ordering featureFilter spec bbdo = do
 
 recordToBytes :: (Chunk Text -> [ByteString] -> [ByteString]) -> SpanLineRecord -> ByteString
 recordToBytes maker (SpanLineRecord inSpans expSpans outSpans score) =
-  mintercalate "\t" [encodeUtf8 $ formatScore score,
+  (mconcat . Data.List.intersperse "\t") [encodeUtf8 $ formatScore score,
                      lineToBytes maker inSpans,
                      lineToBytes maker expSpans,
                      lineToBytes maker outSpans]
