@@ -78,7 +78,10 @@ import qualified Data.HashMap.Strict as H
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
 
-import Rainbow (Chunk, (&), magenta, cyan, fore, bold, yellow, brightYellow, red, brightRed, chunk, chunksToByteStrings, byteStringMakerFromEnvironment, byteStringMakerFromHandle, ByteString)
+import Rainbow (Chunk, magenta, cyan, fore, bold, yellow, brightYellow, red, brightRed, chunk, chunksToByteStrings, byteStringMakerFromEnvironment, byteStringMakerFromHandle)
+
+import Data.ByteString (ByteString)
+import Data.Function ((&))
 
 data LineRecord = LineRecord Text Text Text Word32 MetricValue
                   deriving (Eq, Show)
@@ -119,7 +122,7 @@ runLineByLineWithWorstFeatures ordering featureFilter spec bbdo = do
   let consum = CL.map (recordToBytes maker) .| CC.unlinesAscii .| CC.stdout
   runLineByLineWithWorstFeaturesGeneralized ordering featureFilter spec bbdo consum
 
-recordToBytes :: (Chunk Text -> [ByteString] -> [ByteString]) -> SpanLineRecord -> ByteString
+recordToBytes :: (Chunk -> [ByteString] -> [ByteString]) -> SpanLineRecord -> ByteString
 recordToBytes maker (SpanLineRecord inSpans expSpans outSpans score) =
   (mconcat . Data.List.intersperse "\t") [encodeUtf8 $ formatScore score,
                      lineToBytes maker inSpans,
@@ -130,19 +133,19 @@ recordToBytes maker (SpanLineRecord inSpans expSpans outSpans score) =
         formatScore = Data.Text.pack . printf "%f"
 
 
-lineToBytes :: (Chunk Text -> [ByteString] -> [ByteString]) -> [LineSpan] -> ByteString
+lineToBytes :: (Chunk -> [ByteString] -> [ByteString]) -> [LineSpan] -> ByteString
 lineToBytes maker spans =
   mconcat
   $ chunksToByteStrings maker
   $ Data.List.intersperse (chunk " ")
   $ Prelude.map spanToRainbowChunk $ spans
 
-spanToRainbowChunk :: LineSpan -> Chunk Text
+spanToRainbowChunk :: LineSpan -> Chunk
 spanToRainbowChunk (UnmarkedSpan t) = chunk t
 spanToRainbowChunk (MarkedSpan p t) = markedChunk p c
   where c = chunk t
 
-markedChunk :: Double -> Chunk Text -> Chunk Text
+markedChunk :: Double -> Chunk -> Chunk
 markedChunk pValue c
   | pValue < 0.000000000000001 = bold c & fore brightRed
   | pValue < 0.000000000001 = c & fore red
