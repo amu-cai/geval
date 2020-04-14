@@ -29,4 +29,4 @@ loess inputs outputs x = a * x + b
         weights = Data.Vector.Unboxed.map (\v -> lambda * gaussian (lambda * (x - v))) inputs
         scaledOutputs = Data.Vector.Unboxed.zipWith (*) outputs weights
         scaledInputs = Data.Vector.Unboxed.zipWith (*) inputs weights
-        inputMatrix = transpose (SMT.Matrix 2 (Data.Vector.Unboxed.length inputs) 1000 (weights Data.Vector.Unboxed.++ scaledInputs))
+        inputMatrix = transpose (SMT.Matrix 2 (Data.Vector.Unboxed.length inputs) (weights Data.Vector.Unboxed.++ scaledInputs))
