@@ -26,6 +26,7 @@ module GEval.LineByLine
 
 import GEval.Core
 import GEval.Common
+import GEval.DataSource
 import GEval.EvaluationScheme
 import Text.Tokenizer
 
@@ -463,7 +464,10 @@ lessByMetric reversed metric = lessByMetric' reversed (getMetricOrdering metric)
           (\(LineRecord _ _ _ _ scoreA) (LineRecord _ _ _ _ scoreB) ->
               scoreA < scoreB)
 
-runLineByLineGeneralized :: ResultOrdering -> GEvalSpecification -> (Maybe References -> ConduitT LineRecord Void (ResourceT IO) a) -> IO a
+runLineByLineGeneralized :: ResultOrdering
+                           -> GEvalSpecification
+                           -> (Maybe References -> ConduitT LineRecord Void (ResourceT IO) a)
+                           -> IO a
 runLineByLineGeneralized ordering spec consum = do
   mReferences <- case gesReferences spec of
     Just referencesFp -> do
@@ -474,7 +478,18 @@ runLineByLineGeneralized ordering spec consum = do
   mInHeader <- readHeaderFileWrapper $ getInHeader spec
   mOutHeader <- readHeaderFileWrapper $ getOutHeader spec
   let mOutHeader = Nothing
-  gevalLineByLineCore metric mSelector preprocess mInHeader mOutHeader inputFilePath expectedFilePath outFilePath (sorter ordering .| consum mReferences)
+  let chDataSource = ChallengeDataSource {
+        challengeDataSourceInput = inputFilePath,
+        challengeDataSourceExpected = expectedFilePath,
+        challengeDataSourceSelector = mSelector,
+        challengeDataSourcePreprocess = preprocess,
+        challengeDataSourceFilter = Nothing,
+        challengeDataSourceInHeader = mInHeader,
+        challengeDataSourceOutHeader = mOutHeader }
+  let dataSource = DataSource {
+        dataSourceChallengeData = chDataSource,
+        dataSourceOut = outFilePath }
+  gevalLineByLineCore metric dataSource (sorter ordering .| consum mReferences)
   where metric = gesMainMetric spec
         scheme = gesMainScheme spec
         mSelector = gesSelector spec
@@ -532,7 +547,17 @@ runMultiOutputGeneralized spec consum = do
   let sourceSpecs = (outSource:altSourceSpecs)
   mInHeader <- readHeaderFileWrapper $ getInHeader spec
   mOutHeader <- readHeaderFileWrapper $ getOutHeader spec
-  let sources = Prelude.map (gevalLineByLineSource metric mSelector preprocess mInHeader mOutHeader inputSource expectedSource) sourceSpecs
+  let chDataSource = ChallengeDataSource {
+        challengeDataSourceInput = inputSource,
+        challengeDataSourceExpected = expectedSource,
+        challengeDataSourceSelector = mSelector,
+        challengeDataSourcePreprocess = preprocess,
+        challengeDataSourceFilter = Nothing,
+        challengeDataSourceInHeader = mInHeader,
+        challengeDataSourceOutHeader = mOutHeader }
+  let sources = Prelude.map (\s -> gevalLineByLineSource metric DataSource {
+                                dataSourceChallengeData = chDataSource,
+                                dataSourceOut = s}) sourceSpecs
   runResourceT $ runConduit $
     (sequenceSources sources .| consum)
   where metric = gesMainMetric spec
@@ -569,8 +594,22 @@ runDiffGeneralized ordering otherOut spec consum = do
     Left (NoFile fp) -> throwM $ NoOutFile fp
     Left (NoDirectory d) -> throwM $ NoOutFile otherOut
     Right otherOutSource -> do
-      let sourceA = gevalLineByLineSource metric mSelector preprocess mInHeader mOutHeader inputSource expectedSource otherOutSource
-      let sourceB = gevalLineByLineSource metric mSelector preprocess mInHeader mOutHeader inputSource expectedSource outSource
+      let chDataSource = ChallengeDataSource {
+            challengeDataSourceInput = inputSource,
+            challengeDataSourceExpected = expectedSource,
+            challengeDataSourceSelector = mSelector,
+            challengeDataSourcePreprocess = preprocess,
+            challengeDataSourceFilter = Nothing,
+            challengeDataSourceInHeader = mInHeader,
+            challengeDataSourceOutHeader = mOutHeader }
+      let dataSourceA = DataSource {
+            dataSourceChallengeData = chDataSource,
+            dataSourceOut = otherOutSource}
+      let dataSourceB = DataSource {
+            dataSourceChallengeData = chDataSource,
+            dataSourceOut = outSource}
+      let sourceA = gevalLineByLineSource metric dataSourceA
+      let sourceB = gevalLineByLineSource metric dataSourceB
       runResourceT $ runConduit $
         ((getZipSource $ (,)
           <$> ZipSource sourceA
@@ -592,21 +631,18 @@ runDiffGeneralized ordering otherOut spec consum = do
 escapeTabs :: Text -> Text
 escapeTabs = Data.Text.replace "\t" "<tab>"
 
-gevalLineByLineCore :: Metric -> Maybe Selector -> (Text -> Text) -> (Maybe TabularHeader) -> (Maybe TabularHeader) -> SourceSpec -> SourceSpec -> SourceSpec -> ConduitT LineRecord Void (ResourceT IO) a -> IO a
-gevalLineByLineCore metric mSelector preprocess mInHeader mOutHeader inputSource expectedSource outSource consum =
+gevalLineByLineCore :: Metric
+                      -> DataSource
+                      -> ConduitT LineRecord Void (ResourceT IO) a
+                      -> IO a
+gevalLineByLineCore metric dataSource consum =
   runResourceT $ runConduit $
-     ((gevalLineByLineSource metric mSelector preprocess mInHeader mOutHeader inputSource expectedSource outSource) .| consum)
+     ((gevalLineByLineSource metric dataSource) .| consum)
 
 gevalLineByLineSource :: Metric
-                        -> Maybe Selector
-                        -> (Text -> Text)
-                        -> (Maybe TabularHeader)
-                        -> (Maybe TabularHeader)
-                        -> SourceSpec
-                        -> SourceSpec
-                        -> SourceSpec
+                        -> DataSource
                         -> ConduitT () LineRecord (ResourceT IO) ()
-gevalLineByLineSource metric mSelector preprocess mInHeader mOutHeader inputSource expectedSource outSource =
+gevalLineByLineSource metric dataSource =
   (getZipSource $ (,)
        <$> ZipSource (CL.sourceList [1..])
        <*> (ZipSource $ threeLineSource context)) .| CL.mapM (checkStepM evaluateLine) .| CL.catMaybes
@@ -629,6 +665,14 @@ gevalLineByLineSource metric mSelector preprocess mInHeader mOutHeader inputSour
           fileProcessingOptionsSelector = mSelector,
           fileProcessingOptionsPreprocess = id,
           fileProcessingOptionsHeader = mInHeader }
+        challengeDataSource = dataSourceChallengeData dataSource
+        mSelector = challengeDataSourceSelector challengeDataSource
+        preprocess = challengeDataSourcePreprocess challengeDataSource
+        mInHeader = challengeDataSourceInHeader challengeDataSource
+        mOutHeader = challengeDataSourceOutHeader challengeDataSource
+        inputSource = challengeDataSourceInput challengeDataSource
+        expectedSource = challengeDataSourceExpected challengeDataSource
+        outSource = dataSourceOut dataSource
 
 
 justTokenize :: Maybe Tokenizer -> IO ()
