@@ -34,8 +34,8 @@ module GEval.Core
       EvaluationContext(..),
       ParserSpec(..),
       fileAsLineSource,
-      checkAndGetFiles,
-      checkAndGetFilesSingleOut,
+      checkAndGetDataSource,
+      checkAndGetDataSources,
       checkMultipleOuts,
       checkMultipleOutsCore,
       gesMainMetric,
@@ -48,7 +48,8 @@ module GEval.Core
       FileProcessingOptions(..),
       readHeaderFileWrapper,
       getInHeader,
-      getOutHeader
+      getOutHeader,
+      addPreprocessing,
     ) where
 
 import Debug.Trace
@@ -266,22 +267,8 @@ data LineSource m = LineSource (ConduitT () Text m ()) (Text -> ItemTarget) (Tex
 
 geval :: GEvalSpecification -> IO [(SourceSpec, [MetricOutput])]
 geval gevalSpec = do
-  mInHeader <- readHeaderFileWrapper $ getInHeader gevalSpec
-  mOutHeader <- readHeaderFileWrapper $ getOutHeader gevalSpec
-  (inputSource, expectedSource, outSources) <- checkAndGetFiles False gevalSpec
-  let chDataSource = ChallengeDataSource {
-        challengeDataSourceInput = inputSource,
-        challengeDataSourceExpected = expectedSource,
-        challengeDataSourceSelector = gesSelector gevalSpec,
-        challengeDataSourcePreprocess = gesPreprocess gevalSpec,
-        challengeDataSourceFilter = Nothing,
-        challengeDataSourceInHeader = mInHeader,
-        challengeDataSourceOutHeader = mOutHeader }
-
-  results <- Prelude.mapM (\outSource -> gevalOnSingleOut gevalSpec
-                                                        DataSource {
-                             dataSourceChallengeData = chDataSource,
-                             dataSourceOut = outSource }) outSources
+  dataSources <- checkAndGetDataSources False gevalSpec
+  results <- Prelude.mapM (gevalOnSingleOut gevalSpec) dataSources
   return $ sortBy (\a b ->  (show $ fst a) `naturalComp` (show $ fst b)) results
 
 noGraph :: d -> Maybe GraphSeries
@@ -313,15 +300,15 @@ readHeaderFileWrapper (Just headerFilePath) = do
     Just header -> return $ Just header
     Nothing -> throwM $ NoHeaderFile headerFilePath
 
-checkAndGetFilesSingleOut :: Bool -> GEvalSpecification -> IO (SourceSpec, SourceSpec, SourceSpec)
-checkAndGetFilesSingleOut forceInput gevalSpec = do
-  res <- checkAndGetFiles forceInput gevalSpec
+checkAndGetDataSource :: Bool -> GEvalSpecification -> IO DataSource
+checkAndGetDataSource forceInput gevalSpec = do
+  res <- checkAndGetDataSources forceInput gevalSpec
   case res of
-    (inputSource, expectedSource, [outSource]) -> return (inputSource, expectedSource, outSource)
+    ([dataSource]) -> return dataSource
     _ -> throwM $ UnexpectedMultipleOutputs
 
-checkAndGetFiles :: Bool -> GEvalSpecification -> IO (SourceSpec, SourceSpec, [SourceSpec])
-checkAndGetFiles forceInput gevalSpec = do
+checkAndGetDataSources :: Bool -> GEvalSpecification -> IO [DataSource]
+checkAndGetDataSources forceInput gevalSpec = do
   ess <- getSmartSourceSpec expectedTestDirectory defaultExpectedFile expectedFile
   case ess of
     Left NoSpecGiven -> throwM $ NoExpectedFile expectedFile
@@ -348,7 +335,22 @@ checkAndGetFiles forceInput gevalSpec = do
                throwM $ NoOutFile outFile
              Right outSource -> do
                return [outSource]
-       return (inputSource, expectedSource, osss)
+
+       mInHeader <- readHeaderFileWrapper $ getInHeader gevalSpec
+       mOutHeader <- readHeaderFileWrapper $ getOutHeader gevalSpec
+
+       let chDataSource = ChallengeDataSource {
+        challengeDataSourceInput = inputSource,
+        challengeDataSourceExpected = expectedSource,
+        challengeDataSourceSelector = mSelector,
+        challengeDataSourcePreprocess = preprocess,
+        challengeDataSourceFilter = Nothing,
+        challengeDataSourceInHeader = mInHeader,
+        challengeDataSourceOutHeader = mOutHeader }
+
+       return $ Prelude.map (\oss -> DataSource {
+                          dataSourceChallengeData = chDataSource,
+                          dataSourceOut = oss}) osss
     where expectedTestDirectory = expectedDirectory </> testName
           outTestDirectory = outDirectory </> testName
           expectedDirectory = getExpectedDirectory gevalSpec
@@ -358,6 +360,9 @@ checkAndGetFiles forceInput gevalSpec = do
           expectedFile = gesExpectedFile gevalSpec
           inputFile = gesInputFile gevalSpec
           schemes = gesMetrics gevalSpec
+
+          mSelector = gesSelector gevalSpec
+          preprocess = gesPreprocess gevalSpec
 
 checkSingleOut :: FilePath -> FilePath -> IO (Either SmartSourceError SourceSpec)
 checkSingleOut outTestDirectory outFile

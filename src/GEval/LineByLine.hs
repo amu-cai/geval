@@ -474,26 +474,11 @@ runLineByLineGeneralized ordering spec consum = do
       references <- readReferences referencesFp
       return $ Just references
     Nothing -> return Nothing
-  (inputFilePath, expectedFilePath, outFilePath) <- checkAndGetFilesSingleOut True spec
-  mInHeader <- readHeaderFileWrapper $ getInHeader spec
-  mOutHeader <- readHeaderFileWrapper $ getOutHeader spec
-  let mOutHeader = Nothing
-  let chDataSource = ChallengeDataSource {
-        challengeDataSourceInput = inputFilePath,
-        challengeDataSourceExpected = expectedFilePath,
-        challengeDataSourceSelector = mSelector,
-        challengeDataSourcePreprocess = preprocess,
-        challengeDataSourceFilter = Nothing,
-        challengeDataSourceInHeader = mInHeader,
-        challengeDataSourceOutHeader = mOutHeader }
-  let dataSource = DataSource {
-        dataSourceChallengeData = chDataSource,
-        dataSourceOut = outFilePath }
+  dataSource' <- checkAndGetDataSource True spec
+  let dataSource = addPreprocessing (applyPreprocessingOperations scheme) dataSource'
   gevalLineByLineCore metric dataSource (sorter ordering .| consum mReferences)
   where metric = gesMainMetric spec
         scheme = gesMainScheme spec
-        mSelector = gesSelector spec
-        preprocess = (gesPreprocess spec) . (applyPreprocessingOperations scheme)
         sorter KeepTheOriginalOrder = doNothing
         sorter ordering = gobbleAndDo $ sortBy (sortOrder ordering (getMetricOrdering metric))
         sortOrder FirstTheWorst TheHigherTheBetter = compareScores
@@ -540,21 +525,14 @@ runOracleItemBased spec = runMultiOutputGeneralized spec consum
 
 runMultiOutputGeneralized :: GEvalSpecification -> ConduitT [LineRecord] Void (ResourceT IO) () -> IO ()
 runMultiOutputGeneralized spec consum = do
-  (inputSource, expectedSource, outSource) <- checkAndGetFilesSingleOut True spec
+  dataSource' <- checkAndGetDataSource True spec
+  let dataSource = addPreprocessing (applyPreprocessingOperations scheme) dataSource'
   let (Just altOuts) = gesAltOutFiles spec
   altSourceSpecs' <- mapM (getSmartSourceSpec ((gesOutDirectory spec) </> (gesTestName spec)) "out.tsv") altOuts
   let altSourceSpecs = rights altSourceSpecs'
+  let outSource = dataSourceOut dataSource
   let sourceSpecs = (outSource:altSourceSpecs)
-  mInHeader <- readHeaderFileWrapper $ getInHeader spec
-  mOutHeader <- readHeaderFileWrapper $ getOutHeader spec
-  let chDataSource = ChallengeDataSource {
-        challengeDataSourceInput = inputSource,
-        challengeDataSourceExpected = expectedSource,
-        challengeDataSourceSelector = mSelector,
-        challengeDataSourcePreprocess = preprocess,
-        challengeDataSourceFilter = Nothing,
-        challengeDataSourceInHeader = mInHeader,
-        challengeDataSourceOutHeader = mOutHeader }
+  let chDataSource = dataSourceChallengeData dataSource
   let sources = Prelude.map (\s -> gevalLineByLineSource metric DataSource {
                                 dataSourceChallengeData = chDataSource,
                                 dataSourceOut = s}) sourceSpecs
@@ -562,8 +540,6 @@ runMultiOutputGeneralized spec consum = do
     (sequenceSources sources .| consum)
   where metric = gesMainMetric spec
         scheme = gesMainScheme spec
-        preprocess = (gesPreprocess spec) . (applyPreprocessingOperations scheme)
-        mSelector = gesSelector spec
 
 runMostWorseningFeatures :: ResultOrdering -> FilePath -> GEvalSpecification -> BlackBoxDebuggingOptions -> IO ()
 runMostWorseningFeatures ordering otherOut spec bbdo = do
@@ -585,29 +561,17 @@ runMostWorseningFeatures ordering otherOut spec bbdo = do
 
 runDiffGeneralized :: ResultOrdering -> FilePath -> GEvalSpecification -> (Maybe References -> ConduitT (LineRecord, LineRecord) Void (ResourceT IO) a) -> IO a
 runDiffGeneralized ordering otherOut spec consum = do
-  (inputSource, expectedSource, outSource) <- checkAndGetFilesSingleOut True spec
+  dataSourceB <- checkAndGetDataSource True spec
   ooss <- getSmartSourceSpec ((gesOutDirectory spec) </> (gesTestName spec)) "out.tsv" otherOut
-  mInHeader <- readHeaderFileWrapper $ getInHeader spec
-  mOutHeader <- readHeaderFileWrapper $ getOutHeader spec
   case ooss of
     Left NoSpecGiven -> throwM $ NoOutFile otherOut
     Left (NoFile fp) -> throwM $ NoOutFile fp
     Left (NoDirectory d) -> throwM $ NoOutFile otherOut
     Right otherOutSource -> do
-      let chDataSource = ChallengeDataSource {
-            challengeDataSourceInput = inputSource,
-            challengeDataSourceExpected = expectedSource,
-            challengeDataSourceSelector = mSelector,
-            challengeDataSourcePreprocess = preprocess,
-            challengeDataSourceFilter = Nothing,
-            challengeDataSourceInHeader = mInHeader,
-            challengeDataSourceOutHeader = mOutHeader }
+      let chDataSource = dataSourceChallengeData dataSourceB
       let dataSourceA = DataSource {
             dataSourceChallengeData = chDataSource,
             dataSourceOut = otherOutSource}
-      let dataSourceB = DataSource {
-            dataSourceChallengeData = chDataSource,
-            dataSourceOut = outSource}
       let sourceA = gevalLineByLineSource metric dataSourceA
       let sourceB = gevalLineByLineSource metric dataSourceB
       runResourceT $ runConduit $
