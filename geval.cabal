@@ -54,6 +54,7 @@ library
                      , Data.Conduit.Bootstrap
                      , GEval.Formatting
                      , Data.Conduit.Header
+                     , GEval.DataSource
                      , Paths_geval
   build-depends:       base >= 4.7 && < 5
                      , cond

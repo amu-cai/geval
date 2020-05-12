@@ -106,6 +106,7 @@ import GEval.Selector
 import GEval.Annotation
 import GEval.BlackBoxDebugging
 import Data.Conduit.Bootstrap
+import GEval.DataSource
 
 import qualified Data.HashMap.Strict as M
 import qualified Data.Vector as V
@@ -265,31 +266,44 @@ data LineSource m = LineSource (ConduitT () Text m ()) (Text -> ItemTarget) (Tex
 
 geval :: GEvalSpecification -> IO [(SourceSpec, [MetricOutput])]
 geval gevalSpec = do
+  mInHeader <- readHeaderFileWrapper $ getInHeader gevalSpec
+  mOutHeader <- readHeaderFileWrapper $ getOutHeader gevalSpec
   (inputSource, expectedSource, outSources) <- checkAndGetFiles False gevalSpec
-  results <- Prelude.mapM (gevalOnSingleOut gevalSpec inputSource expectedSource) outSources
+  let chDataSource = ChallengeDataSource {
+        challengeDataSourceInput = inputSource,
+        challengeDataSourceExpected = expectedSource,
+        challengeDataSourceSelector = gesSelector gevalSpec,
+        challengeDataSourcePreprocess = gesPreprocess gevalSpec,
+        challengeDataSourceFilter = Nothing,
+        challengeDataSourceInHeader = mInHeader,
+        challengeDataSourceOutHeader = mOutHeader }
+
+  results <- Prelude.mapM (\outSource -> gevalOnSingleOut gevalSpec
+                                                        DataSource {
+                             dataSourceChallengeData = chDataSource,
+                             dataSourceOut = outSource }) outSources
   return $ sortBy (\a b ->  (show $ fst a) `naturalComp` (show $ fst b)) results
 
 noGraph :: d -> Maybe GraphSeries
 noGraph = const Nothing
 
-gevalOnSingleOut :: GEvalSpecification -> SourceSpec -> SourceSpec -> SourceSpec -> IO (SourceSpec, [MetricOutput])
-gevalOnSingleOut gevalSpec inputSource expectedSource outSource = do
-  mInHeader <- readHeaderFileWrapper $ getInHeader gevalSpec
-  mOutHeader <- readHeaderFileWrapper $ getOutHeader gevalSpec
-  vals <- Prelude.mapM (\scheme -> gevalCore (evaluationSchemeMetric scheme)
-                                           mSelector
-                                           (preprocess . applyPreprocessingOperations scheme)
-                                           mInHeader
-                                           mOutHeader
-                                           (gesBootstrapResampling gevalSpec)
-                                           inputSource
-                                           expectedSource
-                                           outSource) schemes
+gevalOnSingleOut :: GEvalSpecification -> DataSource -> IO (SourceSpec, [MetricOutput])
+gevalOnSingleOut gevalSpec dataSource = do
+  vals <- Prelude.mapM (\scheme ->
+                         gevalCore (evaluationSchemeMetric scheme)
+                                   (gesBootstrapResampling gevalSpec)
+                                   (addPreprocessing (applyPreprocessingOperations scheme) dataSource))
+                                   schemes
   return (outSource, vals)
-  where schemes = gesMetrics gevalSpec
-        preprocess = gesPreprocess gevalSpec
-        mSelector = gesSelector gevalSpec
+  where outSource = dataSourceOut dataSource
+        schemes = gesMetrics gevalSpec
 
+addPreprocessing :: (Text -> Text) -> DataSource -> DataSource
+addPreprocessing prep dataSource =
+  dataSource {
+     dataSourceChallengeData = (dataSourceChallengeData dataSource) {
+         challengeDataSourcePreprocess =
+             (challengeDataSourcePreprocess $ dataSourceChallengeData dataSource) . prep }}
 
 readHeaderFileWrapper :: Maybe FilePath -> IO (Maybe TabularHeader)
 readHeaderFileWrapper Nothing = return Nothing
@@ -468,16 +482,10 @@ handleBootstrap _ = True
 -- Throws @GEvalException@ if something was wrong in the data (e.g.
 -- inconsistent number of lines in the sources).
 gevalCore :: Metric           -- ^ evaluation metric
-          -> Maybe Selector   -- ^ selector to be used
-          -> (Text -> Text)    -- ^ preprocessing function (e.g. tokenization)
-          -> (Maybe TabularHeader)  -- ^ header for input
-          -> (Maybe TabularHeader)  -- ^ header for output/expected files
           -> (Maybe Int)      -- ^ number of bootstrap samples
-          -> SourceSpec       -- ^ source specification for the input values
-          -> SourceSpec       -- ^ source specification for the expected output
-          -> SourceSpec       -- ^ source specification for the output
+          -> DataSource
           -> IO (MetricOutput) -- ^ metric value for the output against the expected output
-gevalCore metric mSelector preprocess mInHeader mOutHeader mBootstrapResampling inputSource expectedSource outSource = do
+gevalCore metric mBootstrapResampling dataSource = do
   whenM (isEmptyFileSource outSource) $ throwM $ EmptyOutput
   go metric
      (fileAsLineSource inputSource inOptions)
@@ -496,6 +504,16 @@ gevalCore metric mSelector preprocess mInHeader mOutHeader mBootstrapResampling 
           fileProcessingOptionsSelector = mSelector,
           fileProcessingOptionsPreprocess = preprocess,
           fileProcessingOptionsHeader = mInHeader }
+        challengeDataSource = dataSourceChallengeData dataSource
+        mSelector = challengeDataSourceSelector challengeDataSource
+        preprocess = challengeDataSourcePreprocess challengeDataSource
+        mInHeader = challengeDataSourceInHeader challengeDataSource
+        mOutHeader = challengeDataSourceOutHeader challengeDataSource
+        inputSource = challengeDataSourceInput challengeDataSource
+        expectedSource = challengeDataSourceExpected challengeDataSource
+        outSource = dataSourceOut dataSource
+
+
 
 isEmptyFileSource :: SourceSpec -> IO Bool
 isEmptyFileSource (FilePathSpec filePath) = isEmptyFile filePath
