@@ -1,10 +1,16 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 module GEval.DataSource
   (ChallengeDataSource(..),
    DataSource(..),
+   TargetRecord(..),
    Filter,
    noFilter,
    applyFilter)
   where
+
+import GEval.Common (SourceItem(..))
+import GEval.Selector (ItemTarget(..))
 
 import Data.Text
 
@@ -12,14 +18,17 @@ import Data.Conduit.SmartSource
 import Data.Conduit.Header
 import GEval.Selector
 
+data TargetRecord = TargetRecord (SourceItem ItemTarget) (SourceItem ItemTarget) (SourceItem ItemTarget)
+
 data Filter = NoFilter | InputFilter (Text -> Bool)
 
 noFilter :: Filter
 noFilter = NoFilter
 
-applyFilter :: Filter -> (Text, (Text, Text)) -> Bool
+applyFilter :: Filter -> TargetRecord -> Bool
 applyFilter NoFilter _ = True
-applyFilter (InputFilter fun) (inp, (exp, out)) = fun inp
+applyFilter (InputFilter fun) (TargetRecord (Got (RawItemTarget t)) _ _)  = fun t
+applyFilter (InputFilter fun) (TargetRecord (Got (PartiallyParsedItemTarget ts)) _ _) = fun (intercalate "\t" ts)
 
 -- | This type specifies the way the challenge data (input and
 -- expected data, but not outputs) flow into evaluation.

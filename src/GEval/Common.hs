@@ -9,6 +9,8 @@ import Control.Exception
 
 import Data.Attoparsec.Text
 
+data SourceItem a = Got a | Wrong String | Done
+
 type MetricValue = Double
 
 data GraphSeries = GraphSeries [(Double, Double)]

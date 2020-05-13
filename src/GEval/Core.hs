@@ -749,8 +749,6 @@ parseDistributionWrapper nbOfBits seed distroSpec = case parseDistribution nbOfB
   Right distro -> distro
   Left s -> throw $ UnexpectedData 0 s -- shouldn't be here anyway
 
-data SourceItem a = Got a | Wrong String | Done
-
 skipLineNumber :: (x -> c) -> ((Word32, x) -> c)
 skipLineNumber fun = fun . snd
 
@@ -979,17 +977,30 @@ class EvaluationContext ctxt m where
   checkStepM :: ((Word32, ParsedRecord ctxt) -> (ResourceT m) c) -> (Word32, WrappedParsedRecord ctxt) -> (ResourceT m) (Maybe c)
 
 data WithoutInput m e o = WithoutInput (LineSource (ResourceT m)) (LineSource (ResourceT m))
+                          | WithoutInputButFiltered Filter (LineSource (ResourceT m)) (LineSource (ResourceT m)) (LineSource (ResourceT m))
 
 instance (MonadUnliftIO m, MonadIO m, MonadThrow m) => EvaluationContext (WithoutInput m e o) m where
   data ParserSpec (WithoutInput m e o) = ParserSpecWithoutInput (ItemTarget -> Either String e) (ItemTarget -> Either String o)
   data WrappedParsedRecord (WithoutInput m e o) = WrappedParsedRecordWithoutInput (SourceItem e) (SourceItem o)
   data ParsedRecord (WithoutInput m e o) = ParsedRecordWithoutInput e o
   getFirstLineNo _ (WithoutInput _ (LineSource _ _ _ _ lineNo)) = lineNo
+  getFirstLineNo _ (WithoutInputButFiltered _ _ _ (LineSource _ _ _ _ lineNo)) = lineNo
   getExpectedSource (WithoutInput (LineSource _ _ _ expectedSource _) _) = expectedSource
+  getExpectedSource (WithoutInputButFiltered _ _ (LineSource _ _ _ expectedSource _) _) = expectedSource
   getOutSource (WithoutInput _ (LineSource _ _ _ outSource _)) = outSource
+  getOutSource (WithoutInputButFiltered _ _ _ (LineSource _ _ _ outSource _)) = outSource
   recordSource (WithoutInput expectedLineSource outLineSource) (ParserSpecWithoutInput expParser outParser) = getZipSource $ WrappedParsedRecordWithoutInput
                         <$> ZipSource (items expectedLineSource expParser)
                         <*> ZipSource (items outLineSource outParser)
+  recordSource (WithoutInputButFiltered theFilter inputLineSource expectedLineSource outLineSource) (ParserSpecWithoutInput expParser outParser) =
+    (getZipSource $ (\x (y,z) -> TargetRecord x y z)
+         <$> ZipSource (sourceItems inputLineSource)
+         <*> ZipSource (getZipSource $ (,)
+                        <$> ZipSource (sourceItems expectedLineSource)
+                        <*> ZipSource (sourceItems outLineSource)))
+    .| CC.filter (applyFilter theFilter)
+    .| CC.map (\(TargetRecord _ y z) -> WrappedParsedRecordWithoutInput (applyParser expParser y) (applyParser outParser z))
+
   checkStep _ step (lineNo, WrappedParsedRecordWithoutInput (Got expectedItem) (Got outItem)) = Just $ step (lineNo, ParsedRecordWithoutInput expectedItem outItem)
   checkStep _ _ (lineNo, WrappedParsedRecordWithoutInput _ (Wrong m)) = throw $ UnexpectedData lineNo m
   checkStep _ _ (lineNo, WrappedParsedRecordWithoutInput (Wrong m) _) = throw $ UnexpectedData lineNo m
@@ -1017,10 +1028,14 @@ instance (MonadUnliftIO m, MonadIO m, MonadThrow m) => EvaluationContext (WithIn
   getFirstLineNo _ (WithInput _ _ _ (LineSource _ _ _ _ lineNo)) = lineNo
   getExpectedSource (WithInput _ _ (LineSource _ _ _ expectedSource _) _) = expectedSource
   getOutSource (WithInput _ _ _ (LineSource _ _ _ outSource _)) = outSource
-  recordSource (WithInput _ inputLineSource expectedLineSource outLineSource) (ParserSpecWithInput inpParser expParser outParser) = getZipSource $ (\x (y,z) -> WrappedParsedRecordWithInput x y z)
-         <$> ZipSource (items inputLineSource inpParser)                                                                         <*> (ZipSource $ getZipSource $ (,)
-                        <$> ZipSource (items expectedLineSource expParser)
-                        <*> ZipSource (items outLineSource outParser))
+  recordSource (WithInput theFilter inputLineSource expectedLineSource outLineSource) (ParserSpecWithInput inpParser expParser outParser) =
+    (getZipSource $ (\x (y,z) -> TargetRecord x y z)
+         <$> ZipSource (sourceItems inputLineSource)
+         <*> ZipSource (getZipSource $ (,)
+                        <$> ZipSource (sourceItems expectedLineSource)
+                        <*> ZipSource (sourceItems outLineSource)))
+    .| CC.filter (applyFilter theFilter)
+    .| CC.map (\(TargetRecord x y z) -> WrappedParsedRecordWithInput (applyParser inpParser x) (applyParser expParser y) (applyParser outParser z))
   checkStep _ step (lineNo, WrappedParsedRecordWithInput (Got inputItem) (Got expectedItem) (Got outItem)) = Just $ step (lineNo, ParsedRecordWithInput inputItem expectedItem outItem)
   checkStep _ _ (lineNo, WrappedParsedRecordWithInput _ _ (Wrong m)) = throw $ UnexpectedData lineNo m
   checkStep _ _ (lineNo, WrappedParsedRecordWithInput _ (Wrong m) _) = throw $ UnexpectedData lineNo m
@@ -1067,6 +1082,19 @@ items (LineSource lineSource itemDecoder preprocess _ _) parser =
         preprocess' (RawItemTarget t) = RawItemTarget $ preprocess t
         preprocess' (PartiallyParsedItemTarget ts) = PartiallyParsedItemTarget $ Prelude.map preprocess ts
 
+sourceItems :: MonadResource m => LineSource m -> ConduitT () (SourceItem ItemTarget) m ()
+sourceItems (LineSource lineSource itemDecoder preprocess _ _) =
+  (lineSource .| CL.map (Got . preprocess' . itemDecoder)) >> yield Done
+  where preprocess' (RawItemTarget t) = RawItemTarget $ preprocess t
+        preprocess' (PartiallyParsedItemTarget ts) = PartiallyParsedItemTarget $ Prelude.map preprocess ts
+
+applyParser :: (ItemTarget -> Either String a) -> SourceItem ItemTarget -> SourceItem a
+applyParser parser (Got x) = case parser x of
+  Right v -> Got v
+  Left c -> Wrong c
+applyParser _ Done = Done
+applyParser _ (Wrong c) = Wrong c
+
 -- | Takes a source of lines and returns a conduit of lines represented as
 -- items (without preprocessing and parsing!) to be used in line-by-line modes.
 linesAsItems :: MonadResource m => LineSource m -> ConduitT () (SourceItem Text) m ()
@@ -1074,5 +1102,8 @@ linesAsItems (LineSource lineSource _ _ _ _) =
   (lineSource .| CL.map Got) >> yield Done
 
 applyFilterToSourceItems :: Filter -> (SourceItem Text, (SourceItem Text, SourceItem Text)) -> Bool
-applyFilterToSourceItems filter (Got x, (Got y, Got z)) = applyFilter filter (x, (y, z))
+applyFilterToSourceItems filter (Got x, (Got y, Got z)) = applyFilter filter targetRecord
+  where targetRecord = TargetRecord (Got (RawItemTarget x))
+                                    (Got (RawItemTarget y))
+                                    (Got (RawItemTarget z))
 applyFilterToSourceItems _ special = True
