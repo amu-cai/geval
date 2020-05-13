@@ -28,6 +28,7 @@ data PreprocessingOperation = RegexpMatch Regex
                               | SetName Text
                               | SetPriority Int
                               | RegexpSubstition Regex Text
+                              | FeatureFilter Text
   deriving (Eq)
 
 leftParameterBracket :: Char
@@ -55,6 +56,7 @@ readOps ('S':theRest) = (Sorting:ops, theRest')
 readOps ('N':theRest) = handleParametrizedOp (SetName . pack) theRest
 readOps ('P':theRest) = handleParametrizedOp (SetPriority . read) theRest
 readOps ('s':theRest) = handleParametrizedBinaryOp (\a b -> RegexpSubstition (fromRight undefined $ compileM (BSU.fromString a) []) (pack b)) theRest
+readOps ('f':theRest) = handleParametrizedOp (FeatureFilter . pack) theRest
 readOps s = ([], s)
 
 handleParametrizedOp :: (String -> PreprocessingOperation) -> String -> ([PreprocessingOperation], String)
@@ -117,6 +119,7 @@ instance Show PreprocessingOperation where
   show (SetName t) = parametrizedOperation "N" (unpack t)
   show (SetPriority p) = parametrizedOperation "P" (show p)
   show (RegexpSubstition (Regex _ regexp) s) = "s" ++ (formatParameter $ BSU.toString regexp) ++ (formatParameter $ unpack s)
+  show (FeatureFilter featureSpec) = parametrizedOperation "f" (unpack featureSpec)
 
 applySubstitution :: Regex -> Text -> Text -> Text
 applySubstitution r substitution t =
@@ -150,3 +153,4 @@ applyPreprocessingOperation Sorting = Data.Text.unwords . sort . Data.Text.words
 applyPreprocessingOperation (SetName _) = id
 applyPreprocessingOperation (SetPriority _) = id
 applyPreprocessingOperation (RegexpSubstition regex substition) = applySubstitution regex substition
+applyPreprocessingOperation (FeatureFilter _) = id
