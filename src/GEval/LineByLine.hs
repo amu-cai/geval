@@ -610,10 +610,11 @@ gevalLineByLineSource metric dataSource =
   (getZipSource $ (,)
        <$> ZipSource (CL.sourceList [1..])
        <*> (ZipSource $ threeLineSource context)) .| CL.mapM (checkStepM evaluateLine) .| CL.catMaybes
-  where context = (WithInput inputLineSource expectedLineSource outputLineSource)
-        inputLineSource = fileAsLineSource inputSource inOptions
-        expectedLineSource = fileAsLineSource expectedSource outOptions
-        outputLineSource = fileAsLineSource outSource outOptions
+  where context = fromSpecificationToWithInput lsSpec
+        lsSpec = dataSourceToLineSourcesSpecification dataSource
+        inputLineSource = lineSourcesInputSource lsSpec
+        expectedLineSource = lineSourcesExpectedSource lsSpec
+        outputLineSource = lineSourcesOutputSource lsSpec
         justLine (LineInFile _ _ l) = l
         evaluateLine (lineNo, ParsedRecordWithInput inp exp out) = do
           s <- liftIO $ gevalCoreOnSingleLines metric preprocess (getDataDecoder inputLineSource) (LineInFile inputSource lineNo inp)

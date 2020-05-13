@@ -50,6 +50,10 @@ module GEval.Core
       getInHeader,
       getOutHeader,
       addPreprocessing,
+      LineSourcesSpecification(..),
+      dataSourceToLineSourcesSpecification,
+      fromSpecificationToWithoutInput,
+      fromSpecificationToWithInput
     ) where
 
 import Debug.Trace
@@ -293,10 +297,6 @@ dataSourceToLineSourcesSpecification dataSource = LineSourcesSpecification {
         preprocess = challengeDataSourcePreprocess chDataSource
         mInHeader = challengeDataSourceInHeader chDataSource
         mOutHeader = challengeDataSourceOutHeader chDataSource
-
-toWithoutInput lsSpec = WithoutInput expectedSource outSource
-  where expectedSource = lineSourcesExpectedSource lsSpec
-        outSource = lineSourcesOutputSource lsSpec
 
 geval :: GEvalSpecification -> IO [(SourceSpec, [MetricOutput])]
 geval gevalSpec = do
@@ -562,7 +562,7 @@ gevalBootstrapOnSources :: (MonadIO m, MonadThrow m, MonadUnliftIO m) =>
 gevalBootstrapOnSources numberOfSamples (Mean (MultiLabelFMeasure beta)) lsSpec = do
   gevalRunPipeline parserSpec (trans step) finalPipeline context
   where parserSpec = (ParserSpecWithoutInput (liftOp expParser) (liftOp outParser))
-        context = (WithoutInput expectedLineStream outLineStream)
+        context = fromSpecificationToWithoutInput lsSpec
         step = itemStep SAMultiLabelFMeasure
         expParser = expectedParser SAMultiLabelFMeasure
         outParser = outputParser SAMultiLabelFMeasure
@@ -572,22 +572,19 @@ gevalBootstrapOnSources numberOfSamples (Mean (MultiLabelFMeasure beta)) lsSpec 
               $ continueGEvalCalculations SAMSE MSE))
         trans :: ((a, b) -> c) -> ParsedRecord (WithoutInput m a b) -> c
         trans step (ParsedRecordWithoutInput x y) = step (x, y)
-        expectedLineStream = lineSourcesExpectedSource lsSpec
-        outLineStream = lineSourcesOutputSource lsSpec
 
 gevalBootstrapOnSources numberOfSamples metric lsSpec = do
     case toSing $ toHelper metric of
                 SomeSing smetric -> gevalRunPipeline parserSpec (trans step) finalPipeline context
                                      where parserSpec = (ParserSpecWithoutInput (liftOp expParser) (liftOp outParser))
-                                           context = (WithoutInput expectedLineStream outLineStream)
+                                           context = fromSpecificationToWithoutInput lsSpec
                                            step = itemStep smetric
                                            expParser = expectedParser smetric
                                            outParser = outputParser smetric
                                            finalPipeline = fixer (bootstrapC numberOfSamples $ continueGEvalCalculations smetric metric)
                                            trans :: ((a, b) -> c) -> ParsedRecord (WithoutInput m a b) -> c
                                            trans step (ParsedRecordWithoutInput x y) = step (x, y)
-                                           expectedLineStream = lineSourcesExpectedSource lsSpec
-                                           outLineStream = lineSourcesOutputSource lsSpec
+
 
 fixer :: ConduitT c Void (ResourceT m) [MetricOutput] -> ConduitT c Void (ResourceT m) MetricOutput
 fixer c = do
@@ -617,10 +614,7 @@ gevalCoreOnSources :: (MonadIO m, MonadThrow m, MonadUnliftIO m) =>
 gevalCoreOnSources CharMatch = helper
  where
    helper lsSpec = do
-     gevalCoreGeneralized (ParserSpecWithInput justUnpack justUnpack justUnpack) step countAgg (fMeasureOnCounts charMatchBeta) noGraph (WithInput inputLineSource expectedLineSource outputLineSource)
-     where inputLineSource = lineSourcesInputSource lsSpec
-           expectedLineSource = lineSourcesExpectedSource lsSpec
-           outputLineSource = lineSourcesOutputSource lsSpec
+     gevalCoreGeneralized (ParserSpecWithInput justUnpack justUnpack justUnpack) step countAgg (fMeasureOnCounts charMatchBeta) noGraph (fromSpecificationToWithInput lsSpec)
    step (ParsedRecordWithInput inp exp out) = getCharMatchCount inp exp out
    justUnpack = liftOp (Right . unpack)
 
@@ -698,7 +692,7 @@ gevalCoreOnSourcesStandardWay metric lsSpec =
   case toSing $ toHelper metric of
     SomeSing smetric -> gevalRunPipeline parserSpec (trans step) finalPipeline context
                        where parserSpec = (ParserSpecWithoutInput (liftOp expParser) (liftOp outParser))
-                             context = toWithoutInput lsSpec
+                             context = fromSpecificationToWithoutInput lsSpec
                              step = itemStep smetric
                              expParser = expectedParser smetric
                              outParser = outputParser smetric
@@ -707,7 +701,7 @@ gevalCoreOnSourcesStandardWay metric lsSpec =
                              trans step (ParsedRecordWithoutInput x y) = step (x, y)
 
 helperLogLossHashed nbOfBits finalStep lsSpec =
-          gevalCore''' (ParserSpecWithoutInput (liftOp (Right . id)) (liftOp tentativeParser)) (\(lineNo, (t,d)) -> calculateLogLoss nbOfBits lineNo t (parseDistributionWrapper nbOfBits lineNo d)) averageC (finalStep . negate) noGraph (toWithoutInput lsSpec)
+          gevalCore''' (ParserSpecWithoutInput (liftOp (Right . id)) (liftOp tentativeParser)) (\(lineNo, (t,d)) -> calculateLogLoss nbOfBits lineNo t (parseDistributionWrapper nbOfBits lineNo d)) averageC (finalStep . negate) noGraph (fromSpecificationToWithoutInput lsSpec)
   where -- Unfortunately, we're parsing the distribution twice. We need to
         -- tentatively parse the distribution when the line number is unknown
         -- (so we just set it to 1)
@@ -788,7 +782,7 @@ gevalCoreWithoutInputOnItemTargets :: (MonadUnliftIO m, MonadThrow m, MonadIO m)
                       -> LineSourcesSpecification (ResourceT m)
                       -> m (MetricOutput)           -- ^ metric values for the output against the expected output
 gevalCoreWithoutInputOnItemTargets expParser outParser itemStep aggregator finalStep generateGraph lsSpec =
-  gevalCoreGeneralized (ParserSpecWithoutInput expParser outParser) (trans itemStep) aggregator finalStep generateGraph (toWithoutInput lsSpec)
+  gevalCoreGeneralized (ParserSpecWithoutInput expParser outParser) (trans itemStep) aggregator finalStep generateGraph (fromSpecificationToWithoutInput lsSpec)
  where
    trans :: ((a, b) -> c) -> ParsedRecord (WithoutInput m a b) -> c
    trans step (ParsedRecordWithoutInput x y) = step (x, y)
@@ -958,6 +952,16 @@ defineContinuation aggregator finalStep generateGraph = do
   v <- aggregator
   return $ MetricOutput (SimpleRun $ finalStep v) (generateGraph v)
 
+fromSpecificationToWithoutInput lsSpec = WithoutInput expectedSource outSource
+    where expectedSource = lineSourcesExpectedSource lsSpec
+          outSource = lineSourcesOutputSource lsSpec
+
+fromSpecificationToWithInput lsSpec = WithInput theFilter inpSource expectedSource outSource
+    where inpSource = lineSourcesInputSource lsSpec
+          expectedSource = lineSourcesExpectedSource lsSpec
+          outSource = lineSourcesOutputSource lsSpec
+          theFilter = lineSourcesFilter lsSpec
+
 -- | A type family to handle all the evaluation "context".
 --
 -- This is needed as for some metrics the output and the expected metric is enough
@@ -1001,18 +1005,19 @@ instance (MonadUnliftIO m, MonadIO m, MonadThrow m) => EvaluationContext (Withou
   checkStepM _ (_, WrappedParsedRecordWithoutInput Done Done) = return Nothing
 
 
-data WithInput m i e o = WithInput (LineSource (ResourceT m)) (LineSource (ResourceT m)) (LineSource (ResourceT m))
 
-getInputFilePath (WithInput (LineSource _ _ _ inputFilePath _) _ _) = inputFilePath
+data WithInput m i e o = WithInput Filter (LineSource (ResourceT m)) (LineSource (ResourceT m)) (LineSource (ResourceT m))
+
+getInputFilePath (WithInput _ (LineSource _ _ _ inputFilePath _) _ _) = inputFilePath
 
 instance (MonadUnliftIO m, MonadIO m, MonadThrow m) => EvaluationContext (WithInput m i e o) m where
   data ParserSpec (WithInput m i e o) = ParserSpecWithInput (ItemTarget -> Either String i) (ItemTarget -> Either String e) (ItemTarget -> Either String o)
   data WrappedParsedRecord (WithInput m i e o) = WrappedParsedRecordWithInput (SourceItem i) (SourceItem e) (SourceItem o)
   data ParsedRecord (WithInput m i e o) = ParsedRecordWithInput i e o
-  getFirstLineNo _ (WithInput _ _ (LineSource _ _ _ _ lineNo)) = lineNo
-  getExpectedSource (WithInput _ (LineSource _ _ _ expectedSource _) _) = expectedSource
-  getOutSource (WithInput _ _ (LineSource _ _ _ outSource _)) = outSource
-  recordSource (WithInput inputLineSource expectedLineSource outLineSource) (ParserSpecWithInput inpParser expParser outParser) = getZipSource $ (\x (y,z) -> WrappedParsedRecordWithInput x y z)
+  getFirstLineNo _ (WithInput _ _ _ (LineSource _ _ _ _ lineNo)) = lineNo
+  getExpectedSource (WithInput _ _ (LineSource _ _ _ expectedSource _) _) = expectedSource
+  getOutSource (WithInput _ _ _ (LineSource _ _ _ outSource _)) = outSource
+  recordSource (WithInput _ inputLineSource expectedLineSource outLineSource) (ParserSpecWithInput inpParser expParser outParser) = getZipSource $ (\x (y,z) -> WrappedParsedRecordWithInput x y z)
          <$> ZipSource (items inputLineSource inpParser)                                                                         <*> (ZipSource $ getZipSource $ (,)
                         <$> ZipSource (items expectedLineSource expParser)
                         <*> ZipSource (items outLineSource outParser))
@@ -1036,12 +1041,15 @@ instance (MonadUnliftIO m, MonadIO m, MonadThrow m) => EvaluationContext (WithIn
   checkStepM _ (_, WrappedParsedRecordWithInput (Got _) Done Done) = throw TooManyLinesInInput
   checkStepM _ (_, WrappedParsedRecordWithInput Done Done Done) = return Nothing
 
-
 threeLineSource :: (MonadUnliftIO m, MonadIO m, MonadThrow m) => WithInput m Text Text Text -> ConduitT () (WrappedParsedRecord (WithInput m Text Text Text)) (ResourceT m) ()
-threeLineSource (WithInput inputLineSource expectedLineSource outLineSource) = getZipSource $ (\x (y,z) -> WrappedParsedRecordWithInput x y z)
-         <$> ZipSource (linesAsItems inputLineSource)                                             <*> (ZipSource $ getZipSource $ (,)
+threeLineSource (WithInput theFilter inputLineSource expectedLineSource outLineSource) =
+  (getZipSource $ (\x (y,z) -> (x, (y,z)))
+         <$> ZipSource (linesAsItems inputLineSource)
+         <*> (ZipSource $ getZipSource $ (,)
                         <$> ZipSource (linesAsItems expectedLineSource)
-                        <*> ZipSource (linesAsItems outLineSource))
+                        <*> ZipSource (linesAsItems outLineSource)))
+  .| (CC.filter (applyFilterToSourceItems theFilter))
+  .| (CC.map (\(x, (y,z)) -> WrappedParsedRecordWithInput x y z))
 
 averageC :: MonadResource m => ConduitT Double Void m Double
 averageC = getZipSink
@@ -1064,3 +1072,7 @@ items (LineSource lineSource itemDecoder preprocess _ _) parser =
 linesAsItems :: MonadResource m => LineSource m -> ConduitT () (SourceItem Text) m ()
 linesAsItems (LineSource lineSource _ _ _ _) =
   (lineSource .| CL.map Got) >> yield Done
+
+applyFilterToSourceItems :: Filter -> (SourceItem Text, (SourceItem Text, SourceItem Text)) -> Bool
+applyFilterToSourceItems filter (Got x, (Got y, Got z)) = applyFilter filter (x, (y, z))
+applyFilterToSourceItems _ special = True
