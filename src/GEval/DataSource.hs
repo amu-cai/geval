@@ -1,7 +1,9 @@
 module GEval.DataSource
   (ChallengeDataSource(..),
    DataSource(..),
-   Filter(..))
+   Filter,
+   noFilter,
+   applyFilter)
   where
 
 import Data.Text
@@ -11,6 +13,13 @@ import Data.Conduit.Header
 import GEval.Selector
 
 newtype Filter = Filter (Maybe (Text -> Bool))
+
+noFilter :: Filter
+noFilter = Filter Nothing
+
+applyFilter :: Filter -> (Text, (Text, Text)) -> Bool
+applyFilter (Filter Nothing) _ = True
+applyFilter (Filter (Just fun)) (inp, (exp, out)) = fun inp
 
 -- | This type specifies the way the challenge data (input and
 -- expected data, but not outputs) flow into evaluation.

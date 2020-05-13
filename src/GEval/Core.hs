@@ -377,7 +377,7 @@ checkAndGetDataSources forceInput gevalSpec = do
         challengeDataSourceExpected = expectedSource,
         challengeDataSourceSelector = mSelector,
         challengeDataSourcePreprocess = preprocess,
-        challengeDataSourceFilter = Filter Nothing,
+        challengeDataSourceFilter = noFilter,
         challengeDataSourceInHeader = mInHeader,
         challengeDataSourceOutHeader = mOutHeader }
 
@@ -502,7 +502,7 @@ gevalCoreOnSingleLines metric preprocess inpDecoder inpLine expDecoder expLine o
                            then preprocess
                            else id
         lsSpec = LineSourcesSpecification {
-          lineSourcesFilter = Filter Nothing,
+          lineSourcesFilter = noFilter,
           lineSourcesInputSource = singleLineAsLineSource inpLine inpDecoder preprocess,
           lineSourcesExpectedSource = singleLineAsLineSource expLine expDecoder outputPreprocess,
           lineSourcesOutputSource = singleLineAsLineSource outLine outDecoder outputPreprocess }
