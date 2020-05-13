@@ -136,7 +136,7 @@ main = hspec $ do
     it "sorted" $
       runGEvalTest "accuracy-on-sorted" `shouldReturnAlmost` 0.75
     it "with filtering" $
-      runGEvalTest "accuracy-filtering" `shouldReturnAlmost` 1.0
+      runGEvalTest "accuracy-filtering" `shouldReturnAlmost` 0.6666
   describe "F-measure" $ do
     it "simple example" $
       runGEvalTest "f-measure-simple" `shouldReturnAlmost` 0.57142857

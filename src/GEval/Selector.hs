@@ -4,9 +4,12 @@ module GEval.Selector
     ( Selector(..),
       DataFormat(..),
       ItemTarget(..),
+      TargetRecord(..),
       liftOp,
       select,
       parseSelector ) where
+
+import GEval.Common (SourceItem(..))
 
 import qualified Data.Text as T
 import qualified Data.Vector as V
@@ -29,6 +32,8 @@ data DataFormat = Tsv | Jsonl
 
 data ItemTarget = RawItemTarget T.Text | PartiallyParsedItemTarget [T.Text]
      deriving (Eq, Show)
+
+data TargetRecord = TargetRecord (SourceItem ItemTarget) (SourceItem ItemTarget) (SourceItem ItemTarget)
 
 parseSelector :: String -> Selector
 parseSelector = Selector . T.splitOn "/" . T.pack

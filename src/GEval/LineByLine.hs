@@ -299,7 +299,11 @@ featureExtractor :: (Monad m, FeatureSource s) => Maybe Tokenizer -> BlackBoxDeb
 featureExtractor mTokenizer bbdo mReferences mInHeader = CC.map extract
                                               .| finalFeatures (bbdoCartesian bbdo) (fromMaybe (bbdoMinFrequency bbdo) (bbdoMinCartesianFrequency bbdo))
   where extract (rank, line) =
-          (line, LineWithPeggedFactors rank (getScore line) $ getFeatures mTokenizer bbdo mReferences (mainLineRecord line) mInHeader)
+          (line, LineWithPeggedFactors rank (getScore line) $ getFeatures mTokenizer bbdo mReferences (lineToTargetRecord $ mainLineRecord line) mInHeader)
+
+lineToTargetRecord (LineRecord inp exp out _ _) = TargetRecord (Got (RawItemTarget inp))
+                                                               (Got (RawItemTarget exp))
+                                                               (Got (RawItemTarget out))
 
 finalFeatures :: Monad m => Bool -> Integer -> ConduitT (a, LineWithPeggedFactors) (a, LineWithFactors) m ()
 finalFeatures False _ = CC.map (\(l, p) -> (l, peggedToUnaryLine p))
@@ -330,18 +334,6 @@ filtreCartesian True = CC.concatMapAccum step S.empty
 
 peggedToUnaryLine :: LineWithPeggedFactors -> LineWithFactors
 peggedToUnaryLine (LineWithPeggedFactors rank score fs) = LineWithFactors rank score (Prelude.map UnaryFactor fs)
-
-getFeatures :: Maybe Tokenizer -> BlackBoxDebuggingOptions -> Maybe References -> LineRecord -> Maybe TabularHeader -> [PeggedFactor]
-getFeatures mTokenizer bbdo mReferences (LineRecord inLine expLine outLine _ _) mInHeader =
-  Data.List.concat [
-     extractFactors mTokenizer bbdo mReferencesData "exp" expLine,
-     extractFactorsFromTabbed mTokenizer bbdo mReferencesData "in" inLine mInHeader,
-     extractFactors mTokenizer bbdo mReferencesData "out" outLine]
-  where mReferencesData = case mReferences of
-          Just references -> Just $ ReferencesData {
-            referencesDataReferences = references,
-            referencesDataCurrentId = Nothing }
-          Nothing -> Nothing
 
 data FeatureAggregate = ExistentialFactorAggregate Double MetricValue Integer
                         | NumericalValueAggregate [Double] [MetricValue] [Int] [MetricValue]
@@ -475,7 +467,7 @@ runLineByLineGeneralized ordering spec consum = do
       return $ Just references
     Nothing -> return Nothing
   dataSource' <- checkAndGetDataSource True spec
-  let dataSource = addPreprocessing (applyPreprocessingOperations scheme) dataSource'
+  let dataSource = addSchemeSpecifics scheme dataSource'
   gevalLineByLineCore metric dataSource (sorter ordering .| consum mReferences)
   where metric = gesMainMetric spec
         scheme = gesMainScheme spec
@@ -526,7 +518,7 @@ runOracleItemBased spec = runMultiOutputGeneralized spec consum
 runMultiOutputGeneralized :: GEvalSpecification -> ConduitT [LineRecord] Void (ResourceT IO) () -> IO ()
 runMultiOutputGeneralized spec consum = do
   dataSource' <- checkAndGetDataSource True spec
-  let dataSource = addPreprocessing (applyPreprocessingOperations scheme) dataSource'
+  let dataSource = addSchemeSpecifics scheme dataSource'
   let (Just altOuts) = gesAltOutFiles spec
   altSourceSpecs' <- mapM (getSmartSourceSpec ((gesOutDirectory spec) </> (gesTestName spec)) "out.tsv") altOuts
   let altSourceSpecs = rights altSourceSpecs'

@@ -49,7 +49,7 @@ module GEval.Core
       readHeaderFileWrapper,
       getInHeader,
       getOutHeader,
-      addPreprocessing,
+      addSchemeSpecifics,
       LineSourcesSpecification(..),
       dataSourceToLineSourcesSpecification,
       fromSpecificationToWithoutInput,
@@ -140,9 +140,13 @@ isBetter metric valA valB = isBetter' metricOrdering valA valB
         isBetter' TheLowerTheBetter valA valB = valA < valB
         metricOrdering = getMetricOrdering metric
 
-isInputNeeded :: Metric -> Bool
-isInputNeeded CharMatch = True
-isInputNeeded _ = False
+isInputNeeded :: EvaluationScheme -> Bool
+isInputNeeded (EvaluationScheme CharMatch _) = True
+isInputNeeded (EvaluationScheme _ ops) = hasFiltering ops
+
+hasFiltering [] = False
+hasFiltering ((FeatureFilter _):_) = True
+hasFiltering (_:ops) = hasFiltering ops
 
 -- | Could output be preprocessable
 isPreprocessable :: Metric -> Bool
@@ -312,18 +316,19 @@ gevalOnSingleOut gevalSpec dataSource = do
   vals <- Prelude.mapM (\scheme ->
                          gevalCore (evaluationSchemeMetric scheme)
                                    (gesBootstrapResampling gevalSpec)
-                                   (addPreprocessing (applyPreprocessingOperations scheme) dataSource))
+                                   (addSchemeSpecifics scheme dataSource))
                                    schemes
   return (outSource, vals)
   where outSource = dataSourceOut dataSource
         schemes = gesMetrics gevalSpec
 
-addPreprocessing :: (Text -> Text) -> DataSource -> DataSource
-addPreprocessing prep dataSource =
+addSchemeSpecifics :: EvaluationScheme -> DataSource -> DataSource
+addSchemeSpecifics scheme dataSource =
   dataSource {
      dataSourceChallengeData = (dataSourceChallengeData dataSource) {
+         challengeDataSourceFilter = getFilterForScheme (challengeDataSourceInHeader $ dataSourceChallengeData dataSource) scheme,
          challengeDataSourcePreprocess =
-             (challengeDataSourcePreprocess $ dataSourceChallengeData dataSource) . prep }}
+             (challengeDataSourcePreprocess $ dataSourceChallengeData dataSource) . (applyPreprocessingOperations scheme) }}
 
 readHeaderFileWrapper :: Maybe FilePath -> IO (Maybe TabularHeader)
 readHeaderFileWrapper Nothing = return Nothing
@@ -352,7 +357,7 @@ checkAndGetDataSources forceInput gevalSpec = do
        throwM $ NoExpectedDirectory d
     Right expectedSource -> do
        -- in most cases inputSource is NoSource (unless needed by a metric or in the line-by-line mode)
-       inputSource <- getInputSourceIfNeeded forceInput (Prelude.map evaluationSchemeMetric schemes) expectedTestDirectory inputFile
+       inputSource <- getInputSourceIfNeeded forceInput schemes expectedTestDirectory inputFile
 
        mMultipleOuts <- checkMultipleOuts gevalSpec
        osss <- case mMultipleOuts of
@@ -442,9 +447,9 @@ getOutFile gevalSpec out = outDirectory </> testName </> out
   where outDirectory = gesOutDirectory gevalSpec
         testName = gesTestName gevalSpec
 
-getInputSourceIfNeeded :: Bool -> [Metric] -> FilePath -> FilePath -> IO SourceSpec
-getInputSourceIfNeeded forced metrics directory inputFilePath
-   | forced || (Prelude.any isInputNeeded metrics) = do
+getInputSourceIfNeeded :: Bool -> [EvaluationScheme] -> FilePath -> FilePath -> IO SourceSpec
+getInputSourceIfNeeded forced schemes directory inputFilePath
+   | forced || (Prelude.any isInputNeeded schemes) = do
        iss <- getSmartSourceSpec directory defaultInputFile inputFilePath
        case iss of
          Left NoSpecGiven -> throwM $ NoInputFile inputFilePath
@@ -950,9 +955,12 @@ defineContinuation aggregator finalStep generateGraph = do
   v <- aggregator
   return $ MetricOutput (SimpleRun $ finalStep v) (generateGraph v)
 
-fromSpecificationToWithoutInput lsSpec = WithoutInput expectedSource outSource
-    where expectedSource = lineSourcesExpectedSource lsSpec
-          outSource = lineSourcesOutputSource lsSpec
+fromSpecificationToWithoutInput lsSpec = case lineSourcesFilter lsSpec of
+     NoFilter -> WithoutInput expectedSource outSource
+     theFilter -> WithoutInputButFiltered theFilter inputSource expectedSource outSource
+  where expectedSource = lineSourcesExpectedSource lsSpec
+        outSource = lineSourcesOutputSource lsSpec
+        inputSource = lineSourcesInputSource lsSpec
 
 fromSpecificationToWithInput lsSpec = WithInput theFilter inpSource expectedSource outSource
     where inpSource = lineSourcesInputSource lsSpec

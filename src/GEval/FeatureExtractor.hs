@@ -21,7 +21,8 @@ module GEval.FeatureExtractor
    ReferencesData(..),
    FeatureIndex(..),
    toTextualContent,
-   filterExistentialFactors)
+   filterExistentialFactors,
+   getFeatures)
   where
 
 import Data.Text
@@ -32,6 +33,7 @@ import Text.Tokenizer
 import Text.WordShape
 import GEval.BlackBoxDebugging
 import GEval.Common
+import GEval.Selector (TargetRecord(..), ItemTarget(..))
 import Text.Read (readMaybe)
 
 import Control.Error.Util (hush)
@@ -256,3 +258,24 @@ instance WithTextualContent ExistentialFactor where
 instance WithTextualContent AtomicFactor where
   toTextualContent (TextFactor t) = Just t
   toTextualContent (ShapeFactor _) = Nothing
+
+getFeatures :: Maybe Tokenizer
+              -> BlackBoxDebuggingOptions
+              -> Maybe References
+              -> TargetRecord
+              -> Maybe TabularHeader
+              -> [PeggedFactor]
+getFeatures mTokenizer bbdo mReferences (TargetRecord inLine expLine outLine) mInHeader =
+  Data.List.concat [
+     extractFactors mTokenizer bbdo mReferencesData "exp" (asText expLine),
+     extractFactorsFromTabbed mTokenizer bbdo mReferencesData "in" (asText inLine) mInHeader,
+     extractFactors mTokenizer bbdo mReferencesData "out" (asText outLine)]
+  where mReferencesData = case mReferences of
+          Just references -> Just $ ReferencesData {
+            referencesDataReferences = references,
+            referencesDataCurrentId = Nothing }
+          Nothing -> Nothing
+        asText (Got (RawItemTarget t)) = t
+        asText (Got (PartiallyParsedItemTarget ts)) = Data.Text.intercalate "\t" ts
+        asText (Wrong _) = ""
+        asText GEval.Common.Done = ""
