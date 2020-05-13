@@ -1,4 +1,8 @@
 
+## 1.34.0.0
+
+* Add filtering (f<...> op for metrics)
+
 ## 1.33.0.0
 
 * Handle headers in TSV files
