@@ -266,7 +266,7 @@ extensionsHandled = ["tsv", "jsonl"]
 data LineSource m = LineSource (ConduitT () Text m ()) (Text -> ItemTarget) (Text -> Text) SourceSpec Word32
 
 data LineSourcesSpecification m = LineSourcesSpecification {
-  lineSourcesFilter :: Maybe (Text -> Bool),
+  lineSourcesFilter :: Filter,
   lineSourcesInputSource :: LineSource m,
   lineSourcesExpectedSource :: LineSource m,
   lineSourcesOutputSource :: LineSource m }
@@ -377,7 +377,7 @@ checkAndGetDataSources forceInput gevalSpec = do
         challengeDataSourceExpected = expectedSource,
         challengeDataSourceSelector = mSelector,
         challengeDataSourcePreprocess = preprocess,
-        challengeDataSourceFilter = Nothing,
+        challengeDataSourceFilter = Filter Nothing,
         challengeDataSourceInHeader = mInHeader,
         challengeDataSourceOutHeader = mOutHeader }
 
@@ -502,7 +502,7 @@ gevalCoreOnSingleLines metric preprocess inpDecoder inpLine expDecoder expLine o
                            then preprocess
                            else id
         lsSpec = LineSourcesSpecification {
-          lineSourcesFilter = Nothing,
+          lineSourcesFilter = Filter Nothing,
           lineSourcesInputSource = singleLineAsLineSource inpLine inpDecoder preprocess,
           lineSourcesExpectedSource = singleLineAsLineSource expLine expDecoder outputPreprocess,
           lineSourcesOutputSource = singleLineAsLineSource outLine outDecoder outputPreprocess }

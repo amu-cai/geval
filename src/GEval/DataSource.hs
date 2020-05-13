@@ -1,6 +1,7 @@
 module GEval.DataSource
   (ChallengeDataSource(..),
-   DataSource(..))
+   DataSource(..),
+   Filter(..))
   where
 
 import Data.Text
@@ -8,6 +9,8 @@ import Data.Text
 import Data.Conduit.SmartSource
 import Data.Conduit.Header
 import GEval.Selector
+
+newtype Filter = Filter (Maybe (Text -> Bool))
 
 -- | This type specifies the way the challenge data (input and
 -- expected data, but not outputs) flow into evaluation.
@@ -18,7 +21,7 @@ data ChallengeDataSource = ChallengeDataSource {
   challengeDataSourceExpected :: SourceSpec,
   challengeDataSourceSelector :: Maybe Selector,
   challengeDataSourcePreprocess :: Text -> Text,
-  challengeDataSourceFilter :: Maybe (Text -> Bool),
+  challengeDataSourceFilter :: Filter,
   challengeDataSourceInHeader :: Maybe TabularHeader,
   challengeDataSourceOutHeader :: Maybe TabularHeader }
 
