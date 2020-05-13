@@ -35,6 +35,8 @@ import GEval.Submit (submit)
 import GEval.BlackBoxDebugging
 import GEval.Selector
 import GEval.Validation
+import GEval.Model
+import GEval.ModelTraining
 
 import Data.List (intercalate)
 
@@ -99,6 +101,16 @@ optionsParser = GEvalOptions
                 (flag' OracleItemBased
                     ( long "oracle-item-based"
                       <> help "Generate the best possible output considering outputs given by --out-file and --alt-out-file options (and peeking into the expected file)."))
+                <|>
+                (TrainModel <$> option auto
+                    ( long "train"
+                      <> metavar "MODEL-TYPE"
+                      <> help "Train a model"))
+                <|>
+                (Infer <$> strOption
+                    ( long "infer"
+                      <> metavar "MODEL-PATH"
+                      <> help "Infer from a model"))
                 )
 
    <*> ((flag' FirstTheWorst
@@ -386,6 +398,12 @@ runGEval''' (Just ListMetrics) _ _ _ _ _ _ = do
   return Nothing
 runGEval''' (Just OracleItemBased) _ _ spec _ _ _ = do
   runOracleItemBased spec
+  return Nothing
+runGEval''' (Just (TrainModel modelType)) _ _ spec _ _ _ = do
+  trainModel modelType spec
+  return Nothing
+runGEval''' (Just (Infer modelPath)) _ _ spec _ _ _ = do
+  infer modelPath spec
   return Nothing
 
 getGraphFilename :: Int -> FilePath -> FilePath

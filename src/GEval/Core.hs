@@ -63,6 +63,7 @@ import Data.Singletons.TH
 import GEval.Metric
 import GEval.MetricsMechanics
 import GEval.EvaluationScheme
+import GEval.Model (ModelType)
 
 import Data.Conduit
 import Data.Conduit.Combinators as CC
@@ -227,6 +228,8 @@ data GEvalSpecialCommand = Init
                            | PrintVersion | JustTokenize | Submit
                            | Validate | ListMetrics
                            | OracleItemBased
+                           | TrainModel ModelType
+                           | Infer FilePath
 
 data ResultOrdering = KeepTheOriginalOrder | FirstTheWorst | FirstTheBest
 

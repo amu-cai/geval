@@ -4,6 +4,7 @@ module GEval.EvaluationScheme
    applyPreprocessingOperations,
    evaluationSchemeName,
    evaluationSchemePriority,
+   getRegexpMatch,
    PreprocessingOperation(..))
   where
 
@@ -58,6 +59,12 @@ readOps ('P':theRest) = handleParametrizedOp (SetPriority . read) theRest
 readOps ('s':theRest) = handleParametrizedBinaryOp (\a b -> RegexpSubstition (fromRight undefined $ compileM (BSU.fromString a) []) (pack b)) theRest
 readOps ('f':theRest) = handleParametrizedOp (FeatureFilter . pack) theRest
 readOps s = ([], s)
+
+getRegexpMatch :: EvaluationScheme -> Maybe Regex
+getRegexpMatch (EvaluationScheme _ ops) = getRegexpMatch' ops
+  where getRegexpMatch' [] = Nothing
+        getRegexpMatch' ((RegexpMatch regex):_) = Just regex
+        getRegexpMatch' (_:ops) = getRegexpMatch' ops
 
 handleParametrizedOp :: (String -> PreprocessingOperation) -> String -> ([PreprocessingOperation], String)
 handleParametrizedOp constructor theRest =

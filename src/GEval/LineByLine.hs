@@ -21,7 +21,8 @@ module GEval.LineByLine
         ResultOrdering(..),
         justTokenize,
         worstFeaturesPipeline,
-        runOracleItemBased
+        runOracleItemBased,
+        runMultiOutputGeneralizedForEvaluationScheme
        ) where
 
 import GEval.Core
@@ -516,7 +517,11 @@ runOracleItemBased spec = runMultiOutputGeneralized spec consum
         metric = gesMainMetric spec
 
 runMultiOutputGeneralized :: GEvalSpecification -> ConduitT [LineRecord] Void (ResourceT IO) () -> IO ()
-runMultiOutputGeneralized spec consum = do
+runMultiOutputGeneralized spec consum = runMultiOutputGeneralizedForEvaluationScheme spec mainScheme consum
+  where mainScheme = gesMainScheme spec
+
+runMultiOutputGeneralizedForEvaluationScheme :: GEvalSpecification -> EvaluationScheme -> ConduitT [LineRecord] Void (ResourceT IO) () -> IO ()
+runMultiOutputGeneralizedForEvaluationScheme spec scheme@(EvaluationScheme metric _) consum = do
   dataSource' <- checkAndGetDataSource True spec
   let dataSource = addSchemeSpecifics scheme dataSource'
   let (Just altOuts) = gesAltOutFiles spec
@@ -530,8 +535,6 @@ runMultiOutputGeneralized spec consum = do
                                 dataSourceOut = s}) sourceSpecs
   runResourceT $ runConduit $
     (sequenceSources sources .| consum)
-  where metric = gesMainMetric spec
-        scheme = gesMainScheme spec
 
 runMostWorseningFeatures :: ResultOrdering -> FilePath -> GEvalSpecification -> BlackBoxDebuggingOptions -> IO ()
 runMostWorseningFeatures ordering otherOut spec bbdo = do
