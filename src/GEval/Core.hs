@@ -265,6 +265,39 @@ extensionsHandled = ["tsv", "jsonl"]
 
 data LineSource m = LineSource (ConduitT () Text m ()) (Text -> ItemTarget) (Text -> Text) SourceSpec Word32
 
+data LineSourcesSpecification m = LineSourcesSpecification {
+  lineSourcesFilter :: Maybe (Text -> Bool),
+  lineSourcesInputSource :: LineSource m,
+  lineSourcesExpectedSource :: LineSource m,
+  lineSourcesOutputSource :: LineSource m }
+
+dataSourceToLineSourcesSpecification :: DataSource -> LineSourcesSpecification (ResourceT IO)
+dataSourceToLineSourcesSpecification dataSource = LineSourcesSpecification {
+  lineSourcesFilter = challengeDataSourceFilter chDataSource,
+  lineSourcesInputSource = fileAsLineSource inputSource inOptions,
+  lineSourcesExpectedSource = fileAsLineSource expectedSource outOptions,
+  lineSourcesOutputSource = fileAsLineSource outSource outOptions}
+  where chDataSource = dataSourceChallengeData dataSource
+        inputSource = challengeDataSourceInput chDataSource
+        expectedSource = challengeDataSourceExpected chDataSource
+        outSource = dataSourceOut dataSource
+        outOptions = FileProcessingOptions {
+          fileProcessingOptionsSelector = mSelector,
+          fileProcessingOptionsPreprocess = preprocess,
+          fileProcessingOptionsHeader = mOutHeader }
+        inOptions = FileProcessingOptions {
+          fileProcessingOptionsSelector = mSelector,
+          fileProcessingOptionsPreprocess = preprocess,
+          fileProcessingOptionsHeader = mInHeader }
+        mSelector = challengeDataSourceSelector chDataSource
+        preprocess = challengeDataSourcePreprocess chDataSource
+        mInHeader = challengeDataSourceInHeader chDataSource
+        mOutHeader = challengeDataSourceOutHeader chDataSource
+
+toWithoutInput lsSpec = WithoutInput expectedSource outSource
+  where expectedSource = lineSourcesExpectedSource lsSpec
+        outSource = lineSourcesOutputSource lsSpec
+
 geval :: GEvalSpecification -> IO [(SourceSpec, [MetricOutput])]
 geval gevalSpec = do
   dataSources <- checkAndGetDataSources False gevalSpec
@@ -455,14 +488,24 @@ getDataFormatFromFilePath path =
 
 dataDecoder fmt mSelector = CC.map (select fmt mSelector)
 
-gevalCoreOnSingleLines :: Metric -> (Text -> Text) -> (Text -> ItemTarget) -> LineInFile -> (Text -> ItemTarget) -> LineInFile -> (Text -> ItemTarget) -> LineInFile -> IO (MetricOutput)
+gevalCoreOnSingleLines :: Metric
+                         -> (Text -> Text)
+                         -> (Text -> ItemTarget)
+                         -> LineInFile
+                         -> (Text -> ItemTarget)
+                         -> LineInFile
+                         -> (Text -> ItemTarget)
+                         -> LineInFile -> IO (MetricOutput)
 gevalCoreOnSingleLines metric preprocess inpDecoder inpLine expDecoder expLine outDecoder outLine =
-  gevalCoreOnSources metric (singleLineAsLineSource inpLine inpDecoder preprocess)
-                            (singleLineAsLineSource expLine expDecoder outputPreprocess)
-                            (singleLineAsLineSource outLine outDecoder outputPreprocess)
+  gevalCoreOnSources metric lsSpec
   where outputPreprocess = if isPreprocessable metric
                            then preprocess
                            else id
+        lsSpec = LineSourcesSpecification {
+          lineSourcesFilter = Nothing,
+          lineSourcesInputSource = singleLineAsLineSource inpLine inpDecoder preprocess,
+          lineSourcesExpectedSource = singleLineAsLineSource expLine expDecoder outputPreprocess,
+          lineSourcesOutputSource = singleLineAsLineSource outLine outDecoder outputPreprocess }
 
 singleLineAsLineSource :: LineInFile -> (Text -> ItemTarget) -> (Text -> Text) -> LineSource (ResourceT IO)
 singleLineAsLineSource (LineInFile sourceSpec lineNo line) itemDecoder preprocess =
@@ -492,33 +535,14 @@ gevalCore :: Metric           -- ^ evaluation metric
           -> IO (MetricOutput) -- ^ metric value for the output against the expected output
 gevalCore metric mBootstrapResampling dataSource = do
   whenM (isEmptyFileSource outSource) $ throwM $ EmptyOutput
-  go metric
-     (fileAsLineSource inputSource inOptions)
-     (fileAsLineSource expectedSource outOptions)
-     (fileAsLineSource outSource outOptions)
+  let lsSpec = dataSourceToLineSourcesSpecification dataSource
+  go metric lsSpec
   where go = case mBootstrapResampling of
                Nothing -> gevalCoreOnSources
                Just bootstrapResampling -> if handleBootstrap metric
                                           then gevalBootstrapOnSources bootstrapResampling
                                           else gevalCoreOnSources
-        outOptions = FileProcessingOptions {
-          fileProcessingOptionsSelector = mSelector,
-          fileProcessingOptionsPreprocess = preprocess,
-          fileProcessingOptionsHeader = mOutHeader }
-        inOptions = FileProcessingOptions {
-          fileProcessingOptionsSelector = mSelector,
-          fileProcessingOptionsPreprocess = preprocess,
-          fileProcessingOptionsHeader = mInHeader }
-        challengeDataSource = dataSourceChallengeData dataSource
-        mSelector = challengeDataSourceSelector challengeDataSource
-        preprocess = challengeDataSourcePreprocess challengeDataSource
-        mInHeader = challengeDataSourceInHeader challengeDataSource
-        mOutHeader = challengeDataSourceOutHeader challengeDataSource
-        inputSource = challengeDataSourceInput challengeDataSource
-        expectedSource = challengeDataSourceExpected challengeDataSource
         outSource = dataSourceOut dataSource
-
-
 
 isEmptyFileSource :: SourceSpec -> IO Bool
 isEmptyFileSource (FilePathSpec filePath) = isEmptyFile filePath
@@ -531,13 +555,11 @@ data LineInFile = LineInFile SourceSpec Word32 Text
 gevalBootstrapOnSources :: (MonadIO m, MonadThrow m, MonadUnliftIO m) =>
                           Int                         -- ^ number of samples
                           -> Metric                    -- ^ evaluation metric
-                          -> LineSource (ResourceT m)  -- ^ source of the input values
-                          -> LineSource (ResourceT m)  -- ^ source to read the expected output
-                          -> LineSource (ResourceT m)  -- ^ source to read the output
+                          -> LineSourcesSpecification (ResourceT m)
                           -> m (MetricOutput)           -- ^ metric values for the output against the expected output
 
 -- for the time being hardcoded
-gevalBootstrapOnSources numberOfSamples (Mean (MultiLabelFMeasure beta)) inputLineStream expectedLineStream outLineStream = do
+gevalBootstrapOnSources numberOfSamples (Mean (MultiLabelFMeasure beta)) lsSpec = do
   gevalRunPipeline parserSpec (trans step) finalPipeline context
   where parserSpec = (ParserSpecWithoutInput (liftOp expParser) (liftOp outParser))
         context = (WithoutInput expectedLineStream outLineStream)
@@ -550,8 +572,10 @@ gevalBootstrapOnSources numberOfSamples (Mean (MultiLabelFMeasure beta)) inputLi
               $ continueGEvalCalculations SAMSE MSE))
         trans :: ((a, b) -> c) -> ParsedRecord (WithoutInput m a b) -> c
         trans step (ParsedRecordWithoutInput x y) = step (x, y)
+        expectedLineStream = lineSourcesExpectedSource lsSpec
+        outLineStream = lineSourcesOutputSource lsSpec
 
-gevalBootstrapOnSources numberOfSamples metric inputLineStream expectedLineStream outLineStream = do
+gevalBootstrapOnSources numberOfSamples metric lsSpec = do
     case toSing $ toHelper metric of
                 SomeSing smetric -> gevalRunPipeline parserSpec (trans step) finalPipeline context
                                      where parserSpec = (ParserSpecWithoutInput (liftOp expParser) (liftOp outParser))
@@ -562,6 +586,8 @@ gevalBootstrapOnSources numberOfSamples metric inputLineStream expectedLineStrea
                                            finalPipeline = fixer (bootstrapC numberOfSamples $ continueGEvalCalculations smetric metric)
                                            trans :: ((a, b) -> c) -> ParsedRecord (WithoutInput m a b) -> c
                                            trans step (ParsedRecordWithoutInput x y) = step (x, y)
+                                           expectedLineStream = lineSourcesExpectedSource lsSpec
+                                           outLineStream = lineSourcesOutputSource lsSpec
 
 fixer :: ConduitT c Void (ResourceT m) [MetricOutput] -> ConduitT c Void (ResourceT m) MetricOutput
 fixer c = do
@@ -582,26 +608,27 @@ fixer c = do
 -- cases), the work is delegated to @gevalCoreWithoutInput@ function.
 gevalCoreOnSources :: (MonadIO m, MonadThrow m, MonadUnliftIO m) =>
                      Metric                      -- ^ evaluation metric
-                     -> LineSource (ResourceT m)  -- ^ source of the input values
-                     -> LineSource (ResourceT m)  -- ^ source to read the expected output
-                     -> LineSource (ResourceT m)  -- ^ source to read the output
+                     -> LineSourcesSpecification (ResourceT m)
                      -> m (MetricOutput)           -- ^ metric values for the output against the expected output
 
 -- first not-standard metrics
 
 -- CharMatch is the only metric needing input lines (so far)
-gevalCoreOnSources CharMatch inputLineSource = helper inputLineSource
+gevalCoreOnSources CharMatch = helper
  where
-   helper inputLineSource expectedLineSource outputLineSource = do
+   helper lsSpec = do
      gevalCoreGeneralized (ParserSpecWithInput justUnpack justUnpack justUnpack) step countAgg (fMeasureOnCounts charMatchBeta) noGraph (WithInput inputLineSource expectedLineSource outputLineSource)
+     where inputLineSource = lineSourcesInputSource lsSpec
+           expectedLineSource = lineSourcesExpectedSource lsSpec
+           outputLineSource = lineSourcesOutputSource lsSpec
    step (ParsedRecordWithInput inp exp out) = getCharMatchCount inp exp out
    justUnpack = liftOp (Right . unpack)
 
-gevalCoreOnSources (LogLossHashed nbOfBits) _ = helperLogLossHashed nbOfBits id
-gevalCoreOnSources (LikelihoodHashed nbOfBits) _ = helperLogLossHashed nbOfBits logLossToLikehood
+gevalCoreOnSources (LogLossHashed nbOfBits) = helperLogLossHashed nbOfBits id
+gevalCoreOnSources (LikelihoodHashed nbOfBits) = helperLogLossHashed nbOfBits logLossToLikehood
 
 
-gevalCoreOnSources (Mean (MultiLabelFMeasure beta)) _
+gevalCoreOnSources (Mean (MultiLabelFMeasure beta))
   = gevalCoreWithoutInputOnItemTargets (Right . intoWords)
                                        (Right . getWords)
                                        ((fMeasureOnCounts beta) . (getCounts (==)))
@@ -615,7 +642,7 @@ gevalCoreOnSources (Mean (MultiLabelFMeasure beta)) _
       intoWords (RawItemTarget t) = Prelude.map unpack $ Data.Text.words t
       intoWords (PartiallyParsedItemTarget ts) = Prelude.map unpack ts
 
-gevalCoreOnSources (Mean WER) _
+gevalCoreOnSources (Mean WER)
   = gevalCoreWithoutInputOnItemTargets (Right . intoWords)
                                        (Right . getWords)
                                        ((uncurry (/.)) . (uncurry werStep))
@@ -629,10 +656,10 @@ gevalCoreOnSources (Mean WER) _
       intoWords (RawItemTarget t) = Prelude.map unpack $ Data.Text.words t
       intoWords (PartiallyParsedItemTarget ts) = Prelude.map unpack ts
 
-gevalCoreOnSources (Mean _) _ = error $ "Mean/ meta-metric defined only for MultiLabel-F1 and WER for the time being"
+gevalCoreOnSources (Mean _) = error $ "Mean/ meta-metric defined only for MultiLabel-F1 and WER for the time being"
 
 -- only MultiLabel-F1 handled for JSONs for the time being...
-gevalCoreOnSources (MultiLabelFMeasure beta) _ = gevalCoreWithoutInputOnItemTargets (Right . intoWords)
+gevalCoreOnSources (MultiLabelFMeasure beta) = gevalCoreWithoutInputOnItemTargets (Right . intoWords)
                                                                             (Right . getWords)
                                                                             (getCounts (==))
                                                                             countAgg
@@ -644,14 +671,14 @@ gevalCoreOnSources (MultiLabelFMeasure beta) _ = gevalCoreWithoutInputOnItemTarg
       intoWords (RawItemTarget t) = Prelude.map unpack $ Data.Text.words t
       intoWords (PartiallyParsedItemTarget ts) = Prelude.map unpack ts
 
-gevalCoreOnSources Pearson _ = gevalCoreByCorrelationMeasure pearson
-gevalCoreOnSources Spearman _ = gevalCoreByCorrelationMeasure spearman
+gevalCoreOnSources Pearson = gevalCoreByCorrelationMeasure pearson
+gevalCoreOnSources Spearman = gevalCoreByCorrelationMeasure spearman
 
-gevalCoreOnSources (ProbabilisticMultiLabelFMeasure beta) _ = generalizedProbabilisticFMeasure beta
-                                                                                               SAProbabilisticMultiLabelFMeasure
+gevalCoreOnSources (ProbabilisticMultiLabelFMeasure beta) = generalizedProbabilisticFMeasure beta
+                                                                                             SAProbabilisticMultiLabelFMeasure
 
-gevalCoreOnSources (ProbabilisticSoftFMeasure beta) _ = generalizedProbabilisticFMeasure beta
-                                                                                         SAProbabilisticSoftFMeasure
+gevalCoreOnSources (ProbabilisticSoftFMeasure beta) = generalizedProbabilisticFMeasure beta
+                                                                                       SAProbabilisticSoftFMeasure
 
 -- and now more typical metrics, which:
 -- 1) parse the expected output
@@ -661,18 +688,17 @@ gevalCoreOnSources (ProbabilisticSoftFMeasure beta) _ = generalizedProbabilistic
 -- 5) apply some final funtion on the aggregate
 -- 6) create a graph using the aggregate (applicable only to some metrics)
 
-gevalCoreOnSources metric _ = gevalCoreOnSourcesStandardWay metric
+gevalCoreOnSources metric = gevalCoreOnSourcesStandardWay metric
 
 gevalCoreOnSourcesStandardWay :: (MonadIO m, MonadThrow m, MonadUnliftIO m) =>
                      Metric                      -- ^ evaluation metric
-                     -> LineSource (ResourceT m)  -- ^ source to read the expected output
-                     -> LineSource (ResourceT m)  -- ^ source to read the output
+                     -> LineSourcesSpecification (ResourceT m)
                      -> m (MetricOutput)           -- ^ metric values for the output against the expected output
-gevalCoreOnSourcesStandardWay metric expectedLineStream outLineStream =
+gevalCoreOnSourcesStandardWay metric lsSpec =
   case toSing $ toHelper metric of
     SomeSing smetric -> gevalRunPipeline parserSpec (trans step) finalPipeline context
                        where parserSpec = (ParserSpecWithoutInput (liftOp expParser) (liftOp outParser))
-                             context = (WithoutInput expectedLineStream outLineStream)
+                             context = toWithoutInput lsSpec
                              step = itemStep smetric
                              expParser = expectedParser smetric
                              outParser = outputParser smetric
@@ -680,8 +706,8 @@ gevalCoreOnSourcesStandardWay metric expectedLineStream outLineStream =
                              trans :: ((a, b) -> c) -> ParsedRecord (WithoutInput m a b) -> c
                              trans step (ParsedRecordWithoutInput x y) = step (x, y)
 
-helperLogLossHashed nbOfBits finalStep expectedLineSource outLineSource =
-          gevalCore''' (ParserSpecWithoutInput (liftOp (Right . id)) (liftOp tentativeParser)) (\(lineNo, (t,d)) -> calculateLogLoss nbOfBits lineNo t (parseDistributionWrapper nbOfBits lineNo d)) averageC (finalStep . negate) noGraph (WithoutInput expectedLineSource outLineSource)
+helperLogLossHashed nbOfBits finalStep lsSpec =
+          gevalCore''' (ParserSpecWithoutInput (liftOp (Right . id)) (liftOp tentativeParser)) (\(lineNo, (t,d)) -> calculateLogLoss nbOfBits lineNo t (parseDistributionWrapper nbOfBits lineNo d)) averageC (finalStep . negate) noGraph (toWithoutInput lsSpec)
   where -- Unfortunately, we're parsing the distribution twice. We need to
         -- tentatively parse the distribution when the line number is unknown
         -- (so we just set it to 1)
@@ -717,8 +743,7 @@ countFragAgg = CC.foldl countFragFolder (fromInteger 0, fromInteger 0, fromInteg
 
 gevalCoreByCorrelationMeasure :: (MonadUnliftIO m, MonadThrow m, MonadIO m) =>
                                 (V.Vector (Double, Double) -> Double) -> -- ^ correlation function
-                                LineSource (ResourceT m) ->  -- ^ source to read the expected output
-                                LineSource (ResourceT m) ->  -- ^ source to read the output
+                                LineSourcesSpecification (ResourceT m) ->
                                 m (MetricOutput)             -- ^ metric values for the output against the expected output
 gevalCoreByCorrelationMeasure correlationFunction =
   gevalCoreWithoutInput SAPearson correlationC finalStep noGraph
@@ -742,11 +767,10 @@ gevalCoreWithoutInput :: (MonadUnliftIO m, MonadThrow m, MonadIO m)
                                                    -- a "total" value
                       -> (d -> Double)             -- ^ function to transform the "total" value into the final score
                       -> (d -> Maybe GraphSeries)
-                      -> LineSource (ResourceT m)  -- ^ source to read the expected output
-                      -> LineSource (ResourceT m)  -- ^ source to read the output
+                      -> LineSourcesSpecification (ResourceT m)
                       -> m (MetricOutput)           -- ^ metric values for the output against the expected output
-gevalCoreWithoutInput smetric aggregator finalStep generateGraph expectedLineStream outLineStream =
-  gevalCoreWithoutInputOnItemTargets (liftOp expParser) (liftOp outParser) iStep aggregator finalStep generateGraph expectedLineStream outLineStream
+gevalCoreWithoutInput smetric aggregator finalStep generateGraph lsSpec =
+  gevalCoreWithoutInputOnItemTargets (liftOp expParser) (liftOp outParser) iStep aggregator finalStep generateGraph lsSpec
   where expParser = expectedParser smetric
         outParser = outputParser smetric
         iStep = itemStep smetric
@@ -761,11 +785,10 @@ gevalCoreWithoutInputOnItemTargets :: (MonadUnliftIO m, MonadThrow m, MonadIO m)
                                                    -- a "total" value
                       -> (d -> Double)             -- ^ function to transform the "total" value into the final score
                       -> (d -> Maybe GraphSeries)
-                      -> LineSource (ResourceT m)  -- ^ source to read the expected output
-                      -> LineSource (ResourceT m)  -- ^ source to read the output
+                      -> LineSourcesSpecification (ResourceT m)
                       -> m (MetricOutput)           -- ^ metric values for the output against the expected output
-gevalCoreWithoutInputOnItemTargets expParser outParser itemStep aggregator finalStep generateGraph expectedLineStream outLineStream =
-  gevalCoreGeneralized (ParserSpecWithoutInput expParser outParser) (trans itemStep) aggregator finalStep generateGraph (WithoutInput expectedLineStream outLineStream)
+gevalCoreWithoutInputOnItemTargets expParser outParser itemStep aggregator finalStep generateGraph lsSpec =
+  gevalCoreGeneralized (ParserSpecWithoutInput expParser outParser) (trans itemStep) aggregator finalStep generateGraph (toWithoutInput lsSpec)
  where
    trans :: ((a, b) -> c) -> ParsedRecord (WithoutInput m a b) -> c
    trans step (ParsedRecordWithoutInput x y) = step (x, y)
