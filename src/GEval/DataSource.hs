@@ -22,7 +22,9 @@ import Data.Conduit.SmartSource
 import Data.Conduit.Header
 import GEval.Selector
 
-data Filter = NoFilter | FilterByFeatures (Maybe TabularHeader) String
+import qualified Data.Set as S
+
+data Filter = NoFilter | FilterByFeatures (Maybe TabularHeader) (S.Set String)
 
 noFilter :: Filter
 noFilter = NoFilter
@@ -33,19 +35,19 @@ applyFilter (FilterByFeatures mInHeader featureSpec) tR = applyFeatureFilter mIn
 
 getFilterForScheme :: Maybe TabularHeader -> EvaluationScheme -> Filter
 getFilterForScheme mTabHeader (EvaluationScheme _ ops) = case findFilter ops of
-  Nothing -> NoFilter
-  Just f -> FilterByFeatures mTabHeader (unpack $ fixIndex f)
+  [] -> NoFilter
+  fs -> FilterByFeatures mTabHeader (S.fromList $ Prelude.map (unpack . fixIndex) fs)
 
 fixIndex = replace "[" "<" . replace "]" ">"
 
-findFilter :: [PreprocessingOperation] -> Maybe Text
-findFilter [] = Nothing
-findFilter ((FeatureFilter f):_) = Just f
+findFilter :: [PreprocessingOperation] -> [Text]
+findFilter [] = []
+findFilter ((FeatureFilter f):ops) = (f:(findFilter ops))
 findFilter (_:ops) = findFilter ops
 
 
-applyFeatureFilter :: Maybe TabularHeader -> String -> TargetRecord -> Bool
-applyFeatureFilter mInHeader featureSpec tR = featureSpec `elem` (Prelude.map show fs)
+applyFeatureFilter :: Maybe TabularHeader -> S.Set String -> TargetRecord -> Bool
+applyFeatureFilter mInHeader featureSpec tR = featureSpec `S.isSubsetOf` (S.fromList $ Prelude.map show fs)
   where fs = getFeatures Nothing
                          BlackBoxDebuggingOptions {
                            bbdoMinFrequency = 0,
