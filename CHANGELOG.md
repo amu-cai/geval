@@ -1,4 +1,8 @@
 
+## 1.35.0.0
+
+* Add simple "mix" ensembling
+
 ## 1.34.0.0
 
 * Add filtering (f<...> op for metrics)
