@@ -343,6 +343,10 @@ main = hspec $ do
       runGEvalTest "multilabel-f1-with-probs" `shouldReturnAlmost` 0.615384615384615
     it "labels given with probs and numbers" $ do
       runGEvalTest "multilabel-f1-with-probs-and-numbers" `shouldReturnAlmost` 0.6666666666666
+    it "information extraction" $ do
+      runGEvalTest "multilabel-f1-ie" `shouldReturnAlmost` 0.1111111111
+    it "information extraction with flags" $ do
+      runGEvalTest "multilabel-f1-ie-flags" `shouldReturnAlmost` 0.444444444444
   describe "Mean/MultiLabel-F" $ do
     it "simple" $ do
       runGEvalTest "mean-multilabel-f1-simple" `shouldReturnAlmost` 0.5
