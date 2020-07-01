@@ -228,16 +228,15 @@ type family ItemIntermediateRepresentationType (t :: AMetric) :: * where
   ItemIntermediateRepresentationType AProbabilisticSoftFMeasure = ([Double], [Double], Double, Int)
   ItemIntermediateRepresentationType APearson = (Double, Double)
   ItemIntermediateRepresentationType ASpearman = (Double, Double)
-  ItemIntermediateRepresentationType (AMultiLabelFMeasure ms) = (MatchingCount ms, Int, Int)
+  -- FIXME
+  -- It would be better to distinguish ExactMatch here (for which we could return (Int, Int, Int)
+  -- ant other possibilities, but it resulted in too much down-the-rabbit hole with types.
+  ItemIntermediateRepresentationType (AMultiLabelFMeasure _) = (Double, Int, Int)
   ItemIntermediateRepresentationType ALogLossHashed = (Text, Text)
   ItemIntermediateRepresentationType ALikelihoodHashed = (Text, Text)
   ItemIntermediateRepresentationType ACharMatch = (Text, Text)
   ItemIntermediateRepresentationType AWER = (Int, Int)
   ItemIntermediateRepresentationType t = Double
-
-type family MatchingCount (t :: MatchingSpecification) where
-  MatchingCount ExactMatch = Int
-  MatchingCount _ = Double
 
 itemStep :: SAMetric t -> (ParsedExpectedType t, ParsedOutputType t) -> ItemIntermediateRepresentationType t
 itemStep SARMSE = itemSquaredError
@@ -269,10 +268,7 @@ itemStep SATokenAccuracy = countHitsAndTotals
 itemStep SASegmentAccuracy = uncurry segmentAccuracy
 itemStep SAMAE = itemAbsoluteError
 itemStep SASMAPE = smape
-itemStep (SAMultiLabelFMeasure SExactMatch) = getCounts (==)
-itemStep (SAMultiLabelFMeasure SFuzzyMatch) = getWeightedCounts (getMatchingFunction $ fromSing SFuzzyMatch)
-itemStep (SAMultiLabelFMeasure smatchSpec@(SCutLabel _))
-  = getWeightedCounts (getMatchingFunction $ fromSing smatchSpec)
+itemStep (SAMultiLabelFMeasure smatchSpec) = getWeightedCounts (getMatchingFunctionForText $ fromSing smatchSpec)
 itemStep SAMultiLabelLogLoss = uncurry countLogLossOnProbList
 itemStep SAMultiLabelLikelihood = uncurry countLogLossOnProbList
 

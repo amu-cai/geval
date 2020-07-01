@@ -578,7 +578,7 @@ gevalBootstrapOnSources numberOfSamples (Mean (MultiLabelFMeasure beta matchingS
         outParser = case toSing matchingSpec of
           SomeSing s -> outputParser (SAMultiLabelFMeasure s)
         finalPipeline = fixer (
-          CL.map (fMeasureOnCounts' beta)
+          CL.map (fMeasureOnCounts beta)
           .| (bootstrapC numberOfSamples
               $ continueGEvalCalculations SAMSE MSE))
         trans :: ((a, b) -> c) -> ParsedRecord (WithoutInput m a b) -> c
@@ -667,7 +667,7 @@ gevalCoreOnSources (Mean _) = error $ "Mean/ meta-metric defined only for MultiL
 gevalCoreOnSources (MultiLabelFMeasure beta matchingSpec) =
   gevalCoreWithoutInputOnItemTargets (Right . intoWords)
                                      (Right . getWords)
-                                     (getCounts (==))
+                                     (getWeightedCounts (getMatchingFunctionForString matchingSpec))
                                      countAgg
                                      (fMeasureOnCounts beta)
                                      noGraph

@@ -26,7 +26,12 @@ singletons [d|data MatchingSpecification = ExactMatch -- ^ exact match, i.e. ide
                            deriving (Eq)
              |]
 
-getMatchingFunction :: MatchingSpecification -> Text -> Text -> Double
-getMatchingFunction ExactMatch = (\a b -> 1.0)
-getMatchingFunction FuzzyMatch = (\a b -> 1.0)
-getMatchingFunction (CutLabel smatchSpec)= getMatchingFunction smatchSpec
+getMatchingFunctionForString :: MatchingSpecification -> String -> String -> Double
+getMatchingFunctionForString ExactMatch a b
+  | a == b = 1.0
+  | otherwise = 0.0
+getMatchingFunctionForString FuzzyMatch a b = 1.0
+getMatchingFunctionForString (CutLabel smatchSpec) a b = getMatchingFunctionForString smatchSpec a b
+
+getMatchingFunctionForText :: MatchingSpecification -> Text -> Text -> Double
+getMatchingFunctionForText matchSpec a b = getMatchingFunctionForString matchSpec (unpack a) (unpack b)
