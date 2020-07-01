@@ -5,6 +5,8 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE EmptyCase #-}
 {-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE FlexibleContexts #-}
 
 module GEval.MetricsMechanics
   where
@@ -40,6 +42,7 @@ import GEval.Clippings (Clipping, ClippingSpec, LabeledClipping, lineClippingsPa
 import GEval.BIO (TaggedEntity, parseBioSequenceIntoEntities, parseBioSequenceIntoEntitiesWithoutNormalization)
 import GEval.LogLossHashed (parseWordSpecs, wordSpecToPair)
 import GEval.ProbList (ProbList(..), parseIntoProbList, WordWithProb(..), countLogLossOnProbList)
+import GEval.MatchingSpecification
 
 -- | Helper type so that singleton can be used.
 -- | (The problem is that some metrics are parametrized by Double
@@ -47,7 +50,7 @@ import GEval.ProbList (ProbList(..), parseIntoProbList, WordWithProb(..), countL
 singletons [d|data AMetric = ARMSE | AMSE | APearson | ASpearman | ABLEU | AGLEU | AWER | AAccuracy | AClippEU
                              | AFMeasure | AMacroFMeasure | ANMI
                              | ALogLossHashed | ACharMatch | AMAP | ALogLoss | ALikelihood
-                             | ABIOF1 | ABIOF1Labels | ATokenAccuracy | ASegmentAccuracy | ALikelihoodHashed | AMAE | ASMAPE | AMultiLabelFMeasure
+                             | ABIOF1 | ABIOF1Labels | ATokenAccuracy | ASegmentAccuracy | ALikelihoodHashed | AMAE | ASMAPE | AMultiLabelFMeasure MatchingSpecification
                              | AMultiLabelLogLoss | AMultiLabelLikelihood
                              | ASoftFMeasure | AProbabilisticMultiLabelFMeasure | AProbabilisticSoftFMeasure | ASoft2DFMeasure
                              | AFLCFMeasure
@@ -80,7 +83,7 @@ toHelper SegmentAccuracy = ASegmentAccuracy
 toHelper (LikelihoodHashed _) = ALikelihoodHashed
 toHelper MAE = AMAE
 toHelper SMAPE = ASMAPE
-toHelper (MultiLabelFMeasure _) = AMultiLabelFMeasure
+toHelper (MultiLabelFMeasure _ matchingSpec) = AMultiLabelFMeasure matchingSpec
 toHelper MultiLabelLogLoss = AMultiLabelLogLoss
 toHelper MultiLabelLikelihood = AMultiLabelLikelihood
 toHelper (SoftFMeasure _) = ASoftFMeasure
@@ -123,7 +126,7 @@ type family ParsedExpectedType (t :: AMetric) :: * where
   ParsedExpectedType ASegmentAccuracy = [Annotation]
   ParsedExpectedType AMAE = Double
   ParsedExpectedType ASMAPE = Double
-  ParsedExpectedType AMultiLabelFMeasure = [Text]
+  ParsedExpectedType (AMultiLabelFMeasure _) = [Text]
   ParsedExpectedType AMultiLabelLogLoss = [Text]
   ParsedExpectedType AMultiLabelLikelihood = [Text]
 
@@ -157,7 +160,7 @@ expectedParser SATokenAccuracy = intoWords
 expectedParser SASegmentAccuracy = parseSegmentAnnotations
 expectedParser SAMAE = doubleParser
 expectedParser SASMAPE = doubleParser
-expectedParser SAMultiLabelFMeasure = intoWords
+expectedParser (SAMultiLabelFMeasure _) = intoWords
 expectedParser SAMultiLabelLogLoss = intoWords
 expectedParser SAMultiLabelLikelihood = intoWords
 
@@ -204,7 +207,7 @@ outputParser SATokenAccuracy = intoWords
 outputParser SASegmentAccuracy = parseSegmentAnnotations
 outputParser SAMAE = doubleParser
 outputParser SASMAPE = doubleParser
-outputParser SAMultiLabelFMeasure = intoWords
+outputParser (SAMultiLabelFMeasure _) = intoWords
 outputParser SAMultiLabelLogLoss = Right . parseIntoProbList
 outputParser SAMultiLabelLikelihood = Right . parseIntoProbList
 
@@ -225,12 +228,16 @@ type family ItemIntermediateRepresentationType (t :: AMetric) :: * where
   ItemIntermediateRepresentationType AProbabilisticSoftFMeasure = ([Double], [Double], Double, Int)
   ItemIntermediateRepresentationType APearson = (Double, Double)
   ItemIntermediateRepresentationType ASpearman = (Double, Double)
-  ItemIntermediateRepresentationType AMultiLabelFMeasure = (Int, Int, Int)
+  ItemIntermediateRepresentationType (AMultiLabelFMeasure ms) = (MatchingCount ms, Int, Int)
   ItemIntermediateRepresentationType ALogLossHashed = (Text, Text)
   ItemIntermediateRepresentationType ALikelihoodHashed = (Text, Text)
   ItemIntermediateRepresentationType ACharMatch = (Text, Text)
   ItemIntermediateRepresentationType AWER = (Int, Int)
   ItemIntermediateRepresentationType t = Double
+
+type family MatchingCount (t :: MatchingSpecification) where
+  MatchingCount ExactMatch = Int
+  MatchingCount _ = Double
 
 itemStep :: SAMetric t -> (ParsedExpectedType t, ParsedOutputType t) -> ItemIntermediateRepresentationType t
 itemStep SARMSE = itemSquaredError
@@ -262,7 +269,10 @@ itemStep SATokenAccuracy = countHitsAndTotals
 itemStep SASegmentAccuracy = uncurry segmentAccuracy
 itemStep SAMAE = itemAbsoluteError
 itemStep SASMAPE = smape
-itemStep SAMultiLabelFMeasure = getCounts (==)
+itemStep (SAMultiLabelFMeasure SExactMatch) = getCounts (==)
+itemStep (SAMultiLabelFMeasure SFuzzyMatch) = getWeightedCounts (getMatchingFunction $ fromSing SFuzzyMatch)
+itemStep (SAMultiLabelFMeasure smatchSpec@(SCutLabel _))
+  = getWeightedCounts (getMatchingFunction $ fromSing smatchSpec)
 itemStep SAMultiLabelLogLoss = uncurry countLogLossOnProbList
 itemStep SAMultiLabelLikelihood = uncurry countLogLossOnProbList
 
@@ -354,9 +364,12 @@ getClassesInvolved (Just a, Just b) = if a == b
                                       then (Just a, Just a, Just a)
                                       else (Nothing, Just a, Just b)
 
-getSoftCounts (expected, got) = (weightedMaxMatch matchScore expected got,
-                                 Prelude.length expected,
-                                 Prelude.length got)
+getWeightedCounts :: (a -> b -> Double) -> ([a], [b]) -> (Double, Int, Int)
+getWeightedCounts matchFun (expected, got) = (weightedMaxMatch matchFun expected got,
+                                              Prelude.length expected,
+                                              Prelude.length got)
+
+getSoftCounts args = getWeightedCounts matchScore args
 
 getSoft2DCounts (expected, got) = (tpArea, expArea, gotArea)
   where tpArea = coveredBy expected got

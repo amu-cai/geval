@@ -57,6 +57,7 @@ library
                      , GEval.DataSource
                      , GEval.Model
                      , GEval.ModelTraining
+                     , GEval.MatchingSpecification
                      , Paths_geval
   build-depends:       base >= 4.7 && < 5
                      , cond

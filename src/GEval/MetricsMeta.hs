@@ -18,6 +18,7 @@ import GEval.Metric
 import GEval.EvaluationScheme
 import GEval.CreateChallenge (testExpectedContents)
 import GEval.PrecisionRecall (weightedHarmonicMean)
+import GEval.MatchingSpecification (MatchingSpecification(ExactMatch))
 
 import Text.Regex.PCRE.Heavy
 import Data.Either (fromRight)
@@ -45,10 +46,10 @@ listOfAvailableMetrics = [RMSE,
                           MacroFMeasure 1.0,
                           MacroFMeasure 2.0,
                           MacroFMeasure 0.25,
-                          MultiLabelFMeasure 1.0,
-                          MultiLabelFMeasure 2.0,
-                          MultiLabelFMeasure 0.25,
-                          Mean (MultiLabelFMeasure 1.0),
+                          MultiLabelFMeasure 1.0 ExactMatch,
+                          MultiLabelFMeasure 2.0 ExactMatch,
+                          MultiLabelFMeasure 0.25 ExactMatch,
+                          Mean (MultiLabelFMeasure 1.0 ExactMatch),
                           ProbabilisticMultiLabelFMeasure 1.0,
                           ProbabilisticMultiLabelFMeasure 2.0,
                           ProbabilisticMultiLabelFMeasure 0.25,

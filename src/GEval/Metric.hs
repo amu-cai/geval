@@ -18,6 +18,7 @@ import Data.Monoid ((<>))
 
 import GEval.Common
 import GEval.Clippings
+import GEval.MatchingSpecification
 import Data.Attoparsec.Text (parseOnly)
 
 -- here metrics and their basic properties are listed,
@@ -27,7 +28,8 @@ import Data.Attoparsec.Text (parseOnly)
 data Metric = RMSE | MSE | Pearson | Spearman | BLEU | GLEU | WER | Accuracy | ClippEU
               | FMeasure Double | MacroFMeasure Double | NMI
               | LogLossHashed Word32 | CharMatch | MAP | LogLoss | Likelihood
-              | BIOF1 | BIOF1Labels | TokenAccuracy | SegmentAccuracy | LikelihoodHashed Word32 | MAE | SMAPE | MultiLabelFMeasure Double
+              | BIOF1 | BIOF1Labels | TokenAccuracy | SegmentAccuracy | LikelihoodHashed Word32 | MAE | SMAPE
+              | MultiLabelFMeasure Double MatchingSpecification
               | MultiLabelLogLoss | MultiLabelLikelihood
               | SoftFMeasure Double | ProbabilisticMultiLabelFMeasure Double
               | ProbabilisticSoftFMeasure Double | Soft2DFMeasure Double
@@ -78,14 +80,29 @@ instance Show Metric where
   show SegmentAccuracy = "SegmentAccuracy"
   show MAE = "MAE"
   show SMAPE = "SMAPE"
-  show (MultiLabelFMeasure beta) = "MultiLabel-F" ++ (show beta)
+  show (MultiLabelFMeasure beta ExactMatch) = "MultiLabel-F" ++ (show beta)
+  show (MultiLabelFMeasure beta FuzzyMatch) = "Fuzzy/" ++ (show $ MultiLabelFMeasure beta ExactMatch)
+  show (MultiLabelFMeasure beta (CutLabel matchSpec)) = "CutLabel/" ++ (show $ MultiLabelFMeasure beta matchSpec)
   show MultiLabelLogLoss = "MultiLabel-Logloss"
   show MultiLabelLikelihood = "MultiLabel-Likelihood"
   show (Mean metric) = "Mean/" ++ (show metric)
 
+applyMatchingSpecification :: (MatchingSpecification -> MatchingSpecification)
+                           -> Metric
+                           -> Metric
+applyMatchingSpecification fun (MultiLabelFMeasure beta matchSpec)
+  = MultiLabelFMeasure beta (fun matchSpec)
+applyMatchingSpecification _ metric = error $ "Matching specification cannot be applied to the " ++ (show metric) ++ " metric"
+
 instance Read Metric where
   readsPrec p ('M':'e':'a':'n':'/':theRest) = case readsPrec p theRest of
     [(metric, theRest)] -> [(Mean metric, theRest)]
+    _ -> []
+  readsPrec p ('F':'u':'z':'z':'y':'/':theRest) = case readsPrec p theRest of
+    [(metric, theRest)] -> [(applyMatchingSpecification (const FuzzyMatch) metric, theRest)]
+    _ -> []
+  readsPrec p ('C':'u':'t':'L':'a':'b':'e':'l':'/':theRest) = case readsPrec p theRest of
+    [(metric, theRest)] -> [(applyMatchingSpecification CutLabel metric, theRest)]
     _ -> []
   readsPrec _ ('R':'M':'S':'E':theRest) = [(RMSE, theRest)]
   readsPrec _ ('M':'S':'E':theRest) = [(MSE, theRest)]
@@ -107,7 +124,7 @@ instance Read Metric where
     [(beta, theRest)] -> [(MacroFMeasure beta, theRest)]
     _ -> []
   readsPrec p ('M':'u':'l':'t':'i':'L':'a':'b':'e':'l':'-':'F':theRest) = case readsPrec p theRest of
-    [(beta, theRest)] -> [(MultiLabelFMeasure beta, theRest)]
+    [(beta, theRest)] -> [(MultiLabelFMeasure beta ExactMatch, theRest)]
     _ -> []
   readsPrec p ('S':'o':'f':'t':'2':'D':'-':'F':theRest) = case readsPrec p theRest of
     [(beta, theRest)] -> [(Soft2DFMeasure beta, theRest)]
@@ -175,7 +192,7 @@ getMetricOrdering TokenAccuracy = TheHigherTheBetter
 getMetricOrdering SegmentAccuracy = TheHigherTheBetter
 getMetricOrdering MAE = TheLowerTheBetter
 getMetricOrdering SMAPE = TheLowerTheBetter
-getMetricOrdering (MultiLabelFMeasure _) = TheHigherTheBetter
+getMetricOrdering (MultiLabelFMeasure _ _) = TheHigherTheBetter
 getMetricOrdering MultiLabelLogLoss = TheLowerTheBetter
 getMetricOrdering MultiLabelLikelihood = TheHigherTheBetter
 getMetricOrdering (Mean metric) = getMetricOrdering metric
