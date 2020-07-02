@@ -1,4 +1,8 @@
 
+## 1.36.0.0
+
+* Add fuzzy matching for MultiLabel-F1
+
 ## 1.35.0.0
 
 * Add simple "mix" ensembling
