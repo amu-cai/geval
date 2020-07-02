@@ -17,6 +17,9 @@ module GEval.MatchingSpecification
 
 import Data.Singletons.TH
 import Data.Text
+import Data.List.Extra (breakOn)
+
+import Text.EditDistance
 
 -- | The data type for storing a matching specification
 singletons [d|data MatchingSpecification = ExactMatch -- ^ exact match, i.e. identity is required
@@ -27,11 +30,22 @@ singletons [d|data MatchingSpecification = ExactMatch -- ^ exact match, i.e. ide
              |]
 
 getMatchingFunctionForString :: MatchingSpecification -> String -> String -> Double
-getMatchingFunctionForString ExactMatch a b
-  | a == b = 1.0
+getMatchingFunctionForString ExactMatch got expected
+  | got == expected = 1.0
   | otherwise = 0.0
-getMatchingFunctionForString FuzzyMatch a b = 1.0
-getMatchingFunctionForString (CutLabel smatchSpec) a b = getMatchingFunctionForString smatchSpec a b
+getMatchingFunctionForString FuzzyMatch got expected = max 0.0 (1.0 - charError)
+  where charError = (fromIntegral editDist) / (fromIntegral $ Prelude.length expected)
+        editDist = levenshteinDistance defaultEditCosts got expected
+
+getMatchingFunctionForString (CutLabel smatchSpec) a b = getMatchingFunctionForString smatchSpec a' b'
+  where a' = cutLabel a
+        b' = cutLabel b
+
+-- | Remove the label along with the separator (the equal sign)
+cutLabel :: String -> String
+cutLabel t = case Data.List.Extra.breakOn "=" t of
+  (t, "") -> t -- no label
+  (_, valWithSeparator) -> Prelude.tail valWithSeparator
 
 getMatchingFunctionForText :: MatchingSpecification -> Text -> Text -> Double
 getMatchingFunctionForText matchSpec a b = getMatchingFunctionForString matchSpec (unpack a) (unpack b)

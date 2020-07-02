@@ -115,6 +115,7 @@ library
                      , random
                      , rainbow
                      , yaml
+                     , extra
   default-language:    Haskell2010
 
 executable geval
