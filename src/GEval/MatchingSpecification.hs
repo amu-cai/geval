@@ -18,6 +18,9 @@ module GEval.MatchingSpecification
 import Data.Singletons.TH
 import Data.Text
 import Data.List.Extra (breakOn)
+import Data.Char (isLetter)
+import Data.List (find)
+import Data.Maybe (isJust)
 
 import Text.EditDistance
 
@@ -26,7 +29,9 @@ singletons [d|data MatchingSpecification = ExactMatch -- ^ exact match, i.e. ide
                                          | FuzzyMatch -- ^ fuzzy match by Levenshtein distance
                                          | CutLabel MatchingSpecification -- ^ require that the label (part before up to `=`)
                                                                           -- is matched and then proceed with some matching spec.
-                           deriving (Eq)
+                                         | SmartMatch MatchingSpecification -- ^ do fuzzy matching only on values
+                                                                            -- containing letters
+                                         deriving (Eq)
              |]
 
 getMatchingFunctionForString :: MatchingSpecification -> String -> String -> Double
@@ -40,6 +45,16 @@ getMatchingFunctionForString FuzzyMatch got expected = max 0.0 (1.0 - charError)
 getMatchingFunctionForString (CutLabel smatchSpec) a b = getMatchingFunctionForString smatchSpec a' b'
   where a' = cutLabel a
         b' = cutLabel b
+
+getMatchingFunctionForString (SmartMatch smatchSpec) got expected = getMatchingFunctionForString chosenMatch got expected
+  where chosenMatch = if wantedBySmartMatch expected
+                      then smatchSpec
+                      else ExactMatch
+
+-- | Whether suitable for fuzzy matching when in the "smart" match mode.
+-- At the moment we check whether it contains at least one letter
+-- (we require the exact match for, for instance, numbers written with digits.
+wantedBySmartMatch = isJust . (Data.List.find isLetter)
 
 -- | Remove the label along with the separator (the equal sign)
 cutLabel :: String -> String

@@ -349,6 +349,8 @@ main = hspec $ do
       runGEvalTest "multilabel-f1-ie-flags" `shouldReturnAlmost` 0.444444444444
     it "information extraction with fuzzy matching" $ do
       runGEvalTest "multilabel-f1-ie-fuzzy" `shouldReturnAlmost` 0.681777777777
+    it "information extraction with smart fuzzy matching" $ do
+      runGEvalTest "multilabel-f1-ie-fuzzy-smart" `shouldReturnAlmost` 0.598444
   describe "Mean/MultiLabel-F" $ do
     it "simple" $ do
       runGEvalTest "mean-multilabel-f1-simple" `shouldReturnAlmost` 0.5
