@@ -31,8 +31,12 @@ singletons [d|data MatchingSpecification = ExactMatch -- ^ exact match, i.e. ide
                                                                           -- is matched and then proceed with some matching spec.
                                          | SmartMatch MatchingSpecification -- ^ do fuzzy matching only on values
                                                                             -- containing letters
+                                         | Harden MatchingSpecification -- ^ harden a soft match
                                          deriving (Eq)
              |]
+
+hardeningThreshold :: Double
+hardeningThreshold = 0.8
 
 getMatchingFunctionForString :: MatchingSpecification -> String -> String -> Double
 getMatchingFunctionForString ExactMatch got expected
@@ -50,6 +54,11 @@ getMatchingFunctionForString (SmartMatch smatchSpec) got expected = getMatchingF
   where chosenMatch = if wantedBySmartMatch expected
                       then smatchSpec
                       else ExactMatch
+
+getMatchingFunctionForString (Harden smatchSpec) got expected = if softMatch >= hardeningThreshold
+                                                                then 1.0
+                                                                else 0.0
+  where softMatch = getMatchingFunctionForString smatchSpec got expected
 
 -- | Whether suitable for fuzzy matching when in the "smart" match mode.
 -- At the moment we check whether it contains at least one letter

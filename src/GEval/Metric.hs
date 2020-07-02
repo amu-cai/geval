@@ -84,6 +84,7 @@ instance Show Metric where
   show (MultiLabelFMeasure beta FuzzyMatch) = "Fuzzy/" ++ (show $ MultiLabelFMeasure beta ExactMatch)
   show (MultiLabelFMeasure beta (CutLabel matchSpec)) = "CutLabel/" ++ (show $ MultiLabelFMeasure beta matchSpec)
   show (MultiLabelFMeasure beta (SmartMatch matchSpec)) = "Smart/" ++ (show $ MultiLabelFMeasure beta matchSpec)
+  show (MultiLabelFMeasure beta (Harden matchSpec)) = "Harden/" ++ (show $ MultiLabelFMeasure beta matchSpec)
   show MultiLabelLogLoss = "MultiLabel-Logloss"
   show MultiLabelLikelihood = "MultiLabel-Likelihood"
   show (Mean metric) = "Mean/" ++ (show metric)
@@ -107,6 +108,9 @@ instance Read Metric where
     _ -> []
   readsPrec p ('S':'m':'a':'r':'t':'/':theRest) = case readsPrec p theRest of
     [(metric, theRest)] -> [(applyMatchingSpecification SmartMatch metric, theRest)]
+    _ -> []
+  readsPrec p ('H':'a':'r':'d':'e':'n':'/':theRest) = case readsPrec p theRest of
+    [(metric, theRest)] -> [(applyMatchingSpecification Harden metric, theRest)]
     _ -> []
   readsPrec _ ('R':'M':'S':'E':theRest) = [(RMSE, theRest)]
   readsPrec _ ('M':'S':'E':theRest) = [(MSE, theRest)]
