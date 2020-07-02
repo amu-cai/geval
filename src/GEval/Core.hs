@@ -636,7 +636,7 @@ gevalCoreOnSources (LikelihoodHashed nbOfBits) = helperLogLossHashed nbOfBits lo
 gevalCoreOnSources (Mean (MultiLabelFMeasure beta matchingSpec))
   = gevalCoreWithoutInputOnItemTargets (Right . intoWords)
                                        (Right . getWords)
-                                       ((fMeasureOnCounts beta) . (getCounts (==)))
+                                       ((fMeasureOnCounts beta) . (getWeightedCounts (getMatchingFunctionForString matchingSpec)))
                                        averageC
                                        id
                                        noGraph
