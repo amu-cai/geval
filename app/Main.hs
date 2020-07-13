@@ -70,7 +70,7 @@ getHeader params schemes = Just $ intercalate "\t" (Prelude.map T.unpack params
 
 formatTableEntry :: GEvalOptions -> [T.Text] -> ((SourceSpec, [MetricResult]), OutputFileParsed) -> String
 formatTableEntry opts paramNames ((sourceSpec, metrics), ofParsed) = intercalate "\t" ((initialColumns paramNames sourceSpec ofParsed) ++ vals)
-   where vals = Prelude.map (formatTheResult (gesPrecision $ geoSpec opts)) metrics
+   where vals = Prelude.map (formatTheResult (gesFormatting $ geoSpec opts)) metrics
 
 initialColumns :: [T.Text] -> SourceSpec -> OutputFileParsed -> [String]
 initialColumns [] sourceSpec ofParsed = [formatSourceSpec sourceSpec]
@@ -79,35 +79,35 @@ initialColumns params sourceSpec (OutputFileParsed _ paramMap) =
 
 showTheResult' :: GEvalOptions -> [MetricResult] -> IO ()
 -- do not show the metric if just one was given
-showTheResult' opts [val] = putStrLn $ formatTheResult (gesPrecision $ geoSpec opts) val
+showTheResult' opts [val] = putStrLn $ formatTheResult (gesFormatting $ geoSpec opts) val
 showTheResult' opts [] = do
   hPutStrLn stderr "no metric given, use --metric option"
   exitFailure
 showTheResult' opts vals =  mapM_ putStrLn
                             $ intercalate [""]
-                            $ Prelude.map (formatCrossTable (gesPrecision $ geoSpec opts))
+                            $ Prelude.map (formatCrossTable (gesFormatting $ geoSpec opts))
                             $ splitIntoTablesWithValues (T.pack "metric") (T.pack "value") mapping metricLabels
   where mapping = LM.fromList $ zip metricLabels vals
         metricLabels = Prelude.map T.pack $ Prelude.map evaluationSchemeName $ gesMetrics $ geoSpec opts
 
-formatCrossTable :: Maybe Int -> TableWithValues MetricResult -> [String]
-formatCrossTable mPrecision (TableWithValues [_, _] body) =
+formatCrossTable :: FormattingOptions -> TableWithValues MetricResult -> [String]
+formatCrossTable format (TableWithValues [_, _] body) =
   -- actually we won't print metric/value header
   -- (1) to keep backward-compatible with the previous version
   -- (2) to be concise
-  Prelude.map (formatCrossTableLine mPrecision) body
-formatCrossTable mPrecision (TableWithValues header body) =
-  (intercalate "\t" $ Prelude.map T.unpack header) : Prelude.map (formatCrossTableLine mPrecision) body
+  Prelude.map (formatCrossTableLine format) body
+formatCrossTable format (TableWithValues header body) =
+  (intercalate "\t" $ Prelude.map T.unpack header) : Prelude.map (formatCrossTableLine format) body
 
 
 
-formatCrossTableLine :: Maybe Int -> (T.Text, [MetricResult]) -> String
-formatCrossTableLine mPrecision (rowName, values) =
-  intercalate "\t" ((T.unpack rowName):Prelude.map (formatTheResult mPrecision) values)
+formatCrossTableLine :: FormattingOptions-> (T.Text, [MetricResult]) -> String
+formatCrossTableLine format (rowName, values) =
+  intercalate "\t" ((T.unpack rowName):Prelude.map (formatTheResult format) values)
 
 formatSourceSpec :: SourceSpec -> String
 formatSourceSpec (FilePathSpec fp) = dropExtensions $ takeFileName fp
 formatSourceSpec spec = show spec
 
-formatTheMetricAndResult :: Maybe Int -> (EvaluationScheme, MetricResult) -> String
-formatTheMetricAndResult mPrecision (scheme, val) = (evaluationSchemeName scheme) ++ "\t" ++ (formatTheResult mPrecision val)
+formatTheMetricAndResult :: FormattingOptions -> (EvaluationScheme, MetricResult) -> String
+formatTheMetricAndResult format (scheme, val) = (evaluationSchemeName scheme) ++ "\t" ++ (formatTheResult format val)
