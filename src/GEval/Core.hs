@@ -113,6 +113,7 @@ import GEval.Annotation
 import GEval.BlackBoxDebugging
 import Data.Conduit.Bootstrap
 import GEval.DataSource
+import GEval.MatchingSpecification
 
 import qualified Data.HashMap.Strict as M
 import qualified Data.Vector as V
@@ -522,7 +523,7 @@ singleLineAsLineSource (LineInFile sourceSpec lineNo line) itemDecoder preproces
 -- some metrics are handled by Bootstrap due to legacy issues,
 -- fix on the way
 handleBootstrap :: Metric -> Bool
-handleBootstrap (Mean (MultiLabelFMeasure _)) = True
+handleBootstrap (Mean (MultiLabelFMeasure _ _)) = True
 handleBootstrap (Mean _) = False
 handleBootstrap CharMatch = False
 handleBootstrap (LogLossHashed _) = False
@@ -567,13 +568,16 @@ gevalBootstrapOnSources :: (MonadIO m, MonadThrow m, MonadUnliftIO m) =>
                           -> m (MetricOutput)           -- ^ metric values for the output against the expected output
 
 -- for the time being hardcoded
-gevalBootstrapOnSources numberOfSamples (Mean (MultiLabelFMeasure beta)) lsSpec = do
+gevalBootstrapOnSources numberOfSamples (Mean (MultiLabelFMeasure beta matchingSpec)) lsSpec = do
   gevalRunPipeline parserSpec (trans step) finalPipeline context
   where parserSpec = (ParserSpecWithoutInput (liftOp expParser) (liftOp outParser))
         context = fromSpecificationToWithoutInput lsSpec
-        step = itemStep SAMultiLabelFMeasure
-        expParser = expectedParser SAMultiLabelFMeasure
-        outParser = outputParser SAMultiLabelFMeasure
+        step = case toSing matchingSpec of
+          SomeSing s -> itemStep (SAMultiLabelFMeasure s)
+        expParser = case toSing matchingSpec of
+          SomeSing s -> expectedParser (SAMultiLabelFMeasure s)
+        outParser = case toSing matchingSpec of
+          SomeSing s -> outputParser (SAMultiLabelFMeasure s)
         finalPipeline = fixer (
           CL.map (fMeasureOnCounts beta)
           .| (bootstrapC numberOfSamples
@@ -630,10 +634,10 @@ gevalCoreOnSources (LogLossHashed nbOfBits) = helperLogLossHashed nbOfBits id
 gevalCoreOnSources (LikelihoodHashed nbOfBits) = helperLogLossHashed nbOfBits logLossToLikehood
 
 
-gevalCoreOnSources (Mean (MultiLabelFMeasure beta))
+gevalCoreOnSources (Mean (MultiLabelFMeasure beta matchingSpec))
   = gevalCoreWithoutInputOnItemTargets (Right . intoWords)
                                        (Right . getWords)
-                                       ((fMeasureOnCounts beta) . (getCounts (==)))
+                                       ((fMeasureOnCounts beta) . (getWeightedCounts (getMatchingFunctionForString matchingSpec)))
                                        averageC
                                        id
                                        noGraph
@@ -661,12 +665,13 @@ gevalCoreOnSources (Mean WER)
 gevalCoreOnSources (Mean _) = error $ "Mean/ meta-metric defined only for MultiLabel-F1 and WER for the time being"
 
 -- only MultiLabel-F1 handled for JSONs for the time being...
-gevalCoreOnSources (MultiLabelFMeasure beta) = gevalCoreWithoutInputOnItemTargets (Right . intoWords)
-                                                                            (Right . getWords)
-                                                                            (getCounts (==))
-                                                                            countAgg
-                                                                            (fMeasureOnCounts beta)
-                                                                            noGraph
+gevalCoreOnSources (MultiLabelFMeasure beta matchingSpec) =
+  gevalCoreWithoutInputOnItemTargets (Right . intoWords)
+                                     (Right . getWords)
+                                     (getWeightedCounts (getMatchingFunctionForString matchingSpec))
+                                     countAgg
+                                     (fMeasureOnCounts beta)
+                                     noGraph
     where
       getWords (RawItemTarget t) = Prelude.map unpack $ selectByStandardThreshold $ parseIntoProbList t
       getWords (PartiallyParsedItemTarget ts) = Prelude.map unpack ts
@@ -848,12 +853,13 @@ gevalRunPipeline' parserSpec itemStep finalPipeline context = do
 
 
 
-continueGEvalCalculations :: (MonadIO m) =>
+continueGEvalCalculations :: forall m t . (MonadIO m) =>
                             SAMetric t
                             -> Metric
                             -> ConduitT (ItemIntermediateRepresentationType t) Void (ResourceT m) MetricOutput
 
-continueGEvalCalculations SAMultiLabelFMeasure (MultiLabelFMeasure beta) = defineContinuation countAgg (fMeasureOnCounts beta) noGraph
+continueGEvalCalculations (SAMultiLabelFMeasure matchingSpec) (MultiLabelFMeasure beta matchingSpec')
+  = defineContinuation countAgg (fMeasureOnCounts beta) noGraph
 
 continueGEvalCalculations SALikelihood Likelihood = defineContinuation averageC logLossToLikehood noGraph
 
