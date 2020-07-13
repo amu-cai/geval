@@ -7,10 +7,9 @@ module GEval.CreateChallenge
 
 import GEval.Metric
 import GEval.EvaluationScheme
-import GEval.Common (GEvalException(..))
+import GEval.Common (GEvalException(..), FormattingOptions(..))
 import GEval.Core (GEvalSpecification(..), configFileName, gesMainMetric, defaultTestName)
 import GEval.Submit (tokenFileName)
-import GEval.MatchingSpecification (MatchingSpecification(ExactMatch))
 import qualified System.Directory as D
 import Control.Conditional (whenM)
 
@@ -22,6 +21,9 @@ import Data.String.Here
 
 import Data.List (intercalate)
 import Data.List.Split (splitOn)
+import Data.Bool
+
+import Text.Printf
 
 createChallenge :: Bool -> FilePath -> GEvalSpecification -> IO ()
 createChallenge withDataFiles expectedDirectory spec = do
@@ -31,7 +33,7 @@ createChallenge withDataFiles expectedDirectory spec = do
   D.createDirectoryIfMissing False testDirectory
   createFile (expectedDirectory </> ".gitignore") $ gitignoreContents
   createFile (expectedDirectory </> "README.md") $ readmeMDContents metric testName
-  createFile (expectedDirectory </> configFileName) $ configContents metrics precision testName
+  createFile (expectedDirectory </> configFileName) $ configContents metrics format testName
   createHeaderFile expectedDirectory "in-header.tsv" $ inHeaderContents metric
   createHeaderFile expectedDirectory "out-header.tsv" $ outHeaderContents metric
   if withDataFiles
@@ -49,7 +51,7 @@ createChallenge withDataFiles expectedDirectory spec = do
       return ()
   where metric = gesMainMetric spec
         metrics = gesMetrics spec
-        precision = gesPrecision spec
+        format = gesFormatting spec
         testName = gesTestName spec
         trainDirectory = expectedDirectory </> "train"
         devDirectory = expectedDirectory </> "dev-0"
@@ -332,8 +334,8 @@ character (inclusively).
 
 |] ++ (commonReadmeMDContents testName)
 
-readmeMDContents (ProbabilisticMultiLabelFMeasure beta) testName = readmeMDContents (MultiLabelFMeasure beta ExactMatch) testName
-readmeMDContents (MultiLabelFMeasure beta _) testName = [i|
+readmeMDContents (ProbabilisticMultiLabelFMeasure beta) testName = readmeMDContents (MultiLabelFMeasure beta) testName
+readmeMDContents (MultiLabelFMeasure beta) testName = [i|
 Tag names and their component
 =============================
 
@@ -423,18 +425,17 @@ Directory structure
 |]
 
 
-configContents :: [EvaluationScheme] -> Maybe Int -> String -> String
-configContents schemes precision testName = unwords (Prelude.map (\scheme -> ("--metric " ++ (show scheme))) schemes) ++
+configContents :: [EvaluationScheme] -> FormattingOptions -> String -> String
+configContents schemes format testName = unwords (Prelude.map (\scheme -> ("--metric " ++ (show scheme))) schemes) ++
                                  (if testName /= defaultTestName
                                      then
                                         " --test-name " ++ testName
                                      else
                                      "") ++
-                                 (precisionOpt precision) ++
+                                 (precisionOpt format) ++
                                  inHeaderOpts ++
                                  outHeaderOpts
-    where precisionOpt Nothing = ""
-          precisionOpt (Just p) = " --precision " ++ (show p)
+    where precisionOpt (FormattingOptions m b) =  maybe "" (printf "--precision %d ") m ++ bool "" "--show-as-percentage" b
           ((EvaluationScheme mainMetric _):_) = schemes
           inHeaderOpts = getHeaderOpts "in-header" inHeaderContents
           outHeaderOpts = getHeaderOpts "out-header" outHeaderContents
@@ -534,8 +535,8 @@ trainContents TokenAccuracy = [hereLit|* V N	I like cats
 trainContents SegmentAccuracy = [hereLit|Art:1-3 N:5-11 V:12-13 A:15-19	The student's smart
 N:1-6 N:8-10 V:12-13 A:15-18	Mary's dog is nice
 |]
-trainContents (ProbabilisticMultiLabelFMeasure beta) = trainContents (MultiLabelFMeasure beta ExactMatch)
-trainContents (MultiLabelFMeasure _ _) = [hereLit|I know Mr John Smith	person/3,4,5 first-name/4 surname/5
+trainContents (ProbabilisticMultiLabelFMeasure beta) = trainContents (MultiLabelFMeasure beta)
+trainContents (MultiLabelFMeasure _) = [hereLit|I know Mr John Smith	person/3,4,5 first-name/4 surname/5
 Steven bloody Brown	person/1,3 first-name/1 surname/3
 James and James	first-name/1 firstname/3
 |]
@@ -607,8 +608,8 @@ Ala has a cat
 devInContents SegmentAccuracy = [hereLit|John is smart
 Mary's intelligent
 |]
-devInContents (ProbabilisticMultiLabelFMeasure beta) = devInContents (MultiLabelFMeasure beta ExactMatch)
-devInContents (MultiLabelFMeasure _ _) = [hereLit|Jan Kowalski is here
+devInContents (ProbabilisticMultiLabelFMeasure beta) = devInContents (MultiLabelFMeasure beta)
+devInContents (MultiLabelFMeasure _) = [hereLit|Jan Kowalski is here
 I see him
 Barbara
 |]
@@ -675,8 +676,8 @@ N V * N
 devExpectedContents SegmentAccuracy = [hereLit|N:1-4 V:6-7 A:9-13
 N:1-4 V:6-7 A:9-19
 |]
-devExpectedContents (ProbabilisticMultiLabelFMeasure beta) = devExpectedContents (MultiLabelFMeasure beta ExactMatch)
-devExpectedContents (MultiLabelFMeasure _ _) = [hereLit|person/1,2 first-name/1 surname/2
+devExpectedContents (ProbabilisticMultiLabelFMeasure beta) = devExpectedContents (MultiLabelFMeasure beta)
+devExpectedContents (MultiLabelFMeasure _) = [hereLit|person/1,2 first-name/1 surname/2
 
 first-name/1
 |]
@@ -748,8 +749,8 @@ I know
 testInContents SegmentAccuracy = [hereLit|Mary's cat is old
 John is young
 |]
-testInContents (ProbabilisticMultiLabelFMeasure beta) = testInContents (MultiLabelFMeasure beta ExactMatch)
-testInContents (MultiLabelFMeasure _ _) = [hereLit|John bloody Smith
+testInContents (ProbabilisticMultiLabelFMeasure beta) = testInContents (MultiLabelFMeasure beta)
+testInContents (MultiLabelFMeasure _) = [hereLit|John bloody Smith
 Nobody is there
 I saw Marketa
 |]
@@ -817,8 +818,8 @@ testExpectedContents TokenAccuracy = [hereLit|* V N
 testExpectedContents SegmentAccuracy = [hereLit|N:1-6 N:8-10 V:12-13 A:15-17
 N:1-4 V:6-7 A:9-13
 |]
-testExpectedContents (ProbabilisticMultiLabelFMeasure beta) = testExpectedContents (MultiLabelFMeasure beta ExactMatch)
-testExpectedContents (MultiLabelFMeasure _ _) = [hereLit|person/1,3 first-name/1 surname/3
+testExpectedContents (ProbabilisticMultiLabelFMeasure beta) = testExpectedContents (MultiLabelFMeasure beta)
+testExpectedContents (MultiLabelFMeasure _) = [hereLit|person/1,3 first-name/1 surname/3
 
 first-name/3
 |]
@@ -876,8 +877,8 @@ inHeaderContents BIOF1Labels = inHeaderContents BIOF1
 inHeaderContents BIOF1 = Just ["Text"]
 inHeaderContents TokenAccuracy = Just ["TokenizedText"]
 inHeaderContents SegmentAccuracy = Just ["Segment"]
-inHeaderContents (ProbabilisticMultiLabelFMeasure beta) = inHeaderContents (MultiLabelFMeasure beta ExactMatch)
-inHeaderContents (MultiLabelFMeasure _ _) = Just ["Text"]
+inHeaderContents (ProbabilisticMultiLabelFMeasure beta) = inHeaderContents (MultiLabelFMeasure beta)
+inHeaderContents (MultiLabelFMeasure _) = Just ["Text"]
 inHeaderContents MultiLabelLikelihood = inHeaderContents MultiLabelLogLoss
 inHeaderContents MultiLabelLogLoss = Just ["Utterance"]
 inHeaderContents (Soft2DFMeasure _) = inHeaderContents ClippEU
@@ -904,8 +905,8 @@ outHeaderContents BIOF1Labels = outHeaderContents BIOF1
 outHeaderContents BIOF1 = Just ["BIOOutput"]
 outHeaderContents TokenAccuracy = Just ["PartsOfSpeech"]
 outHeaderContents SegmentAccuracy = Just ["PartsOfSpeech"]
-outHeaderContents (ProbabilisticMultiLabelFMeasure beta) = outHeaderContents (MultiLabelFMeasure beta ExactMatch)
-outHeaderContents (MultiLabelFMeasure _ _) = Just ["Entities"]
+outHeaderContents (ProbabilisticMultiLabelFMeasure beta) = outHeaderContents (MultiLabelFMeasure beta)
+outHeaderContents (MultiLabelFMeasure _) = Just ["Entities"]
 outHeaderContents MultiLabelLikelihood = outHeaderContents MultiLabelLogLoss
 outHeaderContents MultiLabelLogLoss = Just ["Emotion"]
 outHeaderContents (Soft2DFMeasure _) = Just ["Rectangle"]

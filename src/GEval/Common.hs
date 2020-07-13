@@ -15,6 +15,11 @@ type MetricValue = Double
 
 data GraphSeries = GraphSeries [(Double, Double)]
 
+data FormattingOptions = FormattingOptions {
+  decimalPlaces :: Maybe Int,
+  asPercentage :: Bool
+  }
+
 data MetricResult = SimpleRun MetricValue | BootstrapResampling [MetricValue]
 
 instance Show MetricResult where

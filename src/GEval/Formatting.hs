@@ -1,3 +1,5 @@
+{-# LANGUAGE LambdaCase #-}
+
 module GEval.Formatting
        (formatTheResult, formatSimpleResult, formatTheResultWithErrorBounds)
        where
@@ -7,25 +9,29 @@ import Data.Conduit.Bootstrap
 import Text.Printf
 
 
-formatTheResult :: Maybe Int -> MetricResult -> String
-formatTheResult mPrecision (SimpleRun val) = formatSimpleResult mPrecision val
-formatTheResult mPrecision (BootstrapResampling vals) = formatTheResultWithErrorBounds mPrecision pointEstimate (Just errorBound)
+formatTheResult :: FormattingOptions -> MetricResult -> String
+formatTheResult format (SimpleRun val) = formatSimpleResult format val
+formatTheResult format (BootstrapResampling vals) = formatTheResultWithErrorBounds format pointEstimate (Just errorBound)
   where pointEstimate = (upperBound + lowerBound) / 2.0
         errorBound = (upperBound - lowerBound) / 2.0
         (lowerBound, upperBound) = getConfidenceBounds defaultConfidenceLevel vals
 
-formatTheResultWithErrorBounds :: Maybe Int -> MetricValue -> Maybe MetricValue -> String
-formatTheResultWithErrorBounds mPrecision pointEstimate Nothing = formatSimpleResult mPrecision pointEstimate
-formatTheResultWithErrorBounds mPrecision pointEstimate (Just errorBound) = (formatSimpleResult correctedPrecision pointEstimate)
+formatTheResultWithErrorBounds :: FormattingOptions -> MetricValue -> Maybe MetricValue -> String
+formatTheResultWithErrorBounds format pointEstimate Nothing = formatSimpleResult format pointEstimate
+formatTheResultWithErrorBounds format pointEstimate (Just errorBound) = (formatSimpleResult formatWithCorrectedPrecision pointEstimate)
                                                                             ++ "±"
-                                                                            ++ (formatSimpleResult correctedPrecision errorBound)
+                                                                            ++ (formatSimpleResult formatWithCorrectedPrecision errorBound)
     where errorBoundMagnitude = (floor (logBase 10.0 errorBound)) - 1
-          correctedPrecision = Just $ selectLowerPrecision (max (-errorBoundMagnitude) 0) mPrecision
+          formatWithCorrectedPrecision = selectLowerPrecision (max (-errorBoundMagnitude) 0) format
 
-formatSimpleResult :: Maybe Int -> MetricValue -> String
-formatSimpleResult Nothing = show
-formatSimpleResult (Just prec) = printf "%0.*f" prec
+formatSimpleResult :: FormattingOptions -> MetricValue -> String
+formatSimpleResult = \case
+  FormattingOptions (Just prec) True -> printf "%.*f" (prec-2) . (*100)
+  FormattingOptions (Just prec) _    -> printf "0.*f" prec
+  _                                  -> show
 
-selectLowerPrecision :: Int -> Maybe Int -> Int
-selectLowerPrecision p Nothing = p
-selectLowerPrecision p (Just p') = min p p'
+selectLowerPrecision :: Int -> FormattingOptions -> FormattingOptions
+selectLowerPrecision p = \case
+  a@(FormattingOptions _ True)    -> a
+  FormattingOptions (Just prec) _ -> FormattingOptions (Just $ min prec p) False
+  _                               -> FormattingOptions (Just p) False

@@ -343,16 +343,6 @@ main = hspec $ do
       runGEvalTest "multilabel-f1-with-probs" `shouldReturnAlmost` 0.615384615384615
     it "labels given with probs and numbers" $ do
       runGEvalTest "multilabel-f1-with-probs-and-numbers" `shouldReturnAlmost` 0.6666666666666
-    it "information extraction" $ do
-      runGEvalTest "multilabel-f1-ie" `shouldReturnAlmost` 0.1111111111
-    it "information extraction with flags" $ do
-      runGEvalTest "multilabel-f1-ie-flags" `shouldReturnAlmost` 0.444444444444
-    it "information extraction with fuzzy matching" $ do
-      runGEvalTest "multilabel-f1-ie-fuzzy" `shouldReturnAlmost` 0.681777777777
-    it "information extraction with smart fuzzy matching" $ do
-      runGEvalTest "multilabel-f1-ie-fuzzy-smart" `shouldReturnAlmost` 0.598444
-    it "information extraction with smart fuzzy matching hardened" $ do
-      runGEvalTest "multilabel-f1-ie-fuzzy-harden" `shouldReturnAlmost` 0.555555555
   describe "Mean/MultiLabel-F" $ do
     it "simple" $ do
       runGEvalTest "mean-multilabel-f1-simple" `shouldReturnAlmost` 0.5
@@ -478,7 +468,7 @@ main = hspec $ do
             gesExpectedFile = "expected.tsv",
             gesInputFile = "in.tsv",
             gesMetrics = [EvaluationScheme Likelihood []],
-            gesPrecision = Nothing,
+            gesFormatting = FormattingOptions Nothing False,
             gesTokenizer = Nothing,
             gesGonitoHost = Nothing,
             gesToken = Nothing,
@@ -606,7 +596,7 @@ main = hspec $ do
             let spec = defaultGEvalSpecification {
                   gesExpectedDirectory = Just tempDir,
                   gesMetrics = [scheme],
-                  gesPrecision = Just 4 }
+                  gesFormatting = FormattingOptions (Just 4) False }
             createChallenge True tempDir spec
             validationChallenge tempDir spec
   describe "test sample outputs" $ do
