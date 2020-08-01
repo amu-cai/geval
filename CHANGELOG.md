@@ -1,4 +1,8 @@
 
+## 1.36.1.0
+
+* Add "c" and "t" flags
+
 ## 1.36.0.0
 
 * Add fuzzy matching for MultiLabel-F1
