@@ -541,7 +541,7 @@ Why the result is different for lower-casing and upper-casing? Some
 characters, e.g. German _ß_, are tricky. If you upper-case _Straße_
 you've got _STRASSE_, but if you lower-case it, you obtain _straße_,
 not _strasse_! For this reason, when you want to disregard case when
-evaluating your metric, it is better to case _case folding_ rather
+evaluating your metric, it is better to use _case folding_ rather
 than lower- or upper-casing:
 
 #### `c` — case fold
