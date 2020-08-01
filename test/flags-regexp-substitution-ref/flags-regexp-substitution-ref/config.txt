@@ -1,0 +1,1 @@
+--metric Accuracy:s<([A-Za-z])\S+><WORD-WITH-FIRST-LETTER-\1>

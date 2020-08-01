@@ -364,6 +364,27 @@ main = hspec $ do
       runGEvalTest "f1-with-preprocessing" `shouldReturnAlmost` 0.57142857142857
     it "Regexp substition" $ do
       runGEvalTest "accuracy-with-flags" `shouldReturnAlmost` 0.8
+  describe "Flag examples" $ do
+    it "none" $ do
+      runGEvalTest "flags-none" `shouldReturnAlmost` 0.2
+    it "lower-case" $ do
+      runGEvalTest "flags-lowercase" `shouldReturnAlmost` 0.3
+    it "upper-case" $ do
+      runGEvalTest "flags-uppercase" `shouldReturnAlmost` 0.4
+    it "regexp-matching" $ do
+      runGEvalTest "flags-regexp-matching" `shouldReturnAlmost` 0.8
+    it "regexp-matching-anchor" $ do
+      runGEvalTest "flags-regexp-matching-anchor" `shouldReturnAlmost` 0.8
+    it "regexp-token-matching" $ do
+      runGEvalTest "flags-regexp-token-matching" `shouldReturnAlmost` 0.7
+    it "regexp-token-matching-anchor" $ do
+      runGEvalTest "flags-regexp-token-matching-anchor" `shouldReturnAlmost` 0.8
+    it "regexp-substitution" $ do
+      runGEvalTest "flags-regexp-substitution" `shouldReturnAlmost` 0.3
+    it "regexp-substitution-ref" $ do
+      runGEvalTest "flags-regexp-substitution-ref" `shouldReturnAlmost` 0.5
+    it "filtering" $ do
+      runGEvalTest "flags-filtering" `shouldReturnAlmost` 0.25
   describe "evaluating single lines" $ do
     it "RMSE" $ do
       (MetricOutput (SimpleRun v) _) <- gevalCoreOnSingleLines RMSE id RawItemTarget
