@@ -383,6 +383,8 @@ main = hspec $ do
       runGEvalTest "flags-regexp-substitution" `shouldReturnAlmost` 0.3
     it "regexp-substitution-ref" $ do
       runGEvalTest "flags-regexp-substitution-ref" `shouldReturnAlmost` 0.5
+    it "sort" $ do
+      runGEvalTest "flags-sort" `shouldReturnAlmost` 0.3
     it "filtering" $ do
       runGEvalTest "flags-filtering" `shouldReturnAlmost` 0.25
   describe "evaluating single lines" $ do

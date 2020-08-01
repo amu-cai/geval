@@ -518,10 +518,6 @@ The following files will be used in example calculations, `expected.tsv`:
     Foo baz BAR
     Ok 7777
 
-`in.tsv`:
-
-
-
 Without any flags, the `Accuracy` metric is:
 
     $ geval -o out.tsv -e expected.tsv --metric Accuracy
@@ -541,7 +537,7 @@ Without any flags, the `Accuracy` metric is:
     $ geval -o out.tsv -e expected.tsv --metric Accuracy:l
     0.4
 
-Why the result is differnt for lower-casing and upper-casing? Some
+Why the result is different for lower-casing and upper-casing? Some
 characters, e.g. German _ß_, are tricky. If you upper-case _Straße_
 you've got _STRASSE_, but if you lower-case it, you obtain _straße_,
 not _strasse_! For this reason, when you want to disregard case when
@@ -555,12 +551,12 @@ than lower- or upper-casing:
 
 ### Manipulations with regular expressions
 
-#### `m<REGEXP>` matching a given PCRE regexp
+#### `m<REGEXP>` — matching a given PCRE regexp
 
 The evaluation metric will be calculated only on the parts of the
 outputs matching a given regular expression. This can be used when you
 want to focus on some specific parts of a text. For instance, we could
-calculate Accuracy only considering (disregarding all other
+calculate Accuracy only considering numbers (disregarding all other
 characters, including spaces).
 
     $ geval -o out.tsv -e expected.tsv --metric 'Accuracy:m<\d+>'
@@ -569,9 +565,11 @@ characters, including spaces).
 (Note that apostrophes are due to using Bash here, if you put it into
 the `config.txt` file you should omit apostrophes: `--metric Accuracy:m<\d+>`.)
 
-All matches are considered and concatenated, if no match is found, an empty string is assumed
-(hence, e.g., `testtttttt` is considered a hit for `test` after this normalization).
-Note that both  `aaa 3 4 bbb` and `aaa BBB 34` will be normalized to `34` here.
+All matches are considered and concatenated, if no match is found, an
+empty string is assumed (hence, e.g., `testtttttt` is considered a hit
+for `test` after this normalization, as both will be transformed into
+the empty string). Note that both `aaa 3 4 bbb` and `aaa BBB 34` will
+be normalized to `34` here.
 
 You can use regexp anchoring operators (`^` or `$`). This will refer
 to the beginning or end of the whole *line*. You could use it to
@@ -619,6 +617,9 @@ You can use special operators `\0`, `\1`, `\2` to refer to parts matched by the 
 
 This will sort all tokens, e.g. `foo bar baz` will be treated as `bar baz foo`.
 
+    $ geval -o out.tsv -e expected.tsv --metric 'Accuracy:S'
+    0.3
+
 ### Filtering
 
 #### `f<FEATURE>` — filtering
@@ -626,12 +627,12 @@ This will sort all tokens, e.g. `foo bar baz` will be treated as `bar baz foo`.
 Flags such as `u`, `m<...>`, `s<...><...>` etc. work within a line
 (item), they won't change the number items being evaluated. To
 consider only a subset of items, use the `f<FEATURE>` flag — only the
-lines containing the feature FEATURE will be considered during metric
+lines containing the feature FEATURE will be taken during metric
 calculation. Features are the same as listed by the `--worst-features`
 option, e.g. `exp:foo` would accept only lines with the expected
 output containing the token `foo`, `in[2]:bar` — lines with the second
 columns of input contaning the token `bar` (contrary to
-`--worst-features` square brackets should be used be instead of angle ones for indexing).
+`--worst-features` square brackets should be used, instead of angle ones, for indexing).
 
 You *MUST* supply an input file when you use the `f<...>` flag. Assume
 the following `in.txt` file:
@@ -690,7 +691,8 @@ This is handy, when combined with the `{...}` operator (see below).
 This sets the priority level, considered when the results are displayed in the Gonito platform.
 It has no effect in GEval as such (it is simply disregarded in GEval).
 
-    $ geval --precision 3 -o out.tsv -e expected.tsv --metric 'Accuracy:P<1>' --metric 'MultiLabel-F1:P<3>'               Accuracy:P<1>	0.200
+    $ geval --precision 3 -o out.tsv -e expected.tsv --metric 'Accuracy:P<1>' --metric 'MultiLabel-F1:P<3>'
+    Accuracy:P<1>	0.200
     MultiLabel-F1.0:P<3>	0.511
 
 The priority is interpreted by Gonito in the following way:
