@@ -27,7 +27,7 @@ formatTheResultWithErrorBounds format pointEstimate (Just errorBound) = (formatS
 formatSimpleResult :: FormattingOptions -> MetricValue -> String
 formatSimpleResult = \case
   FormattingOptions (Just prec) True -> printf "%.*f" (prec-2) . (*100)
-  FormattingOptions (Just prec) _    -> printf "0.*f" prec
+  FormattingOptions (Just prec) _    -> printf "%.*f" prec
   _                                  -> show
 
 selectLowerPrecision :: Int -> FormattingOptions -> FormattingOptions
