@@ -12,7 +12,7 @@ import GEval.Metric
 
 import Text.Regex.PCRE.Heavy
 import Text.Regex.PCRE.Light.Base (Regex(..))
-import Data.Text (Text(..), concat, toLower, toUpper, pack, unpack, words, unwords)
+import Data.Text (Text(..), concat, toCaseFold, toLower, toUpper, pack, unpack, words, unwords)
 import Data.List (intercalate, break, sort)
 import Data.Either
 import Data.Maybe (fromMaybe, catMaybes)
@@ -23,8 +23,10 @@ data EvaluationScheme = EvaluationScheme Metric [PreprocessingOperation]
   deriving (Eq)
 
 data PreprocessingOperation = RegexpMatch Regex
+                              | RegexpTokenMatch Regex
                               | LowerCasing
                               | UpperCasing
+                              | CaseFolding
                               | Sorting
                               | SetName Text
                               | SetPriority Int
@@ -51,7 +53,10 @@ readOps ('l':theRest) = (LowerCasing:ops, theRest')
     where (ops, theRest') = readOps theRest
 readOps ('u':theRest) = (UpperCasing:ops, theRest')
     where (ops, theRest') = readOps theRest
+readOps ('c':theRest) = (CaseFolding:ops, theRest')
+    where (ops, theRest') = readOps theRest
 readOps ('m':theRest) = handleParametrizedOp (RegexpMatch . (fromRight undefined) . ((flip compileM) []) . BSU.fromString) theRest
+readOps ('t':theRest) = handleParametrizedOp (RegexpTokenMatch . (fromRight undefined) . ((flip compileM) []) . BSU.fromString) theRest
 readOps ('S':theRest) = (Sorting:ops, theRest')
     where (ops, theRest') = readOps theRest
 readOps ('N':theRest) = handleParametrizedOp (SetName . pack) theRest
@@ -120,8 +125,10 @@ evaluationSchemeMetric (EvaluationScheme metric _) = metric
 
 instance Show PreprocessingOperation where
   show (RegexpMatch (Regex _ regexp)) = parametrizedOperation "m" (BSU.toString regexp)
+  show (RegexpTokenMatch (Regex _ regexp)) = parametrizedOperation "t" (BSU.toString regexp)
   show LowerCasing = "l"
   show UpperCasing = "u"
+  show CaseFolding = "c"
   show Sorting = "S"
   show (SetName t) = parametrizedOperation "N" (unpack t)
   show (SetPriority p) = parametrizedOperation "P" (show p)
@@ -154,8 +161,10 @@ applyPreprocessingOperations (EvaluationScheme _ operations) t = foldl (flip app
 
 applyPreprocessingOperation :: PreprocessingOperation -> Text -> Text
 applyPreprocessingOperation (RegexpMatch regex) = Data.Text.concat . (map fst) . (scan regex)
+applyPreprocessingOperation (RegexpTokenMatch regex) = Data.Text.unwords . (filter (≈ regex)) . Data.Text.words
 applyPreprocessingOperation LowerCasing = toLower
 applyPreprocessingOperation UpperCasing = toUpper
+applyPreprocessingOperation CaseFolding = toCaseFold
 applyPreprocessingOperation Sorting = Data.Text.unwords . sort . Data.Text.words
 applyPreprocessingOperation (SetName _) = id
 applyPreprocessingOperation (SetPriority _) = id

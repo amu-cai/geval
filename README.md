@@ -88,7 +88,7 @@ to happen on macOS, as these packages are usually installed out of the box on Li
 In case the `lzma` package is not installed on your Linux, you need to run (assuming Debian/Ubuntu):
 
     sudo apt-get install pkg-config liblzma-dev libpq-dev libpcre3-dev libcairo2-dev libbz2-dev
-    
+
 #### Windows issues
 
 If you see this message on Windows during executing `stack test` command:
@@ -479,6 +479,265 @@ So now you can see that the accuracy is over 78% and the likelihood
     in<1>:grobu	4	0.74166667	0.01357123871263958600
     in<1>:Brytania	2	0.53333333	0.01357876718525224600
     in<1>:rewolucja	2	0.53333333	0.01357876718525224600
+
+## Metric flags
+
+GEval offers a number of *flags* to modify the way an evaluation
+metric is calculated or presented. For instance, if you use `BLEU:u`
+instead of `BLEU`, the BLEU metric (a standard metric for machine
+translation) will be evaluated on the actual and expected outputs
+upper-cased. In other words, flags can be used to _normalize_ the text
+before running the actual evaluation metric.
+
+Flags are given after a colon (`:`) and can be combined. Some flags
+can have arguments, they should be given in angle brackets (`<...>`).
+
+The following files will be used in example calculations, `expected.tsv`:
+
+    foo 123 bar
+    29008 Straße
+    xyz
+    aaa 3 4 bbb
+    qwerty 100
+    WWW WWW
+    test
+    104
+    BAR Foo baz
+    OK 7777
+
+`out.tsv`:
+
+    foo 999 BAR
+    29008 STRASSE
+    xyz
+    aaa BBB 34
+    qwerty 1000
+    WWW WWW WWW WWW WWW WWW WWW WWW
+    testtttttt
+    104
+    Foo baz BAR
+    Ok 7777
+
+Without any flags, the `Accuracy` metric is:
+
+    $ geval -o out.tsv -e expected.tsv --metric Accuracy
+    0.2
+
+(As only two items are correct: `xyz` and `104`.)
+
+### Case change
+
+#### `l` — lower-case
+
+    $ geval -o out.tsv -e expected.tsv --metric Accuracy:l
+    0.3
+
+#### `u` — upper-case
+
+    $ geval -o out.tsv -e expected.tsv --metric Accuracy:l
+    0.4
+
+Why the result is different for lower-casing and upper-casing? Some
+characters, e.g. German _ß_, are tricky. If you upper-case _Straße_
+you've got _STRASSE_, but if you lower-case it, you obtain _straße_,
+not _strasse_! For this reason, when you want to disregard case when
+evaluating your metric, it is better to use _case folding_ rather
+than lower- or upper-casing:
+
+#### `c` — case fold
+
+    $ geval -o out.tsv -e expected.tsv --metric Accuracy:c
+    0.4
+
+### Manipulations with regular expressions
+
+#### `m<REGEXP>` — matching a given PCRE regexp
+
+The evaluation metric will be calculated only on the parts of the
+outputs matching a given regular expression. This can be used when you
+want to focus on some specific parts of a text. For instance, we could
+calculate Accuracy only considering numbers (disregarding all other
+characters, including spaces).
+
+    $ geval -o out.tsv -e expected.tsv --metric 'Accuracy:m<\d+>'
+    0.8
+
+(Note that apostrophes are due to using Bash here, if you put it into
+the `config.txt` file you should omit apostrophes: `--metric Accuracy:m<\d+>`.)
+
+All matches are considered and concatenated, if no match is found, an
+empty string is assumed (hence, e.g., `testtttttt` is considered a hit
+for `test` after this normalization, as both will be transformed into
+the empty string). Note that both `aaa 3 4 bbb` and `aaa BBB 34` will
+be normalized to `34` here.
+
+You can use regexp anchoring operators (`^` or `$`). This will refer
+to the beginning or end of the whole *line*. You could use it to
+calculate the accuracy considering only the first two characters of output lines:
+
+    $ geval -o out.tsv -e expected.tsv --metric 'Accuracy:m<^..>'
+    0.8
+
+#### `t<REGEXP>` — filtering tokens using a PCRE regexp
+
+This applies a regexp for each token separately (tokens are seperated
+by spaces, you can use a non-standard tokenizer with the `--tokenizer` option if needed).
+All the tokens not matching the regexp are filtered out (but spaces are recovered).
+
+    $ geval -o out.tsv -e expected.tsv --metric 'Accuracy:t<\d+>'
+    0.7
+
+Now, the anchoring operators refer to the beginning or end of a
+*token*. For instance, let's consider only tokens starting with _b_:
+
+    $ geval -o out.tsv -e expected.tsv --metric 'Accuracy:t<^b>'
+    0.8
+
+With `m` or `t` flags you can only select parts of output lines. What
+if you want to do some replacements, e.g. collapse some
+characters/strings into a standard form? You should use the `s` flag for this:
+
+#### `s<REGEXP><REPLACEMENT>` — replace parts of output lines matching a regexp
+
+This will substitute all occurrences of strings matching REGEXP with
+REPLACEMENT. For instance, we could replace all numbers with a special token NUMBER.
+All the other parts of a line are left intact.
+
+    $ geval -o out.tsv -e expected.tsv --metric 'Accuracy:s<\d+><NUMBER>'
+    0.3
+
+You can use special operators `\0`, `\1`, `\2` to refer to parts matched by the regexp.
+
+    $ geval -o out.tsv -e expected.tsv --metric 'Accuracy:s<([A-Za-z])\S+><WORD-WITH-FIRST-LETTER-\1>'
+    0.5
+
+### Other normalizations
+
+#### `S` — sort all tokens
+
+This will sort all tokens, e.g. `foo bar baz` will be treated as `bar baz foo`.
+
+    $ geval -o out.tsv -e expected.tsv --metric 'Accuracy:S'
+    0.3
+
+### Filtering
+
+#### `f<FEATURE>` — filtering
+
+Flags such as `u`, `m<...>`, `s<...><...>` etc. work within a line
+(item), they won't change the number items being evaluated. To
+consider only a subset of items, use the `f<FEATURE>` flag — only the
+lines containing the feature FEATURE will be taken during metric
+calculation. Features are the same as listed by the `--worst-features`
+option, e.g. `exp:foo` would accept only lines with the expected
+output containing the token `foo`, `in[2]:bar` — lines with the second
+columns of input contaning the token `bar` (contrary to
+`--worst-features` square brackets should be used, instead of angle ones, for indexing).
+
+You *MUST* supply an input file when you use the `f<...>` flag. Assume
+the following `in.txt` file:
+
+    12	this aaa
+    32	this bbb
+    32	this ccc
+    12	that aaa
+    12	that aaa
+    10	that aaa
+    11	that
+    11	that
+    17	this
+    12	that
+
+    $ geval -o out.tsv -e expected.tsv -i in.tsv --metric 'Accuracy:f<in[2]:this>'
+    0.25
+
+### Presentation
+
+Some flags are used not for modifying the result, but rather changing
+the way it is presented by GEval (or the associated
+[Gonito](https://gonito.net) Web application).
+
+#### `N<NAME>` — use an alternative name
+
+Sometimes, the metric name gets complicated, you can use the `N<...>`
+to get a more human-readable way.
+
+This will be used:
+
+* by GEval when presenting results from more than one metric (when
+  only one metric is calculated, its name is not given anyway),
+* by Gonito, e.g. in table headers.
+
+    $ geval -o out.tsv -e expected.tsv --metric Accuracy --metric MultiLabel-F1:N<F-score> --metric 'MultiLabel-F0:N<Precision>' --metric 'MultiLabelF9999:N<Recall>'
+    Accuracy	0.200
+    F-score	0.511
+    Precision	0.462
+    Recall	0.571
+
+(GEval does not have separate Precision/Recall metrics, but they can
+be easily obtained by setting the parameter of the F-score to,
+respectively, 0 and a large number.)
+
+More than one name can be given. In such a case, or names will concatenated with spaces.
+
+    $ geval --precision 3 -o out.tsv -e expected.tsv --metric 'Accuracy' --metric 'MultiLabel-F1:N<F-score>N<on>N<tokens>'
+    Accuracy	0.200
+    F-score on tokens	0.511
+
+This is handy, when combined with the `{...}` operator (see below).
+
+#### `P<priority>` — set the priority (within the Gonito platform)
+
+This sets the priority level, considered when the results are displayed in the Gonito platform.
+It has no effect in GEval as such (it is simply disregarded in GEval).
+
+    $ geval --precision 3 -o out.tsv -e expected.tsv --metric 'Accuracy:P<1>' --metric 'MultiLabel-F1:P<3>'
+    Accuracy:P<1>	0.200
+    MultiLabel-F1.0:P<3>	0.511
+
+The priority is interpreted by Gonito in the following way:
+
+  * 1 — show everywhere, including the main leaderboard table
+  * 2 — show on the secondary leaderboard table and in detailed information for a submission
+  * 3 — show only in detailed information for a submission
+
+Although you can specify `P<...>` more than once, only the first value
+will be considered for a given metric (this might be important when combined with the `{...}` operator.
+
+### Combining flags
+
+Flags can be combined, just by concatenation (`:` should be given only once):
+
+    $ geval -o out.tsv -e expected.tsv -i in.tsv --metric Accuracy --metric 'Accuracy:f<in[2]:this>cs<\d><X>N<MyWeirdMetric>'
+    Accuracy	0.2
+    MyWeirdMetric	0.75
+
+Note that the order of flags might be sometimes significant, in
+general, they are considered from left to right.
+
+### Cartesian operator `{...}`
+
+Sometimes, you need to define a large number of similar metrics. Then
+you can use the special `{...}` operator interpreted by GEval (not
+Bash!). For instance `{foo,bar}xyz{aaa,bbb,ccc}` will be internally
+considered as the Cartesian product (i.e. you'll get all the
+combinations): `fooxyzaaa`, `fooxyzbbb`, `fooxyzccc`, `barxyzaaa`,
+`barxyzbbb`, `barxyzccc`.
+
+For example, let's assume that we want accuracy, F-score, precision
+and recall in both case-sensitive and case-insensitive versions.
+Here's the way to calculate all these 8 metrics in a concise manner:
+
+    $ geval --precision 3 -o out.tsv -e expected.tsv -i in.tsv --metric '{Accuracy:N<Acc>,MultiLabel-F1:N<F1>,MultiLabel-F0:N<P>,MultiLabel-F9999:N<R>}N<case>{N<sensitive>,cN<non-sensitive>}'
+        sensitive	non-sensitive
+    Acc case	0.200	0.400
+    F1 case	0.511	0.681
+    P case	0.462	0.615
+    R case	0.571	0.762
+
+Note that GEval automagically put the results in a table! (Well,
+_case_ probably should be written in headers, but, well, it generates
+the table totally on its own.)
 
 ## Handling headers
 
