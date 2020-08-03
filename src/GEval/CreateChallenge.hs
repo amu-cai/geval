@@ -13,6 +13,7 @@ import GEval.Submit (tokenFileName)
 import GEval.MatchingSpecification (MatchingSpecification(ExactMatch))
 import qualified System.Directory as D
 import Control.Conditional (whenM)
+import Data.Maybe (catMaybes)
 
 import System.IO
 import System.FilePath
@@ -427,22 +428,25 @@ Directory structure
 
 
 configContents :: [EvaluationScheme] -> FormattingOptions -> String -> String
-configContents schemes format testName = unwords (Prelude.map (\scheme -> ("--metric " ++ (show scheme))) schemes) ++
-                                 (if testName /= defaultTestName
-                                     then
-                                        " --test-name " ++ testName
-                                     else
-                                     "") ++
-                                 (precisionOpt format) ++
-                                 inHeaderOpts ++
-                                 outHeaderOpts
-    where precisionOpt (FormattingOptions m b) =  maybe "" (printf "--precision %d ") m ++ bool "" "--show-as-percentage" b
+configContents schemes format testName =
+  unwords $ catMaybes ((Prelude.map (\scheme -> (Just $ "--metric " ++ (show scheme))) schemes)
+                       ++ [testNameOpt]
+                       ++ (precisionOpt format)
+                       ++ [inHeaderOpts, outHeaderOpts])
+    where precisionOpt (FormattingOptions m b) = [
+            maybe Nothing (Just . printf "--precision %d") m,
+            bool Nothing (Just "--show-as-percentage") b ]
           ((EvaluationScheme mainMetric _):_) = schemes
+          testNameOpt = if testName /= defaultTestName
+                        then
+                          (Just (" --test-name " ++ testName))
+                        else
+                          Nothing
           inHeaderOpts = getHeaderOpts "in-header" inHeaderContents
           outHeaderOpts = getHeaderOpts "out-header" outHeaderContents
           getHeaderOpts opt selector = case selector mainMetric of
-            Just _ -> " --" ++ opt ++ " " ++ (opt <.> "tsv")
-            Nothing -> ""
+            Just _ -> Just (" --" ++ opt ++ " " ++ (opt <.> "tsv"))
+            Nothing -> Nothing
 
 -- Originally train content was in one file, to avoid large changes
 -- for the time being we are using the original function.
