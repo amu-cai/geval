@@ -7,12 +7,13 @@ module GEval.CreateChallenge
 
 import GEval.Metric
 import GEval.EvaluationScheme
-import GEval.Common (GEvalException(..))
+import GEval.Common (GEvalException(..), FormattingOptions(..))
 import GEval.Core (GEvalSpecification(..), configFileName, gesMainMetric, defaultTestName)
 import GEval.Submit (tokenFileName)
 import GEval.MatchingSpecification (MatchingSpecification(ExactMatch))
 import qualified System.Directory as D
 import Control.Conditional (whenM)
+import Data.Maybe (catMaybes)
 
 import System.IO
 import System.FilePath
@@ -22,6 +23,9 @@ import Data.String.Here
 
 import Data.List (intercalate)
 import Data.List.Split (splitOn)
+import Data.Bool
+
+import Text.Printf
 
 createChallenge :: Bool -> FilePath -> GEvalSpecification -> IO ()
 createChallenge withDataFiles expectedDirectory spec = do
@@ -31,7 +35,7 @@ createChallenge withDataFiles expectedDirectory spec = do
   D.createDirectoryIfMissing False testDirectory
   createFile (expectedDirectory </> ".gitignore") $ gitignoreContents
   createFile (expectedDirectory </> "README.md") $ readmeMDContents metric testName
-  createFile (expectedDirectory </> configFileName) $ configContents metrics precision testName
+  createFile (expectedDirectory </> configFileName) $ configContents metrics format testName
   createHeaderFile expectedDirectory "in-header.tsv" $ inHeaderContents metric
   createHeaderFile expectedDirectory "out-header.tsv" $ outHeaderContents metric
   if withDataFiles
@@ -49,7 +53,7 @@ createChallenge withDataFiles expectedDirectory spec = do
       return ()
   where metric = gesMainMetric spec
         metrics = gesMetrics spec
-        precision = gesPrecision spec
+        format = gesFormatting spec
         testName = gesTestName spec
         trainDirectory = expectedDirectory </> "train"
         devDirectory = expectedDirectory </> "dev-0"
@@ -423,24 +427,26 @@ Directory structure
 |]
 
 
-configContents :: [EvaluationScheme] -> Maybe Int -> String -> String
-configContents schemes precision testName = unwords (Prelude.map (\scheme -> ("--metric " ++ (show scheme))) schemes) ++
-                                 (if testName /= defaultTestName
-                                     then
-                                        " --test-name " ++ testName
-                                     else
-                                     "") ++
-                                 (precisionOpt precision) ++
-                                 inHeaderOpts ++
-                                 outHeaderOpts
-    where precisionOpt Nothing = ""
-          precisionOpt (Just p) = " --precision " ++ (show p)
+configContents :: [EvaluationScheme] -> FormattingOptions -> String -> String
+configContents schemes format testName =
+  unwords $ catMaybes ((Prelude.map (\scheme -> (Just $ "--metric " ++ (show scheme))) schemes)
+                       ++ [testNameOpt]
+                       ++ (precisionOpt format)
+                       ++ [inHeaderOpts, outHeaderOpts])
+    where precisionOpt (FormattingOptions m b) = [
+            maybe Nothing (Just . printf "--precision %d") m,
+            bool Nothing (Just "--show-as-percentage") b ]
           ((EvaluationScheme mainMetric _):_) = schemes
+          testNameOpt = if testName /= defaultTestName
+                        then
+                          (Just (" --test-name " ++ testName))
+                        else
+                          Nothing
           inHeaderOpts = getHeaderOpts "in-header" inHeaderContents
           outHeaderOpts = getHeaderOpts "out-header" outHeaderContents
           getHeaderOpts opt selector = case selector mainMetric of
-            Just _ -> " --" ++ opt ++ " " ++ (opt <.> "tsv")
-            Nothing -> ""
+            Just _ -> Just (" --" ++ opt ++ " " ++ (opt <.> "tsv"))
+            Nothing -> Nothing
 
 -- Originally train content was in one file, to avoid large changes
 -- for the time being we are using the original function.

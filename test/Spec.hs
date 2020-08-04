@@ -501,7 +501,7 @@ main = hspec $ do
             gesExpectedFile = "expected.tsv",
             gesInputFile = "in.tsv",
             gesMetrics = [EvaluationScheme Likelihood []],
-            gesPrecision = Nothing,
+            gesFormatting = FormattingOptions Nothing False,
             gesTokenizer = Nothing,
             gesGonitoHost = Nothing,
             gesToken = Nothing,
@@ -629,7 +629,7 @@ main = hspec $ do
             let spec = defaultGEvalSpecification {
                   gesExpectedDirectory = Just tempDir,
                   gesMetrics = [scheme],
-                  gesPrecision = Just 4 }
+                  gesFormatting = FormattingOptions (Just 4) False }
             createChallenge True tempDir spec
             validationChallenge tempDir spec
   describe "test sample outputs" $ do

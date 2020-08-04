@@ -6,7 +6,7 @@ module GEval.OptionsParser
         runGEvalGetOptions,
         getOptions,
         metricReader,
-        precisionArgParser
+        formatParser
         ) where
 
 import Paths_geval (version)
@@ -138,12 +138,15 @@ optionsParser = GEvalOptions
        <> help "Mark worst features when in the line-by-line mode")
 
 
-precisionArgParser :: Parser Int
-precisionArgParser = option auto
-    ( long "precision"
+formatParser :: Parser FormattingOptions
+formatParser = FormattingOptions
+    <$> (optional $ option auto ( long "precision"
       <> short 'p'
       <> metavar "NUMBER-OF-FRACTIONAL-DIGITS"
-      <> help "Arithmetic precision, i.e. the number of fractional digits to be shown" )
+      <> help "Arithmetic precision, i.e. the number of fractional digits to be shown" ))
+    <*> switch ( long "show-as-percentage"
+      <> short '%'
+      <> help "Returns the result as a percentage (i.e. maximum value of 100 instead of 1)" )
 
 specParser :: Parser GEvalSpecification
 specParser = GEvalSpecification
@@ -191,7 +194,7 @@ specParser = GEvalSpecification
     <> metavar "INPUT"
     <> help "The name of the file with the input (applicable only for some metrics)" )
   <*> ((flip fromMaybe) <$> (singletonMaybe <$> altMetricReader) <*> metricReader)
-  <*> optional precisionArgParser
+  <*> formatParser
   <*> (optional $ option auto
        ( long "tokenizer"
          <> short 'T'

@@ -6,6 +6,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE PackageImports #-}
 
+
 module GEval.Core
     ( geval,
       gevalCore,
@@ -182,7 +183,7 @@ data GEvalSpecification = GEvalSpecification
                             gesExpectedFile :: String,
                             gesInputFile :: String,
                             gesMetrics :: [EvaluationScheme],
-                            gesPrecision :: Maybe Int,
+                            gesFormatting :: FormattingOptions,
                             gesTokenizer :: Maybe Tokenizer,
                             gesGonitoHost :: Maybe String,
                             gesToken :: Maybe String,
@@ -253,7 +254,7 @@ defaultGEvalSpecification = GEvalSpecification {
   gesExpectedFile = defaultExpectedFile,
   gesInputFile = defaultInputFile,
   gesMetrics = [EvaluationScheme defaultMetric []],
-  gesPrecision = Nothing,
+  gesFormatting = FormattingOptions Nothing False,
   gesTokenizer = Nothing,
   gesGonitoHost = Nothing,
   gesToken = Nothing,
@@ -748,9 +749,9 @@ countFragAgg :: (Num n, Num v, Monad m) => ConduitM (n, n, v, v) o m (n, n, v, v
 countFragAgg = CC.foldl countFragFolder (fromInteger 0, fromInteger 0, fromInteger 0, fromInteger 0)
 
 gevalCoreByCorrelationMeasure :: (MonadUnliftIO m, MonadThrow m, MonadIO m) =>
-                                (V.Vector (Double, Double) -> Double) -> -- ^ correlation function
-                                LineSourcesSpecification (ResourceT m) ->
-                                m (MetricOutput)             -- ^ metric values for the output against the expected output
+                                (V.Vector (Double, Double) -> Double) -- ^ correlation function
+                                -> LineSourcesSpecification (ResourceT m)
+                                -> m (MetricOutput)             -- ^ metric values for the output against the expected output
 gevalCoreByCorrelationMeasure correlationFunction =
   gevalCoreWithoutInput SAPearson correlationC finalStep noGraph
   where correlationC = CC.foldl (flip (:)) []
@@ -849,6 +850,8 @@ gevalRunPipeline' parserSpec itemStep finalPipeline context = do
      (((getZipSource $ (,)
        <$> ZipSource (CL.sourceList [(getFirstLineNo (Proxy :: Proxy m) context)..])
        <*> (ZipSource $ recordSource context parserSpec)) .| CL.map (checkStep (Proxy :: Proxy m) itemStep)) .| CL.catMaybes .| finalPipeline)
+
+
 
 continueGEvalCalculations :: forall m t . (MonadIO m) =>
                             SAMetric t
