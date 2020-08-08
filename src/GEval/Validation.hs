@@ -24,8 +24,9 @@ import qualified Data.Conduit.Text as CT
 import Data.Conduit.Binary (sourceFile, sinkFile)
 import Data.Conduit.AutoDecompress (autoDecompress)
 import Data.Conduit.SmartSource (compressedFilesHandled)
-import Data.List (intercalate, nub)
+import Data.List (find, intercalate, nub)
 import qualified Data.Text as T
+import Data.Maybe (isJust)
 
 import System.IO.Temp
 
@@ -45,6 +46,7 @@ data ValidationException = NoChallengeDirectory FilePath
                          | SpaceSuffixDetect FilePath
                          | VaryingNumberOfColumns FilePath
                          | BestPossibleValueNotObtainedWithExpectedData MetricValue MetricValue
+                         | NoMetricOfPriorityOne
 
 instance Exception ValidationException
 
@@ -65,6 +67,10 @@ instance Show ValidationException where
   show (SpaceSuffixDetect filePaths) = somethingWrongWithFilesMessage "Found space at the end of line" filePaths
   show (VaryingNumberOfColumns filePaths) = somethingWrongWithFilesMessage "The file contains varying number of columns" filePaths
   show (BestPossibleValueNotObtainedWithExpectedData expected got) = "The best possible value was not obtained with the expected data, expected: " ++ (show expected) ++ " , obtained: " ++ (show got)
+  show NoMetricOfPriorityOne = "No metric has priority 1"
+
+hasMetricOfPriorityOne :: GEvalSpecification -> Bool
+hasMetricOfPriorityOne spec = isJust $ Data.List.find (\m -> (evaluationSchemePriority m) == 1) $ gesMetrics spec
 
 validationChallenge :: FilePath -> GEvalSpecification -> IO ()
 validationChallenge challengeDirectory spec = do
@@ -72,6 +78,7 @@ validationChallenge challengeDirectory spec = do
   unlessM (D.doesFileExist configFile) $ throwM $ NoConfigFile configFile
   unlessM (D.doesFileExist gitignoreFile) $ throwM $ NoGitignoreFile gitignoreFile
   unlessM (D.doesFileExist readmeFile) $ throwM $ NoReadmeFile readmeFile
+  unless (hasMetricOfPriorityOne spec) $ throwM NoMetricOfPriorityOne
   checkCorrectFile configFile
   checkCorrectFile gitignoreFile
   checkCorrectFile readmeFile
