@@ -1,4 +1,20 @@
 
+## 1.37.0.0
+
+New features:
+
+* Add --select-metric to select metric(s) by name (useful when you
+  have a complicated configuration with a large number of metrics,
+  and you want to see the result only for a specific metric, especially
+  in --line-by-line or --worst-features more)
+* Add --show-preprocessed so that in --line-by-line or similar modes you
+  will be shown the results after the proprocessing
+* --validate checks whether at least one metric is of priority 1
+
+Bug fixes:
+
+* Fix handling MultiLabel-F1 in --line-by-line mode when used with flags
+
 ## 1.36.1.0
 
 * Add "c" and "t" flags
