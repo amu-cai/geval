@@ -72,7 +72,10 @@ data ChallengeDataSource = ChallengeDataSource {
   challengeDataSourcePreprocess :: Text -> Text,
   challengeDataSourceFilter :: Filter,
   challengeDataSourceInHeader :: Maybe TabularHeader,
-  challengeDataSourceOutHeader :: Maybe TabularHeader }
+  challengeDataSourceOutHeader :: Maybe TabularHeader,
+  -- whether the data will be shown preprocessed (not only
+  -- the evaluation will be done on the preprocessed data)
+  challengeDataSourceShowPreprocessed :: Bool }
 
 -- | This type specifies all the data flowing into evaluation,
 -- including the output data to be evaluated.

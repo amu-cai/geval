@@ -611,23 +611,27 @@ gevalLineByLineSource metric dataSource =
         expectedLineSource = lineSourcesExpectedSource lsSpec
         outputLineSource = lineSourcesOutputSource lsSpec
         justLine (LineInFile _ _ l) = l
-        evaluateLine (lineNo, ParsedRecordWithInput inp exp out) = do
-          s <- liftIO $ gevalCoreOnSingleLines metric preprocess (getDataDecoder inputLineSource) (LineInFile inputSource lineNo inp)
-                                                                (getDataDecoder expectedLineSource) (LineInFile expectedSource lineNo exp)
-                                                                (getDataDecoder outputLineSource) (LineInFile outSource lineNo out)
+
+        evaluateLine (lineNo, ParsedRecordWithInput inp' exp' out') = do
+          let inp = if shouldBePreprocessedForPresentation
+                    then preprocess inp'
+                    else inp'
+          let exp = preprocessOut exp'
+          let out = preprocessOut out'
+          s <- liftIO $ gevalCoreOnSingleLines metric
+                                              -- if also to be shown preprocessed, preprocessing
+                                              -- will be done earlier
+                                              (if shouldBePreprocessedForPresentation then id else preprocess)
+                                              (getDataDecoder inputLineSource) (LineInFile inputSource lineNo inp)
+                                              (getDataDecoder expectedLineSource) (LineInFile expectedSource lineNo exp)                                            (getDataDecoder outputLineSource) (LineInFile outSource lineNo out)
           return $ LineRecord inp exp out lineNo (extractSimpleRunValue $ getMetricValue s)
-        -- preparing sources, `id` means that no preprocessing is done (to avoid double preprocessing)
-        outOptions = FileProcessingOptions {
-          fileProcessingOptionsSelector = mSelector,
-          fileProcessingOptionsPreprocess = id,
-          fileProcessingOptionsHeader = mOutHeader }
-        inOptions = FileProcessingOptions {
-          fileProcessingOptionsSelector = mSelector,
-          fileProcessingOptionsPreprocess = id,
-          fileProcessingOptionsHeader = mInHeader }
+        preprocessOut = if shouldBePreprocessedForPresentation && isPreprocessable metric
+                        then preprocess
+                        else id
         challengeDataSource = dataSourceChallengeData dataSource
         mSelector = challengeDataSourceSelector challengeDataSource
         preprocess = challengeDataSourcePreprocess challengeDataSource
+        shouldBePreprocessedForPresentation = challengeDataSourceShowPreprocessed challengeDataSource
         mInHeader = challengeDataSourceInHeader challengeDataSource
         mOutHeader = challengeDataSourceOutHeader challengeDataSource
         inputSource = challengeDataSourceInput challengeDataSource

@@ -28,6 +28,7 @@ module GEval.Core
       defaultMetric,
       getExpectedDirectory,
       configFileName,
+      isPreprocessable,
       ParsedRecord(..),
       WithoutInput(..),
       WithInput(..),
@@ -215,7 +216,8 @@ data GEvalSpecification = GEvalSpecification
                             gesReferences :: Maybe String,
                             gesBootstrapResampling :: Maybe Int,
                             gesInHeader :: Maybe String,
-                            gesOutHeader :: Maybe String }
+                            gesOutHeader :: Maybe String,
+                            gesShowPreprocessed :: Bool }
                           deriving (Show)
 
 gesMainMetric :: GEvalSpecification -> Metric
@@ -286,7 +288,8 @@ defaultGEvalSpecification = GEvalSpecification {
   gesReferences = Nothing,
   gesBootstrapResampling = Nothing,
   gesInHeader = Nothing,
-  gesOutHeader = Nothing }
+  gesOutHeader = Nothing,
+  gesShowPreprocessed = False }
 
 isEmptyFile :: FilePath -> IO (Bool)
 isEmptyFile path = do
@@ -412,7 +415,8 @@ checkAndGetDataSources forceInput gevalSpec = do
         challengeDataSourcePreprocess = preprocess,
         challengeDataSourceFilter = noFilter,
         challengeDataSourceInHeader = mInHeader,
-        challengeDataSourceOutHeader = mOutHeader }
+        challengeDataSourceOutHeader = mOutHeader,
+        challengeDataSourceShowPreprocessed = gesShowPreprocessed gevalSpec }
 
        return $ Prelude.map (\oss -> DataSource {
                           dataSourceChallengeData = chDataSource,

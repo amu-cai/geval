@@ -382,7 +382,8 @@ main = hspec $ do
               gesReferences = Nothing,
               gesBootstrapResampling = Nothing,
               gesInHeader = Nothing,
-              gesOutHeader = Nothing }
+              gesOutHeader = Nothing,
+              gesShowPreprocessed = False }
     it "In line-by-line mode Accuracy" $ do
       results <- runLineByLineGeneralized KeepTheOriginalOrder sampleChallenge (const Data.Conduit.List.consume)
       results `shouldBe` [
@@ -554,7 +555,8 @@ main = hspec $ do
             gesReferences = Nothing,
             gesBootstrapResampling = Nothing,
             gesInHeader = Nothing,
-            gesOutHeader = Nothing }
+            gesOutHeader = Nothing,
+            gesShowPreprocessed = False }
     it "simple test" $ do
       results <- runLineByLineGeneralized KeepTheOriginalOrder sampleChallenge (const Data.Conduit.List.consume)
       Prelude.map (\(LineRecord inp _ _ _ _) -> inp) results `shouldBe` ["foo",

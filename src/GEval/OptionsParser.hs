@@ -238,6 +238,9 @@ specParser = GEvalSpecification
         ( long "out-header"
           <> metavar "FILE"
           <> help "One-line TSV file specifying a list of field names for output and expected files"))
+   <*> switch
+     ( long "show-preprocessed"
+       <> help "When in --line-by-line or similar modes, not just work preprocessed data, but show them as such")
 
 selectMetricsByName :: [String] -> [EvaluationScheme] -> [EvaluationScheme]
 selectMetricsByName [] schemes = schemes
