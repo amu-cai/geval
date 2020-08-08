@@ -38,7 +38,7 @@ import GEval.Validation
 import GEval.Model
 import GEval.ModelTraining
 
-import Data.List (intercalate)
+import Data.List (find, intercalate)
 
 import Data.Conduit.SmartSource
 import Data.CartesianStrings
@@ -193,7 +193,8 @@ specParser = GEvalSpecification
     <> showDefault
     <> metavar "INPUT"
     <> help "The name of the file with the input (applicable only for some metrics)" )
-  <*> ((flip fromMaybe) <$> (singletonMaybe <$> altMetricReader) <*> metricReader)
+  <*> (selectMetricsByName <$> selectMetricReader
+                           <*> ((flip fromMaybe) <$> (singletonMaybe <$> altMetricReader) <*> metricReader))
   <*> formatParser
   <*> (optional $ option auto
        ( long "tokenizer"
@@ -237,6 +238,13 @@ specParser = GEvalSpecification
         ( long "out-header"
           <> metavar "FILE"
           <> help "One-line TSV file specifying a list of field names for output and expected files"))
+
+selectMetricsByName :: [String] -> [EvaluationScheme] -> [EvaluationScheme]
+selectMetricsByName [] schemes = schemes
+selectMetricsByName metricNames schemes = map (selectMetric schemes) metricNames
+  where selectMetric schemes metricName = case find (\s -> evaluationSchemeName s == metricName) schemes of
+          Just scheme -> scheme
+          Nothing -> error $ "Cannot find metric named '" ++ metricName ++ "'"
 
 defaultMinFrequency :: Integer
 defaultMinFrequency = 1
@@ -297,6 +305,13 @@ altMetricReader = optional $ option auto
                  <> short 'a'
                  <> metavar "METRIC"
                  <> help "Alternative metric (overrides --metric option)" )
+
+selectMetricReader :: Parser [String]
+selectMetricReader = many $ strOption
+               ( long "select-metric"
+                 <> metavar "METRIC-NAME"
+                 <> help "Select metric(s) by name" )
+
 
 runGEval :: [String] -> IO (Either (ParserResult GEvalOptions) (Maybe [(SourceSpec, [MetricResult])]))
 runGEval args = do
