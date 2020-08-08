@@ -364,6 +364,38 @@ main = hspec $ do
       runGEvalTest "f1-with-preprocessing" `shouldReturnAlmost` 0.57142857142857
     it "Regexp substition" $ do
       runGEvalTest "accuracy-with-flags" `shouldReturnAlmost` 0.8
+    it "In line-by-line mode" $ do
+      let sampleChallenge = GEvalSpecification
+            { gesOutDirectory = "test/accuracy-flags-line-by-line/accuracy-flags-line-by-line-solution",
+              gesExpectedDirectory = Just "test/accuracy-flags-line-by-line/accuracy-flags-line-by-line",
+              gesTestName = "test-A",
+              gesSelector = Nothing,
+              gesOutFile = "out.tsv",
+              gesAltOutFiles = Nothing,
+              gesExpectedFile = "expected.tsv",
+              gesInputFile = "in.tsv",
+              gesMetrics = [read "Accuracy:f<in[1]:foo>s<\\d+><>"],
+              gesFormatting = FormattingOptions Nothing False,
+              gesTokenizer = Just Minimalistic,
+              gesGonitoHost = Nothing,
+              gesToken = Nothing,
+              gesGonitoGitAnnexRemote = Nothing,
+              gesReferences = Nothing,
+              gesBootstrapResampling = Nothing,
+              gesInHeader = Nothing,
+              gesOutHeader = Nothing }
+      results <- runLineByLineGeneralized KeepTheOriginalOrder sampleChallenge (const Data.Conduit.List.consume)
+      results `shouldBe` [
+        LineRecord "foo"
+                   "Ala 123 ma kota."
+                   "Ala ma 2 kota ."
+                   1
+                   1.0,
+        LineRecord "foo"
+                   "Foo bar baz"
+                   "Fox bax 456 bax"
+                   2
+                   0.0]
   describe "Flag examples" $ do
     it "none" $ do
       runGEvalTest "flags-none" `shouldReturnAlmost` 0.2
