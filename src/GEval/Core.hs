@@ -56,8 +56,6 @@ module GEval.Core
       fromSpecificationToWithInput
     ) where
 
-import Debug.Trace
-
 import Data.Singletons.TH
 
 import GEval.Metric
@@ -152,13 +150,39 @@ hasFiltering (_:ops) = hasFiltering ops
 
 -- | Could output be preprocessable
 isPreprocessable :: Metric -> Bool
-isPreprocessable BLEU = True
-isPreprocessable GLEU = True
-isPreprocessable WER = True
+isPreprocessable RMSE     = False
+isPreprocessable MSE      = False
+isPreprocessable Pearson  = False
+isPreprocessable Spearman = False
+isPreprocessable BLEU     = True
+isPreprocessable GLEU     = True
+isPreprocessable WER      = True
 isPreprocessable Accuracy = True
+isPreprocessable ClippEU  = False
+isPreprocessable (FMeasure _) = False
+isPreprocessable (MacroFMeasure _) = False
+isPreprocessable (SoftFMeasure _) = False
+isPreprocessable (ProbabilisticMultiLabelFMeasure _) = True
+isPreprocessable (ProbabilisticSoftFMeasure _) = True
+isPreprocessable (Soft2DFMeasure _) = False
+isPreprocessable (FLCFMeasure _) = False
+isPreprocessable NMI = False
+isPreprocessable (LogLossHashed _) = False
+isPreprocessable (LikelihoodHashed _) = False
 isPreprocessable CharMatch = True
+isPreprocessable MAP = False
+isPreprocessable LogLoss = False
+isPreprocessable Likelihood = False
+isPreprocessable BIOF1 = False
+isPreprocessable BIOF1Labels = False
 isPreprocessable TokenAccuracy = True
-isPreprocessable _ = False
+isPreprocessable SegmentAccuracy = True
+isPreprocessable MAE = False
+isPreprocessable SMAPE = False
+isPreprocessable (MultiLabelFMeasure _ _) = True
+isPreprocessable MultiLabelLogLoss = False
+isPreprocessable MultiLabelLikelihood = False
+isPreprocessable (Mean metric) = isPreprocessable metric
 
 defaultOutDirectory = "."
 defaultTestName = "test-A"
@@ -192,7 +216,7 @@ data GEvalSpecification = GEvalSpecification
                             gesBootstrapResampling :: Maybe Int,
                             gesInHeader :: Maybe String,
                             gesOutHeader :: Maybe String }
-
+                          deriving (Show)
 
 gesMainMetric :: GEvalSpecification -> Metric
 gesMainMetric spec = case gesMetrics spec of
@@ -560,6 +584,7 @@ isEmptyFileSource _ = return False
 logLossToLikehood logLoss = exp (-logLoss)
 
 data LineInFile = LineInFile SourceSpec Word32 Text
+                  deriving Show
 
 gevalBootstrapOnSources :: (MonadIO m, MonadThrow m, MonadUnliftIO m) =>
                           Int                         -- ^ number of samples

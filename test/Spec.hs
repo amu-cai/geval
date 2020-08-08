@@ -364,8 +364,7 @@ main = hspec $ do
       runGEvalTest "f1-with-preprocessing" `shouldReturnAlmost` 0.57142857142857
     it "Regexp substition" $ do
       runGEvalTest "accuracy-with-flags" `shouldReturnAlmost` 0.8
-    it "In line-by-line mode" $ do
-      let sampleChallenge = GEvalSpecification
+    let sampleChallenge = GEvalSpecification
             { gesOutDirectory = "test/accuracy-flags-line-by-line/accuracy-flags-line-by-line-solution",
               gesExpectedDirectory = Just "test/accuracy-flags-line-by-line/accuracy-flags-line-by-line",
               gesTestName = "test-A",
@@ -384,7 +383,21 @@ main = hspec $ do
               gesBootstrapResampling = Nothing,
               gesInHeader = Nothing,
               gesOutHeader = Nothing }
+    it "In line-by-line mode Accuracy" $ do
       results <- runLineByLineGeneralized KeepTheOriginalOrder sampleChallenge (const Data.Conduit.List.consume)
+      results `shouldBe` [
+        LineRecord "foo"
+                   "Ala 123 ma kota."
+                   "Ala ma 2 kota ."
+                   1
+                   1.0,
+        LineRecord "foo"
+                   "Foo bar baz"
+                   "Fox bax 456 bax"
+                   2
+                   0.0]
+    it "In line-by-line mode F0" $ do
+      results <- runLineByLineGeneralized KeepTheOriginalOrder sampleChallenge { gesMetrics = [read "MultiLabel-F0:f<in[1]:foo>s<\\d+><>"]} (const Data.Conduit.List.consume)
       results `shouldBe` [
         LineRecord "foo"
                    "Ala 123 ma kota."

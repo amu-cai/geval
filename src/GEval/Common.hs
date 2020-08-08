@@ -19,6 +19,7 @@ data FormattingOptions = FormattingOptions {
   decimalPlaces :: Maybe Int,
   asPercentage :: Bool
   }
+  deriving (Show)
 
 data MetricResult = SimpleRun MetricValue | BootstrapResampling [MetricValue]
 
