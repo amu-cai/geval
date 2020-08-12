@@ -534,7 +534,7 @@ Without any flags, the `Accuracy` metric is:
 
 #### `u` — upper-case
 
-    $ geval -o out.tsv -e expected.tsv --metric Accuracy:l
+    $ geval -o out.tsv -e expected.tsv --metric Accuracy:u
     0.4
 
 Why the result is different for lower-casing and upper-casing? Some
