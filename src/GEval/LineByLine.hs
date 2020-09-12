@@ -557,6 +557,7 @@ runMostWorseningFeatures ordering otherOut spec bbdo = do
 runDiffGeneralized :: ResultOrdering -> FilePath -> GEvalSpecification -> (Maybe References -> ConduitT (LineRecord, LineRecord) Void (ResourceT IO) a) -> IO a
 runDiffGeneralized ordering otherOut spec consum = do
   dataSourceB <- checkAndGetDataSource True spec
+  let dataSourceB' = addSchemeSpecifics scheme dataSourceB
   ooss <- getSmartSourceSpec ((gesOutDirectory spec) </> (gesTestName spec)) "out.tsv" otherOut
   case ooss of
     Left NoSpecGiven -> throwM $ NoOutFile otherOut
@@ -567,13 +568,15 @@ runDiffGeneralized ordering otherOut spec consum = do
       let dataSourceA = DataSource {
             dataSourceChallengeData = chDataSource,
             dataSourceOut = otherOutSource}
-      let sourceA = gevalLineByLineSource metric dataSourceA
-      let sourceB = gevalLineByLineSource metric dataSourceB
+      let dataSourceA' = addSchemeSpecifics scheme dataSourceA
+      let sourceA = gevalLineByLineSource metric dataSourceA'
+      let sourceB = gevalLineByLineSource metric dataSourceB'
       runResourceT $ runConduit $
         ((getZipSource $ (,)
           <$> ZipSource sourceA
           <*> ZipSource sourceB) .| sorter ordering .| consum mReferences)
   where metric = gesMainMetric spec
+        scheme = gesMainScheme spec
         preprocess = gesPreprocess spec
         mSelector = gesSelector spec
         sorter KeepTheOriginalOrder = doNothing
