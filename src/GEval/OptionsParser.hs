@@ -6,7 +6,8 @@ module GEval.OptionsParser
         runGEvalGetOptions,
         getOptions,
         metricReader,
-        formatParser
+        formatParser,
+        readOptsFromConfigFile
         ) where
 
 import Paths_geval (version)
