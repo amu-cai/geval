@@ -347,17 +347,20 @@ getOptions' readOptsFromConfigFile args =
     otherwise -> return $ Left parserResult
   where parserResult = execParserPure (prefs idm) fullOptionsParser args
 
+readOptsFromConfigFile :: [String] -> FilePath -> IO (Either (ParserResult GEvalOptions) GEvalOptions)
+readOptsFromConfigFile args configFilePath = do
+  configH <- openFile configFilePath ReadMode
+  contents <- hGetContents configH
+  getOptions' False ((words contents) ++ args)
+
 attemptToReadOptsFromConfigFile :: [String] -> GEvalOptions -> IO (Either (ParserResult GEvalOptions) GEvalOptions)
 attemptToReadOptsFromConfigFile args opts = do
   configExists <- D.doesFileExist configFilePath
   if configExists then do
-      configH <- openFile configFilePath ReadMode
-      contents <- hGetContents configH
-      getOptions' False ((words contents) ++ args)
+      readOptsFromConfigFile args configFilePath
     else
       getOptions' False args
   where configFilePath = (getExpectedDirectory $ geoSpec opts) </> configFileName
-
 
 runGEval'' :: GEvalOptions -> IO (Maybe [(SourceSpec, [MetricResult])])
 runGEval'' opts = runGEval''' (geoSpecialCommand opts)
