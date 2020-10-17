@@ -1,4 +1,11 @@
 
+## 1.38.0.0
+
+New features:
+
+* Add CER (Character-Error Rate) metric
+* Spaces can be escaped with backslashes in configuration files
+
 ## 1.37.0.0
 
 New features:
