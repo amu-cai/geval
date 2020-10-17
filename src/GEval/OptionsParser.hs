@@ -40,6 +40,9 @@ import GEval.Model
 import GEval.ModelTraining
 
 import Data.List (find, intercalate)
+import Data.List.Utils (split)
+
+import Data.Char (isSpace)
 
 import Data.Conduit.SmartSource
 import Data.CartesianStrings
@@ -352,7 +355,26 @@ readOptsFromConfigFile :: [String] -> FilePath -> IO (Either (ParserResult GEval
 readOptsFromConfigFile args configFilePath = do
   configH <- openFile configFilePath ReadMode
   contents <- hGetContents configH
-  getOptions' False ((words contents) ++ args)
+  getOptions' False ((parseConfigFileContents contents) ++ args)
+
+data ConfigFileSymbol = Literal Char | Separator
+  deriving (Eq, Show)
+
+-- very simplistic handling of backslash escaping
+-- even "\\" is treated as double backslashes...
+parseConfigFileContents :: String -> [String]
+parseConfigFileContents contents =
+  filter (not . null)
+  $ map (map (\(Literal c) -> c))
+  $ split [Separator]
+  $ parseSymbols contents
+  where parseSymbols ('\\':c:t)
+          | isSpace c = (Literal c) : parseSymbols t
+          | otherwise = (Literal '\\'): (Literal c) :parseSymbols t
+        parseSymbols (c:t)
+          | isSpace c = Separator : parseSymbols t
+          | otherwise = (Literal c) : parseSymbols t
+        parseSymbols [] = []
 
 attemptToReadOptsFromConfigFile :: [String] -> GEvalOptions -> IO (Either (ParserResult GEvalOptions) GEvalOptions)
 attemptToReadOptsFromConfigFile args opts = do

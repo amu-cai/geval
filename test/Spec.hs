@@ -131,9 +131,10 @@ main = hspec $ do
   describe "CER" $ do
     it "simple example" $
       runGEvalTest "cer-simple" `shouldReturnAlmost` 0.28947368421
-  describe "CER" $ do
     it "simple example (Mean/CER)" $
       runGEvalTest "cer-mean-simple" `shouldReturnAlmost` 0.277777777777778
+    it "space escaping" $
+      runGEvalTest "cer-space-escaping" `shouldReturnAlmost` 0.0555555
   describe "Accuracy" $ do
     it "simple example" $
       runGEvalTest "accuracy-simple" `shouldReturnAlmost` 0.6
