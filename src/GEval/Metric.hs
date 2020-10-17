@@ -25,7 +25,7 @@ import Data.Attoparsec.Text (parseOnly)
 -- the evaluation procedures are defined in GEval.Core
 
 -- | evaluation metric
-data Metric = RMSE | MSE | Pearson | Spearman | BLEU | GLEU | WER | Accuracy | ClippEU
+data Metric = RMSE | MSE | Pearson | Spearman | BLEU | GLEU | WER | CER | Accuracy | ClippEU
               | FMeasure Double | MacroFMeasure Double | NMI
               | LogLossHashed Word32 | CharMatch | MAP | LogLoss | Likelihood
               | BIOF1 | BIOF1Labels | TokenAccuracy | SegmentAccuracy | LikelihoodHashed Word32 | MAE | SMAPE
@@ -48,6 +48,7 @@ instance Show Metric where
   show BLEU = "BLEU"
   show GLEU = "GLEU"
   show WER = "WER"
+  show CER = "CER"
   show Accuracy = "Accuracy"
   show ClippEU = "ClippEU"
   show (FMeasure beta) = "F" ++ (show beta)
@@ -119,6 +120,7 @@ instance Read Metric where
   readsPrec _ ('B':'L':'E':'U':theRest) = [(BLEU, theRest)]
   readsPrec _ ('G':'L':'E':'U':theRest) = [(GLEU, theRest)]
   readsPrec _ ('W':'E':'R':theRest) = [(WER, theRest)]
+  readsPrec _ ('C':'E':'R':theRest) = [(CER, theRest)]
   readsPrec _ ('A':'c':'c':'u':'r':'a':'c':'y':theRest) = [(Accuracy, theRest)]
   readsPrec _ ('C':'l':'i':'p':'p':'E':'U':theRest) = [(ClippEU, theRest)]
   readsPrec _ ('N':'M':'I':theRest) = [(NMI, theRest)]
@@ -178,6 +180,7 @@ getMetricOrdering Spearman = TheHigherTheBetter
 getMetricOrdering BLEU     = TheHigherTheBetter
 getMetricOrdering GLEU     = TheHigherTheBetter
 getMetricOrdering WER      = TheLowerTheBetter
+getMetricOrdering CER      = TheLowerTheBetter
 getMetricOrdering Accuracy = TheHigherTheBetter
 getMetricOrdering ClippEU  = TheHigherTheBetter
 getMetricOrdering (FMeasure _) = TheHigherTheBetter

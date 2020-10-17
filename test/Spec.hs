@@ -128,6 +128,12 @@ main = hspec $ do
   describe "WER" $ do
     it "simple example" $
       runGEvalTest "wer-simple" `shouldReturnAlmost` 0.5555555555
+  describe "CER" $ do
+    it "simple example" $
+      runGEvalTest "cer-simple" `shouldReturnAlmost` 0.28947368421
+  describe "CER" $ do
+    it "simple example (Mean/CER)" $
+      runGEvalTest "cer-mean-simple" `shouldReturnAlmost` 0.277777777777778
   describe "Accuracy" $ do
     it "simple example" $
       runGEvalTest "accuracy-simple" `shouldReturnAlmost` 0.6

@@ -105,6 +105,15 @@ Directory structure
 * `${testName}/in.tsv` — Finnish input data for the test set
 * `${testName}/expected.tsv` — Māori reference translation for the test set
 |]
+readmeMDContents WER testName = readmeMDContents BLEU testName
+readmeMDContents CER testName = [i|
+GEval simple OCR challenge
+==========================
+
+Do OCR.
+
+This is a sample fake challenge for Gonito framework. Replace it with
+the description of your challenge.|] ++ (commonReadmeMDContents testName)
 
 readmeMDContents Accuracy testName = [i|
 GEval sample classification challenge
@@ -417,7 +426,8 @@ Directory structure
 * `README.md` — this file
 * `config.txt` — configuration file
 * `train/` — directory with training data
-* `train/train.tsv` — sample train set
+* `train/in.tsv` — input data for the train set
+* `train/expected.tsv` — expected (reference) data for the train set
 * `dev-0/` — directory with dev (test) data
 * `dev-0/in.tsv` — input data for the dev set
 * `dev-0/expected.tsv` — expected (reference) data for the dev set
@@ -468,6 +478,11 @@ trainContents GLEU = trainContents BLEU
 trainContents BLEU = [hereLit|alussa loi jumala taivaan ja maan	he mea hanga na te atua i te timatanga te rangi me te whenua
 ja maa oli autio ja tyhjä , ja pimeys oli syvyyden päällä	a kahore he ahua o te whenua , i takoto kau ; he pouri ano a runga i te mata o te hohonu
 ja jumalan henki liikkui vetten päällä	na ka whakapaho te wairua o te atua i runga i te kare o nga wai
+|]
+trainContents WER = trainContents BLEU
+trainContents CER = [hereLit|Hannibal ad portas	train1.pdf
+equo ne credite	train2.pdf
+errare humanum est	train3.pdf
 |]
 
 trainContents Accuracy = [hereLit|Y	10	none	yes
@@ -568,6 +583,10 @@ devInContents GLEU = devInContents BLEU
 devInContents BLEU = [hereLit|ja jumala sanoi : " tulkoon valkeus " , ja valkeus tuli
 ja jumala näki , että valkeus oli hyvä ; ja jumala erotti valkeuden pimeydestä
 |]
+devInContents WER = devInContents BLEU
+devInContents CER = [hereLit|dev1.pdf
+dev2.pdf
+|]
 devInContents Accuracy = [hereLit|-8	none	no
 1	mild	no
 |]
@@ -636,6 +655,10 @@ devExpectedContents GLEU = devExpectedContents BLEU
 devExpectedContents BLEU = [hereLit|a ka ki te atua , kia marama : na ka marama
 a ka kite te atua i te marama , he pai : a ka wehea e te atua te marama i te pouri
 |]
+devExpectedContents WER = devExpectedContents BLEU
+devExpectedContents CER = [hereLit|et facta est lux
+Et tu, Brute?
+|]
 devExpectedContents Accuracy = [hereLit|N
 Y
 |]
@@ -702,10 +725,14 @@ devExpectedContents _ = [hereLit|0.82
 
 testInContents :: Metric -> String
 testInContents (Mean metric) = testInContents metric
-testInContents GLEU = [hereLit|Alice has a black
+testInContents GLEU = [hereLit|Alicella on musta kissa.
 |]
 testInContents BLEU = [hereLit|ja jumala kutsui valkeuden päiväksi , ja pimeyden hän kutsui yöksi
 ja tuli ehtoo , ja tuli aamu , ensimmäinen päivä
+|]
+testInContents WER = testInContents BLEU
+testInContents CER = [hereLit|test1.pdf
+test2.pdf
 |]
 testInContents Accuracy = [hereLit|2	mild	yes
 -5	mild	no
@@ -776,6 +803,10 @@ testExpectedContents (Mean metric) = testExpectedContents metric
 testExpectedContents BLEU = [hereLit|na ka huaina e te atua te marama ko te awatea , a ko te pouri i huaina e ia ko te po
 a ko te ahiahi , ko te ata , he ra kotahi
 |]
+testExpectedContents CER = [hereLit|esse est percipi
+tabula rasa
+|]
+testExpectedContents WER = testExpectedContents BLEU
 testExpectedContents Accuracy = [hereLit|N
 Y
 |]
@@ -848,6 +879,8 @@ inHeaderContents :: Metric -> Maybe [String]
 inHeaderContents (Mean metric) = inHeaderContents metric
 inHeaderContents GLEU = Nothing
 inHeaderContents BLEU = Nothing
+inHeaderContents WER = Nothing
+inHeaderContents CER = Just ["Filename"]
 inHeaderContents Accuracy = Just ["Temperature", "Wind", "Rain"]
 inHeaderContents (FMeasure _) = Just ["seismic",
                                       "seismoacoustic",
@@ -894,6 +927,8 @@ outHeaderContents :: Metric -> Maybe [String]
 outHeaderContents (Mean metric) = outHeaderContents metric
 outHeaderContents BLEU = Nothing
 outHeaderContents GLEU = Nothing
+outHeaderContents WER = Nothing
+outHeaderContents CER = Just ["OCRedText"]
 outHeaderContents Accuracy = Just ["ShouldYouKidForWalk"]
 outHeaderContents (FMeasure _) = Just ["IsSeismicBump"]
 outHeaderContents (MacroFMeasure _) = Just ["LanguageCode"]

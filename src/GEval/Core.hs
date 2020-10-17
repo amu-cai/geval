@@ -158,6 +158,7 @@ isPreprocessable Spearman = False
 isPreprocessable BLEU     = True
 isPreprocessable GLEU     = True
 isPreprocessable WER      = True
+isPreprocessable CER      = True
 isPreprocessable Accuracy = True
 isPreprocessable ClippEU  = False
 isPreprocessable (FMeasure _) = False
@@ -691,7 +692,19 @@ gevalCoreOnSources (Mean WER)
       intoWords (RawItemTarget t) = Prelude.map unpack $ Data.Text.words t
       intoWords (PartiallyParsedItemTarget ts) = Prelude.map unpack ts
 
-gevalCoreOnSources (Mean _) = error $ "Mean/ meta-metric defined only for MultiLabel-F1 and WER for the time being"
+gevalCoreOnSources (Mean CER)
+  = gevalCoreWithoutInputOnItemTargets (Right . getString)
+                                       (Right . getString)
+                                       ((uncurry (/.)) . (uncurry werStep))
+                                       averageC
+                                       id
+                                       noGraph
+    where
+      -- repeated as below, as it will be refactored into dependent types soon anyway
+      getString (RawItemTarget t) = unpack t
+      getString (PartiallyParsedItemTarget ts) = Prelude.unwords $ Prelude.map unpack ts
+
+gevalCoreOnSources (Mean _) = error $ "Mean/ meta-metric defined only for MultiLabel-F1, WER and CER for the time being"
 
 -- only MultiLabel-F1 handled for JSONs for the time being...
 gevalCoreOnSources (MultiLabelFMeasure beta matchingSpec) =
@@ -924,6 +937,11 @@ continueGEvalCalculations SAWER WER = defineContinuation werAgg werFinal noGraph
   where werAgg = CC.foldl werFuse (0, 0)
         werFuse (a1, a2) (b1, b2) = (a1 + b1, a2 + b2)
         werFinal (errors, ref) = errors /. ref
+
+continueGEvalCalculations SACER CER = defineContinuation cerAgg cerFinal noGraph
+  where cerAgg = CC.foldl cerFuse (0, 0)
+        cerFuse (a1, a2) (b1, b2) = (a1 + b1, a2 + b2)
+        cerFinal (errors, ref) = errors /. ref
 
 continueGEvalCalculations SAAccuracy Accuracy = defineContinuation averageC id noGraph
 

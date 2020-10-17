@@ -58,6 +58,7 @@ listOfAvailableMetrics = [RMSE,
                           BLEU,
                           GLEU,
                           WER,
+                          CER,
                           NMI,
                           ClippEU,
                           LogLossHashed defaultLogLossHashedSize,
@@ -78,6 +79,7 @@ listOfAvailableMetrics = [RMSE,
                           CharMatch]
 
 extraInfo :: EvaluationScheme -> Maybe String
+extraInfo (EvaluationScheme CER []) = Just "Character-Error Rate"
 extraInfo (EvaluationScheme GLEU [])  = Just "\"Google GLEU\" not the grammar correction metric"
 extraInfo (EvaluationScheme BLEU [LowerCasing,
                                  RegexpMatch _]) = Just "BLEU on lowercased strings, only Latin characters and digits considered"
@@ -97,6 +99,8 @@ isMetricDescribed (SoftFMeasure _) = True
 isMetricDescribed (Soft2DFMeasure _) = True
 isMetricDescribed (ProbabilisticMultiLabelFMeasure _) = True
 isMetricDescribed GLEU = True
+isMetricDescribed WER = True
+isMetricDescribed CER = True
 isMetricDescribed SegmentAccuracy = True
 isMetricDescribed _ = False
 
@@ -138,6 +142,17 @@ metric on a corpus level but does not have its drawbacks for our per
 sentence reward objective.
 see: https://arxiv.org/pdf/1609.08144.pdf
 |]
+getMetricDescription WER =
+  [i|WER (Word-Error Rate) is the number of word-level mistakes divided
+by the number of words in the expected output. Possible mistakes are
+deletions, insertions and substitions — as in the Levenshtein distance.
+|]
+getMetricDescription CER =
+  [i|CER (Character-Error Rate) is the number of character-level mistakes divided
+by the total length of the expected output. Possible mistakes are
+deletions, insertions and substitions — as in the Levenshtein distance.
+|]
+
 getMetricDescription SegmentAccuracy =
   [i|Accuracy counted for segments, i.e. labels with positions.
 The percentage of labels in the ground truth retrieved in the actual output is returned.
@@ -156,6 +171,12 @@ surname/1:0.4
 first-name/3:0.9
 |]
 outContents GLEU = [hereLit|Alice has a black
+|]
+outContents WER = [hereLit|na ka huainaua e te atua te marama ko te awatea , a ko te pouri i huaina e ia ko te po
+a ko te ahiahi , ko ata , he ra ko kotahi
+|]
+outContents CER = [hereLit|esse esi perctp
+tabula rasai
 |]
 outContents SegmentAccuracy = [hereLit|N:1-4 V:5-6 N:8-10 V:12-13 A:15-17
 N:1-4 V:6-7 A:9-13
@@ -178,6 +199,10 @@ expectedScore (EvaluationScheme GLEU [])
   = 0.7142857142857143
 expectedScore (EvaluationScheme SegmentAccuracy [])
   = 0.875
+expectedScore (EvaluationScheme WER [])
+  = 0.08571
+expectedScore (EvaluationScheme CER [])
+  = 0.14814
 
 helpMetricParameterMetricsList :: String
 helpMetricParameterMetricsList = intercalate ", " $ map (\s -> (show s) ++ (case extraInfo s of
@@ -226,7 +251,7 @@ the form LABEL:PAGE/X0,Y0,X1,Y1 where LABEL is any label, page is the page numbe
 formatDescription (ProbabilisticMultiLabelFMeasure _) = [hereLit|In each line a number of labels (entities) can be given. A label probability
 can be provided with a colon (e.g. "foo:0.7"). By default, 1.0 is assumed.
 |]
-formatDescription GLEU = [hereLit|In each line a there is a space sparated sentence of words.
+formatDescription GLEU = [hereLit|In each line a there is a space sparated sequence of words.
 |]
 formatDescription SegmentAccuracy = [hereLit|Labels can be any strings (without spaces), whereas is a list of
 1-based indexes or spans separated by commas (spans are inclusive
@@ -234,6 +259,9 @@ ranges, e.g. "10-14"). For instance, "foo:bar:2,4-7,10" is a
 label "foo:bar" for positions 2, 4, 5, 6, 7 and 10. Note that no
 overlapping segments can be returned (evaluation will fail in
 such a case).
+|]
+formatDescription WER = formatDescription GLEU
+formatDescription CER = [hereLit|Any text, whitespace and punctuation marks are also considered.
 |]
 
 scoreExplanation :: EvaluationScheme -> Maybe String
@@ -257,6 +285,14 @@ Now we have to calculate precision and recall:
 scoreExplanation (EvaluationScheme SegmentAccuracy [])
   = Just [hereLit|Out of 4 segments in the expected output for the first item, 3 were retrieved correcly (accuracy is 3/4=0.75).
 The second item was retrieved perfectly (accuracy is 1.0). Hence, the average is (0.75+1.0)/2=0.875.|]
+scoreExplanation (EvaluationScheme WER [])
+  = Just [hereLit|The total length of expected output (in words) is 35. There are 3 errors
+(1 word substituted, 1 inserted, 1 deleted)  in the actual output. Hence,
+WER = (1+1+1) / 35 = 3 / 35 = 0.08571.|]
+scoreExplanation (EvaluationScheme CER [])
+  = Just [hereLit|The total length of expected output (in characters) is 27. There are 4 errors
+(1 word substituted, 1 inserted, 1 deleted)  in the actual output. Hence,
+CER = (2+1+1) / 27 = 4 / 27 = 0.14814.|]
 
 pasteLines :: String -> String -> String
 pasteLines a b = printf "%-35s %s\n" a b

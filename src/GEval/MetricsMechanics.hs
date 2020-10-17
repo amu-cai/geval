@@ -47,7 +47,7 @@ import GEval.MatchingSpecification
 -- | Helper type so that singleton can be used.
 -- | (The problem is that some metrics are parametrized by Double
 -- | Word32 and this is not handled by the singleton libary.)
-singletons [d|data AMetric = ARMSE | AMSE | APearson | ASpearman | ABLEU | AGLEU | AWER | AAccuracy | AClippEU
+singletons [d|data AMetric = ARMSE | AMSE | APearson | ASpearman | ABLEU | AGLEU | AWER | ACER | AAccuracy | AClippEU
                              | AFMeasure | AMacroFMeasure | ANMI
                              | ALogLossHashed | ACharMatch | AMAP | ALogLoss | ALikelihood
                              | ABIOF1 | ABIOF1Labels | ATokenAccuracy | ASegmentAccuracy | ALikelihoodHashed | AMAE | ASMAPE | AMultiLabelFMeasure MatchingSpecification
@@ -66,6 +66,7 @@ toHelper Spearman = ASpearman
 toHelper BLEU = ABLEU
 toHelper GLEU = AGLEU
 toHelper WER = AWER
+toHelper CER = ACER
 toHelper Accuracy = AAccuracy
 toHelper ClippEU = AClippEU
 toHelper (FMeasure _) = AFMeasure
@@ -104,6 +105,7 @@ type family ParsedExpectedType (t :: AMetric) :: * where
   ParsedExpectedType ABLEU     = [[String]]
   ParsedExpectedType AGLEU     = [[String]]
   ParsedExpectedType AWER      = [String]
+  ParsedExpectedType ACER      = String
   ParsedExpectedType AAccuracy = Text
   ParsedExpectedType AClippEU  = [ClippingSpec]
   ParsedExpectedType AFMeasure = Bool
@@ -138,6 +140,7 @@ expectedParser SASpearman = doubleParser
 expectedParser SABLEU = alternativeSentencesParser
 expectedParser SAGLEU = alternativeSentencesParser
 expectedParser SAWER = intoStringWords
+expectedParser SACER = Right . unpack
 expectedParser SAAccuracy = onlyStrip
 expectedParser SAClippEU = controlledParse lineClippingSpecsParser
 expectedParser SAFMeasure = zeroOneParser
@@ -185,6 +188,7 @@ outputParser SASpearman = expectedParser SASpearman
 outputParser SABLEU = Right . Prelude.words . unpack
 outputParser SAGLEU = Right . Prelude.words . unpack
 outputParser SAWER = expectedParser SAWER
+outputParser SACER = expectedParser SACER
 outputParser SAAccuracy = expectedParser SAAccuracy
 outputParser SAClippEU = controlledParse lineClippingsParser
 outputParser SAFMeasure = probToZeroOneParser
@@ -236,6 +240,7 @@ type family ItemIntermediateRepresentationType (t :: AMetric) :: * where
   ItemIntermediateRepresentationType ALikelihoodHashed = (Text, Text)
   ItemIntermediateRepresentationType ACharMatch = (Text, Text)
   ItemIntermediateRepresentationType AWER = (Int, Int)
+  ItemIntermediateRepresentationType ACER = (Int, Int)
   ItemIntermediateRepresentationType t = Double
 
 itemStep :: SAMetric t -> (ParsedExpectedType t, ParsedOutputType t) -> ItemIntermediateRepresentationType t
@@ -246,6 +251,8 @@ itemStep SASpearman = id
 itemStep SABLEU = uncurry bleuStep
 itemStep SAGLEU = uncurry gleuStep
 itemStep SAWER = uncurry werStep
+-- strings are character lists, so we could re-use werStep
+itemStep SACER = uncurry werStep
 itemStep SAAccuracy = hitOrMiss
 itemStep SAClippEU = clippEUMatchStep
 itemStep SAFMeasure = getCount
