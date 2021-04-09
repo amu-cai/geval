@@ -95,6 +95,7 @@ isEvaluationSchemeDescribed (EvaluationScheme metric []) = isMetricDescribed met
 isEvaluationSchemeDescribed _ = False
 
 isMetricDescribed :: Metric -> Bool
+isMetricDescribed (MultiLabelFMeasure 1.0 ExactMatch) = True
 isMetricDescribed (SoftFMeasure _) = True
 isMetricDescribed (Soft2DFMeasure _) = True
 isMetricDescribed (ProbabilisticMultiLabelFMeasure _) = True
@@ -108,6 +109,17 @@ getEvaluationSchemeDescription :: EvaluationScheme -> String
 getEvaluationSchemeDescription (EvaluationScheme metric []) = getMetricDescription metric
 
 getMetricDescription :: Metric -> String
+getMetricDescription (MultiLabelFMeasure 1.0 ExactMatch) =
+  [i|F-measure (or F-score), i.e. harmonic mean of the precision and
+recall. It can be calculated for any labels. Precision is the fraction
+of correct labels among the ones in the output, whereas recall is the
+fraction of instances in the gold standard that were correctly
+retrieved. Counts for precision and recall are calculated for the
+whole test set, in other words it is a micro-average (it is NOT the
+case that F-scores are calculated for each document or label class
+separately and then averaged). For a macro-average per document, see
+Mean/Multilabel-F1.
+|]
 getMetricDescription (SoftFMeasure _) =
   [i|"Soft" F-measure on intervals, i.e. partial "hits" are considered. For instance,
 if a label `foo` is expected for the span 2-9 and this label is returned but with
@@ -160,6 +172,10 @@ Accuracy is calculated separately for each item and then averaged.
 |]
 
 outContents :: Metric -> String
+outContents (MultiLabelFMeasure _ _) = [hereLit|person/1,3 first-name/1 first-name/3
+surname/2
+first-name/3
+|]
 outContents (SoftFMeasure _) = [hereLit|inwords:1-4
 inwords:1-3 indigits:5
 |]
@@ -183,6 +199,7 @@ N:1-4 V:6-7 A:9-13
 |]
 
 expectedScore :: EvaluationScheme -> MetricValue
+expectedScore (EvaluationScheme (MultiLabelFMeasure 1.0 ExactMatch) []) = 0.6666
 expectedScore (EvaluationScheme (SoftFMeasure beta) [])
   = let precision = 0.25
         recall = 0.75
@@ -240,6 +257,9 @@ formatEvaluationSchemeDescription scheme@(EvaluationScheme metric _) = show sche
 IF YOU WANT TO HAVE IT DESCRIBED|]
 
 formatDescription :: Metric -> String
+formatDescription (MultiLabelFMeasure _ ExactMatch) = [hereLit|Any label separated by spaces can be used. They are
+not intepreted in any way when the metric is calculated.
+|]
 formatDescription (SoftFMeasure _) = [hereLit|Each line is a sequence of entities separated by spaces, each entity is of
 the form LABEL:SPAN, where LABEL is any label and SPAN is defined using single integers, intervals or such
 units separated with commas.
@@ -265,6 +285,11 @@ formatDescription CER = [hereLit|Any text, whitespace and punctuation marks are 
 |]
 
 scoreExplanation :: EvaluationScheme -> Maybe String
+scoreExplanation (EvaluationScheme (MultiLabelFMeasure _ ExactMatch) [])
+  = Just [hereLit|Out of the total 5 labels in the output, 3 are correct (person/1,3, first-name/1 and
+first-name/3), hence precision is 3/5=0.6, whereas out of the 4 labels in gold standard,
+again 3 were retrieved, so recall is 3/4=0.75. The harmonic mean of precision and recall
+is 2/(4/3 + 5/3) = 2/3 = 0.6666|]
 scoreExplanation (EvaluationScheme (SoftFMeasure _) [])
   = Just [hereLit|We have a partial (0.75) success for the entity `inwords:1-4`, hence Recall = 0.75/1 = 0.75,
 Precision = (0 + 0.75 + 0) / 3 = 0.25, so F-score = 0.375|]
