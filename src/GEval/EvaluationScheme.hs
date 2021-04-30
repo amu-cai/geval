@@ -12,6 +12,7 @@ import GEval.Metric
 
 import Text.Regex.PCRE.Heavy
 import Text.Regex.PCRE.Light.Base (Regex(..))
+import Text.Regex.PCRE.Light (compile)
 import Data.Text (Text(..), concat, toCaseFold, toLower, toUpper, pack, unpack, words, unwords)
 import Data.List (intercalate, break, sort)
 import Data.Either
@@ -55,13 +56,13 @@ readOps ('u':theRest) = (UpperCasing:ops, theRest')
     where (ops, theRest') = readOps theRest
 readOps ('c':theRest) = (CaseFolding:ops, theRest')
     where (ops, theRest') = readOps theRest
-readOps ('m':theRest) = handleParametrizedOp (RegexpMatch . (fromRight undefined) . ((flip compileM) []) . BSU.fromString) theRest
-readOps ('t':theRest) = handleParametrizedOp (RegexpTokenMatch . (fromRight undefined) . ((flip compileM) []) . BSU.fromString) theRest
+readOps ('m':theRest) = handleParametrizedOp (RegexpMatch . ((flip compile) []) . BSU.fromString) theRest
+readOps ('t':theRest) = handleParametrizedOp (RegexpTokenMatch . ((flip compile) []) . BSU.fromString) theRest
 readOps ('S':theRest) = (Sorting:ops, theRest')
     where (ops, theRest') = readOps theRest
 readOps ('N':theRest) = handleParametrizedOp (SetName . pack) theRest
 readOps ('P':theRest) = handleParametrizedOp (SetPriority . read) theRest
-readOps ('s':theRest) = handleParametrizedBinaryOp (\a b -> RegexpSubstition (fromRight undefined $ compileM (BSU.fromString a) []) (pack b)) theRest
+readOps ('s':theRest) = handleParametrizedBinaryOp (\a b -> RegexpSubstition (compile (BSU.fromString a) []) (pack b)) theRest
 readOps ('f':theRest) = handleParametrizedOp (FeatureFilter . pack) theRest
 readOps s = ([], s)
 
@@ -141,7 +142,7 @@ applySubstitution r substitution t =
 
 handleRefs :: Text -> Text -> [Text] -> Text
 handleRefs substitution mainMatch subMatches = gsub refRegexp handleRef substitution
-  where Right refRegexp = compileM (BSU.fromString "\\\\\\d+") []
+  where refRegexp = compile (BSU.fromString "\\\\\\d+") []
         indexables = mainMatch : subMatches
         handleRef :: Text -> Text
         handleRef ref =
