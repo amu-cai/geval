@@ -23,6 +23,7 @@ library
                      , GEval.CreateChallenge
                      , GEval.OptionsParser
                      , GEval.BLEU
+                     , GEval.Haversine
                      , GEval.Clippings
                      , GEval.PrecisionRecall
                      , GEval.ClusteringMetrics

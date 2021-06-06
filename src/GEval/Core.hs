@@ -185,6 +185,7 @@ isPreprocessable (MultiLabelFMeasure _ _) = True
 isPreprocessable MultiLabelLogLoss = False
 isPreprocessable MultiLabelLikelihood = False
 isPreprocessable (Mean metric) = isPreprocessable metric
+isPreprocessable Haversine = False
 
 defaultOutDirectory = "."
 defaultTestName = "test-A"
@@ -1001,6 +1002,7 @@ continueGEvalCalculations SAMultiLabelLogLoss MultiLabelLogLoss = defineContinua
                                                                    id
                                                                    noGraph
 
+continueGEvalCalculations SAHaversine Haversine = defineContinuation averageC id noGraph
 
 defineContinuation ::  (ConduitT c Void (ResourceT m) d)  -- ^ a Conduit which aggregates all the combined values into
                                                          -- a "total" value
