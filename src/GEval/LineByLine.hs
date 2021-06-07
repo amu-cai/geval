@@ -617,23 +617,24 @@ gevalLineByLineSource metric dataSource =
 
         evaluateLine (lineNo, ParsedRecordWithInput inp' exp' out') = do
           let inp = if shouldBePreprocessedForPresentation
-                    then preprocess inp'
+                    then inPreprocess inp'
                     else inp'
           let exp = preprocessOut exp'
           let out = preprocessOut out'
           s <- liftIO $ gevalCoreOnSingleLines metric
                                               -- if also to be shown preprocessed, preprocessing
                                               -- will be done earlier
-                                              (if shouldBePreprocessedForPresentation then id else preprocess)
+                                              (if shouldBePreprocessedForPresentation then id else outPreprocess)
                                               (getDataDecoder inputLineSource) (LineInFile inputSource lineNo inp)
                                               (getDataDecoder expectedLineSource) (LineInFile expectedSource lineNo exp)                                            (getDataDecoder outputLineSource) (LineInFile outSource lineNo out)
           return $ LineRecord inp exp out lineNo (extractSimpleRunValue $ getMetricValue s)
         preprocessOut = if shouldBePreprocessedForPresentation && isPreprocessable metric
-                        then preprocess
+                        then outPreprocess
                         else id
         challengeDataSource = dataSourceChallengeData dataSource
         mSelector = challengeDataSourceSelector challengeDataSource
-        preprocess = challengeDataSourcePreprocess challengeDataSource
+        outPreprocess = challengeDataSourceOutPreprocess challengeDataSource
+        inPreprocess = challengeDataSourceInPreprocess challengeDataSource
         shouldBePreprocessedForPresentation = challengeDataSourceShowPreprocessed challengeDataSource
         mInHeader = challengeDataSourceInHeader challengeDataSource
         mOutHeader = challengeDataSourceOutHeader challengeDataSource
