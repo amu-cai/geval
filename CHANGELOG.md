@@ -1,4 +1,10 @@
 
+## 1.39.0.0
+
+New features:
+
+* Add Haversine metric for distance on a sphere
+
 ## 1.38.0.0
 
 New features:
