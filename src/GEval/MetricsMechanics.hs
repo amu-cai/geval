@@ -43,6 +43,7 @@ import GEval.BIO (TaggedEntity, parseBioSequenceIntoEntities, parseBioSequenceIn
 import GEval.LogLossHashed (parseWordSpecs, wordSpecToPair)
 import GEval.ProbList (ProbList(..), parseIntoProbList, WordWithProb(..), countLogLossOnProbList)
 import GEval.MatchingSpecification
+import GEval.Haversine
 
 -- | Helper type so that singleton can be used.
 -- | (The problem is that some metrics are parametrized by Double
@@ -53,7 +54,7 @@ singletons [d|data AMetric = ARMSE | AMSE | APearson | ASpearman | ABLEU | AGLEU
                              | ABIOF1 | ABIOF1Labels | ATokenAccuracy | ASegmentAccuracy | ALikelihoodHashed | AMAE | ASMAPE | AMultiLabelFMeasure MatchingSpecification
                              | AMultiLabelLogLoss | AMultiLabelLikelihood
                              | ASoftFMeasure | AProbabilisticMultiLabelFMeasure | AProbabilisticSoftFMeasure | ASoft2DFMeasure
-                             | AFLCFMeasure
+                             | AFLCFMeasure | AHaversine
                              deriving (Eq)
              |]
 
@@ -92,6 +93,7 @@ toHelper (FLCFMeasure _) = AFLCFMeasure
 toHelper (ProbabilisticMultiLabelFMeasure _) = AProbabilisticMultiLabelFMeasure
 toHelper (ProbabilisticSoftFMeasure _) = AProbabilisticSoftFMeasure
 toHelper (Soft2DFMeasure _) = ASoft2DFMeasure
+toHelper Haversine = AHaversine
 
 type family ParsedInputType (t :: AMetric) :: * where
   ParsedInputType ACharMatch = Text
@@ -131,6 +133,7 @@ type family ParsedExpectedType (t :: AMetric) :: * where
   ParsedExpectedType (AMultiLabelFMeasure _) = [Text]
   ParsedExpectedType AMultiLabelLogLoss = [Text]
   ParsedExpectedType AMultiLabelLikelihood = [Text]
+  ParsedExpectedType AHaversine = (Double, Double)
 
 expectedParser :: SAMetric t -> Text -> Either String (ParsedExpectedType t)
 expectedParser SARMSE = doubleParser
@@ -166,6 +169,7 @@ expectedParser SASMAPE = doubleParser
 expectedParser (SAMultiLabelFMeasure _) = intoWords
 expectedParser SAMultiLabelLogLoss = intoWords
 expectedParser SAMultiLabelLikelihood = intoWords
+expectedParser SAHaversine =  parseSpherePoints
 
 type family ParsedOutputType (t :: AMetric) :: * where
   ParsedOutputType ABLEU = [String]
@@ -178,6 +182,7 @@ type family ParsedOutputType (t :: AMetric) :: * where
   ParsedOutputType AProbabilisticMultiLabelFMeasure = [WordWithProb]
   ParsedOutputType AMultiLabelLikelihood = ProbList
   ParsedOutputType AMultiLabelLogLoss = ProbList
+  ParsedOutputType AHaversine = (Double, Double)
   ParsedOutputType t = ParsedExpectedType t
 
 outputParser :: SAMetric t -> Text -> Either String (ParsedOutputType t)
@@ -214,6 +219,7 @@ outputParser SASMAPE = doubleParser
 outputParser (SAMultiLabelFMeasure _) = intoWords
 outputParser SAMultiLabelLogLoss = Right . parseIntoProbList
 outputParser SAMultiLabelLikelihood = Right . parseIntoProbList
+outputParser SAHaversine = parseSpherePoints
 
 type family ItemIntermediateRepresentationType (t :: AMetric) :: * where
   ItemIntermediateRepresentationType ABLEU = (Int, Int, Int, Int, Int, Int, Int, Int, Int)
@@ -241,6 +247,7 @@ type family ItemIntermediateRepresentationType (t :: AMetric) :: * where
   ItemIntermediateRepresentationType ACharMatch = (Text, Text)
   ItemIntermediateRepresentationType AWER = (Int, Int)
   ItemIntermediateRepresentationType ACER = (Int, Int)
+  ItemIntermediateRepresentationType AHaversine = Double
   ItemIntermediateRepresentationType t = Double
 
 itemStep :: SAMetric t -> (ParsedExpectedType t, ParsedOutputType t) -> ItemIntermediateRepresentationType t
@@ -278,6 +285,7 @@ itemStep SASMAPE = smape
 itemStep (SAMultiLabelFMeasure smatchSpec) = getWeightedCounts (getMatchingFunctionForText $ fromSing smatchSpec)
 itemStep SAMultiLabelLogLoss = uncurry countLogLossOnProbList
 itemStep SAMultiLabelLikelihood = uncurry countLogLossOnProbList
+itemStep SAHaversine = haversine
 
 
 doubleParser = getValue . TR.double
@@ -400,3 +408,12 @@ countHitsAndTotals (es, os) =
            | e == (pack "*") = (h, t)
            | o `Prelude.elem` (splitOn (pack ";") e) = (h + 1, t + 1)
            | otherwise = (h, t + 1)
+
+parseSpherePoints :: Text -> Either String (Double, Double)
+parseSpherePoints t = case DLS.splitOn "\t" (unpack t) of
+   [longitudeStr, latitudeStr] -> case doubleParser (pack longitudeStr) of
+     Right longitude -> case doubleParser (pack latitudeStr) of
+       Right latitude -> Right (longitude, latitude)
+       Left _ -> Left "cannot parse line with latitude of sphere"
+     Left _ -> Left "cannot parse line with longitude of sphere"
+   _ -> Left "cannot parse line with longitude and latitude of sphere"

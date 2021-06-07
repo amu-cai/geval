@@ -115,6 +115,15 @@ Do OCR.
 This is a sample fake challenge for Gonito framework. Replace it with
 the description of your challenge.|] ++ (commonReadmeMDContents testName)
 
+readmeMDContents Haversine testName = [i|
+GEval simple sphere distance
+==========================
+
+Compute distance between two points on a sphere given their longitudes and latitudes.
+
+This is a sample fake challenge for Gonito framework. Replace it with
+the description of your challenge.|] ++ (commonReadmeMDContents testName)
+
 readmeMDContents Accuracy testName = [i|
 GEval sample classification challenge
 =====================================
@@ -462,6 +471,11 @@ configContents schemes format testName =
 -- for the time being we are using the original function.
 
 trainInContents :: Metric -> String
+trainInContents Haversine = unlines
+                            $ map last
+                            $ map (splitOn "\t")
+                            $ lines
+                            $ trainContents Haversine
 trainInContents metric = unlines
                          $ map (intercalate "\t")
                          $ map tail
@@ -470,6 +484,12 @@ trainInContents metric = unlines
                          $ trainContents metric
 
 trainExpectedContents :: Metric -> String
+trainExpectedContents Haversine = unlines
+                                  $ map (intercalate "\t")
+                                  $ map (take 2)
+                                  $ map (splitOn "\t")
+                                  $ lines
+                                  $ trainContents Haversine
 trainExpectedContents metric = unlines $ map head $ map (splitOn "\t") $ lines $ trainContents metric
 
 trainContents :: Metric -> String
@@ -483,6 +503,9 @@ trainContents WER = trainContents BLEU
 trainContents CER = [hereLit|Hannibal ad portas	train1.pdf
 equo ne credite	train2.pdf
 errare humanum est	train3.pdf
+|]
+trainContents Haversine = [hereLit|30.47547	-90.100911	some text
+33.399478	-110.87095	Another text
 |]
 
 trainContents Accuracy = [hereLit|Y	10	none	yes
@@ -645,6 +668,8 @@ devInContents (Soft2DFMeasure _) = devInContents ClippEU
 devInContents ClippEU = [hereLit|file1.djvu
 file2.djvu
 |]
+devInContents Haversine = [hereLit|Some dev text
+|]
 devInContents _ = [hereLit|0.72	0	0.007
 9.54	62	0.054
 |]
@@ -718,6 +743,8 @@ devExpectedContents (Soft2DFMeasure _) = [hereLit|
 |]
 devExpectedContents ClippEU = [hereLit|
 10/10,20,30,100/5 3/0,50,500,500/5
+|]
+devExpectedContents Haversine = [hereLit|32.812883	-109.625582
 |]
 devExpectedContents _ = [hereLit|0.82
 95.2
@@ -793,6 +820,9 @@ I hate
 testInContents (Soft2DFMeasure _) = testInContents ClippEU
 testInContents ClippEU = [hereLit|file3.djvu
 file4.djvu
+|]
+testInContents Haversine = [hereLit|Some test text
+Another test text
 |]
 testInContents _ = [hereLit|0.72	0	0.007
 9.54	62	0.054
@@ -871,6 +901,9 @@ testExpectedContents ClippEU = [hereLit|3/0,0,100,100/10
 |]
 testExpectedContents GLEU = [hereLit|Alice has a black cat
 |]
+testExpectedContents Haversine = [hereLit|39.575264	-76.995928
+29.949932	-90.070116
+|]
 testExpectedContents _ = [hereLit|0.11
 17.2
 |]
@@ -921,6 +954,7 @@ inHeaderContents MultiLabelLikelihood = inHeaderContents MultiLabelLogLoss
 inHeaderContents MultiLabelLogLoss = Just ["Utterance"]
 inHeaderContents (Soft2DFMeasure _) = inHeaderContents ClippEU
 inHeaderContents ClippEU = Just ["DjvuFilePath"]
+inHeaderContents Haversine = Just ["Text"]
 inHeaderContents _ = Just ["OrbitalPeriod", "OrbitalEccentricity", "NumberOfMoons"]
 
 outHeaderContents :: Metric -> Maybe [String]
@@ -951,6 +985,7 @@ outHeaderContents MultiLabelLikelihood = outHeaderContents MultiLabelLogLoss
 outHeaderContents MultiLabelLogLoss = Just ["Emotion"]
 outHeaderContents (Soft2DFMeasure _) = Just ["Rectangle"]
 outHeaderContents ClippEU = Just ["Rectangle"]
+outHeaderContents Haversine = Just ["Longitude", "Latitude"]
 outHeaderContents _ = Just ["Mass"]
 
 gitignoreContents :: String

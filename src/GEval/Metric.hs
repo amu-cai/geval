@@ -34,6 +34,7 @@ data Metric = RMSE | MSE | Pearson | Spearman | BLEU | GLEU | WER | CER | Accura
               | SoftFMeasure Double | ProbabilisticMultiLabelFMeasure Double
               | ProbabilisticSoftFMeasure Double | Soft2DFMeasure Double
               | FLCFMeasure Double
+              | Haversine
               -- it would be better to avoid infinite recursion here
               -- `Mean (Mean BLEU)` is not useful, but as it would mean
               -- a larger refactor, we will postpone this
@@ -88,6 +89,7 @@ instance Show Metric where
   show (MultiLabelFMeasure beta (Harden matchSpec)) = "Harden/" ++ (show $ MultiLabelFMeasure beta matchSpec)
   show MultiLabelLogLoss = "MultiLabel-Logloss"
   show MultiLabelLikelihood = "MultiLabel-Likelihood"
+  show Haversine = "Haversine"
   show (Mean metric) = "Mean/" ++ (show metric)
 
 applyMatchingSpecification :: (MatchingSpecification -> MatchingSpecification)
@@ -166,6 +168,7 @@ instance Read Metric where
   readsPrec _ ('S':'M':'A':'P':'E':theRest) = [(SMAPE, theRest)]
   readsPrec _ ('M':'u':'l':'t':'i':'L':'a':'b':'e':'l':'-':'L':'o':'g':'L':'o':'s':'s':theRest) = [(MultiLabelLogLoss, theRest)]
   readsPrec _ ('M':'u':'l':'t':'i':'L':'a':'b':'e':'l':'-':'L':'i':'k':'e':'l':'i':'h':'o':'o':'d':theRest) = [(MultiLabelLikelihood, theRest)]
+  readsPrec _ ('H':'a':'v':'e':'r':'s':'i':'n':'e':theRest) = [(Haversine, theRest)]
 
 
 
@@ -206,6 +209,7 @@ getMetricOrdering SMAPE = TheLowerTheBetter
 getMetricOrdering (MultiLabelFMeasure _ _) = TheHigherTheBetter
 getMetricOrdering MultiLabelLogLoss = TheLowerTheBetter
 getMetricOrdering MultiLabelLikelihood = TheHigherTheBetter
+getMetricOrdering Haversine = TheLowerTheBetter
 getMetricOrdering (Mean metric) = getMetricOrdering metric
 
 metricCompare :: Metric -> MetricValue -> MetricValue -> Ordering

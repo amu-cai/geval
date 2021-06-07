@@ -76,6 +76,7 @@ listOfAvailableMetrics = [RMSE,
                           Soft2DFMeasure 1.0,
                           Soft2DFMeasure 2.0,
                           Soft2DFMeasure 0.25,
+                          Haversine,
                           CharMatch]
 
 extraInfo :: EvaluationScheme -> Maybe String
@@ -103,6 +104,7 @@ isMetricDescribed GLEU = True
 isMetricDescribed WER = True
 isMetricDescribed CER = True
 isMetricDescribed SegmentAccuracy = True
+isMetricDescribed Haversine = True
 isMetricDescribed _ = False
 
 getEvaluationSchemeDescription :: EvaluationScheme -> String
@@ -170,6 +172,10 @@ getMetricDescription SegmentAccuracy =
 The percentage of labels in the ground truth retrieved in the actual output is returned.
 Accuracy is calculated separately for each item and then averaged.
 |]
+getMetricDescription Haversine =
+  [i|The haversine formula determines the great-circle distance between
+two points on a sphere given their longitudes and latitudes (in degrees).
+|]
 
 outContents :: Metric -> String
 outContents (MultiLabelFMeasure _ _) = [hereLit|person/1,3 first-name/1 first-name/3
@@ -197,6 +203,9 @@ tabula rasai
 outContents SegmentAccuracy = [hereLit|N:1-4 V:5-6 N:8-10 V:12-13 A:15-17
 N:1-4 V:6-7 A:9-13
 |]
+outContents Haversine = [hereLit|39.575264	-56.995928
+29.949932	-90.070116
+|]
 
 expectedScore :: EvaluationScheme -> MetricValue
 expectedScore (EvaluationScheme (MultiLabelFMeasure 1.0 ExactMatch) []) = 0.6666
@@ -220,6 +229,8 @@ expectedScore (EvaluationScheme WER [])
   = 0.08571
 expectedScore (EvaluationScheme CER [])
   = 0.14814
+expectedScore (EvaluationScheme Haversine [])
+  = 1044.2633358563135
 
 helpMetricParameterMetricsList :: String
 helpMetricParameterMetricsList = intercalate ", " $ map (\s -> (show s) ++ (case extraInfo s of
@@ -282,6 +293,9 @@ such a case).
 |]
 formatDescription WER = formatDescription GLEU
 formatDescription CER = [hereLit|Any text, whitespace and punctuation marks are also considered.
+|]
+formatDescription Haversine = [hereLit|Each line is a latitude and longitude of sphere separated by tabulation,
+e.g. "41.558153 -73.051497".
 |]
 
 scoreExplanation :: EvaluationScheme -> Maybe String
