@@ -536,6 +536,8 @@ main = hspec $ do
       runGEvalTest "bio-f1-perfect" `shouldReturnAlmost` 1.0
     it "check inconsistent input" $ do
       runGEvalTest "bio-f1-error" `shouldThrow` (== UnexpectedData 2 "inconsistent label sequence `B-NAME/JOHN I-FOO/SMITH I-FOO/X`")
+    it "weighted F1" $ do
+      runGEvalTest "bio-weighted-f1-simple" `shouldReturnAlmost` 0.82539682
   describe "automatic decompression" $ do
     it "more complex test" $ do
       runGEvalTest "charmatch-complex-compressed" `shouldReturnAlmost` 0.1923076923076923

@@ -3,7 +3,7 @@
 module GEval.BIO
        (BIOLabel(..), bioSequenceParser, parseBioSequenceIntoEntities,
         parseBioSequenceIntoEntitiesWithoutNormalization,
-        TaggedSpan(..), TaggedEntity(..), gatherCountsForBIO,
+        TaggedSpan(..), TaggedEntity(..), gatherCountsForBIO, gatherSeparatedCountsForBIO,
         eraseNormalisation)
        where
 
@@ -16,8 +16,11 @@ import Data.Attoparsec.Combinator
 import Control.Applicative
 import Data.Char
 import Data.Maybe (catMaybes)
+import Data.List (groupBy, sortBy)
 
 import GEval.Common
+
+import qualified Data.HashMap.Strict as M
 
 data BIOLabel = Outside | Beginning T.Text (Maybe T.Text) | Inside T.Text (Maybe T.Text)
                 deriving (Eq, Show)
@@ -42,6 +45,23 @@ gatherCountsForBIO :: [TaggedEntity] -> [TaggedEntity] -> (Int, Int, Int)
 gatherCountsForBIO expected got = (maxMatchOnOrdered laterThan expected got, length expected, length got)
   where
     laterThan (TaggedEntity (TaggedSpan a _) _ _) (TaggedEntity (TaggedSpan b _) _ _) = a > b
+
+compareByLabel :: TaggedEntity -> TaggedEntity -> Ordering
+compareByLabel (TaggedEntity _ labelA _) (TaggedEntity _ labelB _) = labelA `compare` labelB
+
+equalLabel :: TaggedEntity -> TaggedEntity -> Bool
+equalLabel (TaggedEntity _ labelA _) (TaggedEntity _ labelB _) = labelA == labelB
+
+gatherSeparatedCountsForBIO :: [TaggedEntity] -> [TaggedEntity] -> M.HashMap T.Text (Int, Int, Int)
+gatherSeparatedCountsForBIO expected got = M.mapWithKey process expectedMapped
+  where expectedMapped = groupEntitiesByLabel expected
+        gotMapped = groupEntitiesByLabel got
+        groupEntitiesByLabel =
+          M.fromList
+          . map (\l@((TaggedEntity _ lab _):_) -> (lab, l))
+          . groupBy equalLabel
+          . sortBy compareByLabel
+        process lab expectedGroup = gatherCountsForBIO expectedGroup (M.lookupDefault [] lab gotMapped)
 
 parseBioSequenceIntoEntities :: T.Text -> Either String [TaggedEntity]
 parseBioSequenceIntoEntities t = labelsIntoEntities =<< (parseOnly (bioSequenceParser <* endOfInput) t)

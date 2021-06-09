@@ -28,7 +28,7 @@ import Data.Attoparsec.Text (parseOnly)
 data Metric = RMSE | MSE | Pearson | Spearman | BLEU | GLEU | WER | CER | Accuracy | ClippEU
               | FMeasure Double | MacroFMeasure Double | NMI
               | LogLossHashed Word32 | CharMatch | MAP | LogLoss | Likelihood
-              | BIOF1 | BIOF1Labels | TokenAccuracy | SegmentAccuracy | LikelihoodHashed Word32 | MAE | SMAPE
+              | BIOF1 | BIOWeightedF1 | BIOF1Labels | TokenAccuracy | SegmentAccuracy | LikelihoodHashed Word32 | MAE | SMAPE
               | MultiLabelFMeasure Double MatchingSpecification
               | MultiLabelLogLoss | MultiLabelLikelihood
               | SoftFMeasure Double | ProbabilisticMultiLabelFMeasure Double
@@ -78,6 +78,7 @@ instance Show Metric where
   show Likelihood = "Likelihood"
   show BIOF1 = "BIO-F1"
   show BIOF1Labels = "BIO-F1-Labels"
+  show BIOWeightedF1 = "BIO-Weighted-F1"
   show TokenAccuracy = "TokenAccuracy"
   show SegmentAccuracy = "SegmentAccuracy"
   show MAE = "MAE"
@@ -161,6 +162,7 @@ instance Read Metric where
   readsPrec p ('C':'h':'a':'r':'M':'a':'t':'c':'h':theRest) = [(CharMatch, theRest)]
   readsPrec _ ('M':'A':'P':theRest) = [(MAP, theRest)]
   readsPrec _ ('B':'I':'O':'-':'F':'1':'-':'L':'a':'b':'e':'l':'s':theRest) = [(BIOF1Labels, theRest)]
+  readsPrec _ ('B':'I':'O':'-':'W':'e':'i':'g':'h':'t':'e':'d':'-':'F':'1': theRest) = [(BIOWeightedF1, theRest)]
   readsPrec _ ('B':'I':'O':'-':'F':'1':theRest) = [(BIOF1, theRest)]
   readsPrec _ ('T':'o':'k':'e':'n':'A':'c':'c':'u':'r':'a':'c':'y':theRest) = [(TokenAccuracy, theRest)]
   readsPrec _ ('S':'e':'g':'m':'e':'n':'t':'A':'c':'c':'u':'r':'a':'c':'y':theRest) = [(SegmentAccuracy, theRest)]
@@ -201,6 +203,7 @@ getMetricOrdering MAP = TheHigherTheBetter
 getMetricOrdering LogLoss = TheLowerTheBetter
 getMetricOrdering Likelihood = TheHigherTheBetter
 getMetricOrdering BIOF1 = TheHigherTheBetter
+getMetricOrdering BIOWeightedF1 = TheHigherTheBetter
 getMetricOrdering BIOF1Labels = TheHigherTheBetter
 getMetricOrdering TokenAccuracy = TheHigherTheBetter
 getMetricOrdering SegmentAccuracy = TheHigherTheBetter

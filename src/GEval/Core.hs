@@ -177,6 +177,7 @@ isPreprocessable LogLoss = False
 isPreprocessable Likelihood = False
 isPreprocessable BIOF1 = False
 isPreprocessable BIOF1Labels = False
+isPreprocessable BIOWeightedF1 = False
 isPreprocessable TokenAccuracy = True
 isPreprocessable SegmentAccuracy = True
 isPreprocessable MAE = False
@@ -788,6 +789,11 @@ generalizedProbabilisticFMeasure beta metric = gevalCoreWithoutInput metric
 countAgg :: (Num n, Num v, Monad m) => ConduitM (n, v, v) o m (n, v, v)
 countAgg = CC.foldl countFolder (fromInteger 0, fromInteger 0, fromInteger 0)
 
+separatedCountAgg :: Monad m => ConduitM (M.HashMap Text (Int, Int, Int)) o m (M.HashMap Text (Int, Int, Int))
+separatedCountAgg = CC.foldl separatedCountFolder M.empty
+  where separatedCountFolder = M.unionWith countFolder
+
+
 countFragAgg :: (Num n, Num v, Monad m) => ConduitM (n, n, v, v) o m (n, n, v, v)
 countFragAgg = CC.foldl countFragFolder (fromInteger 0, fromInteger 0, fromInteger 0, fromInteger 0)
 
@@ -989,6 +995,8 @@ continueGEvalCalculations SAMAP MAP = defineContinuation averageC
 continueGEvalCalculations SABIOF1 BIOF1 = defineContinuation countAgg f1MeasureOnCounts noGraph
 
 continueGEvalCalculations SABIOF1Labels BIOF1Labels = defineContinuation countAgg f1MeasureOnCounts noGraph
+
+continueGEvalCalculations SABIOWeightedF1 BIOWeightedF1 = defineContinuation separatedCountAgg f1MeasureOnSeparatedCounts noGraph
 
 continueGEvalCalculations SASegmentAccuracy SegmentAccuracy = defineContinuation averageC id noGraph
 

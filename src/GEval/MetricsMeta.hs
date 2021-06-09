@@ -64,6 +64,7 @@ listOfAvailableMetrics = [RMSE,
                           LogLossHashed defaultLogLossHashedSize,
                           LikelihoodHashed defaultLogLossHashedSize,
                           BIOF1,
+                          BIOWeightedF1,
                           BIOF1Labels,
                           TokenAccuracy,
                           SegmentAccuracy,
@@ -105,6 +106,7 @@ isMetricDescribed WER = True
 isMetricDescribed CER = True
 isMetricDescribed SegmentAccuracy = True
 isMetricDescribed Haversine = True
+isMetricDescribed BIOWeightedF1 = True
 isMetricDescribed _ = False
 
 getEvaluationSchemeDescription :: EvaluationScheme -> String
@@ -176,6 +178,9 @@ getMetricDescription Haversine =
   [i|The haversine formula determines the great-circle distance between
 two points on a sphere given their longitudes and latitudes (in degrees).
 |]
+getMetricDescription BIOWeightedF1 =
+  [i|Weighted-average F1-score calculated on output expressed in the BIO format.
+|]
 
 outContents :: Metric -> String
 outContents (MultiLabelFMeasure _ _) = [hereLit|person/1,3 first-name/1 first-name/3
@@ -206,6 +211,10 @@ N:1-4 V:6-7 A:9-13
 outContents Haversine = [hereLit|39.575264	-56.995928
 29.949932	-90.070116
 |]
+outContents BIOWeightedF1 = [hereLit|B-firstname/ALAN B-surname/TURING
+O O O
+B-surname/TARSKI O B-surname/NOT O
+|]
 
 expectedScore :: EvaluationScheme -> MetricValue
 expectedScore (EvaluationScheme (MultiLabelFMeasure 1.0 ExactMatch) []) = 0.6666
@@ -231,6 +240,8 @@ expectedScore (EvaluationScheme CER [])
   = 0.14814
 expectedScore (EvaluationScheme Haversine [])
   = 1044.2633358563135
+expectedScore (EvaluationScheme BIOWeightedF1 [])
+  = 0.86666666
 
 helpMetricParameterMetricsList :: String
 helpMetricParameterMetricsList = intercalate ", " $ map (\s -> (show s) ++ (case extraInfo s of
@@ -297,6 +308,10 @@ formatDescription CER = [hereLit|Any text, whitespace and punctuation marks are 
 formatDescription Haversine = [hereLit|Each line is a latitude and longitude of sphere separated by tabulation,
 e.g. "41.558153 -73.051497".
 |]
+formatDescription BIOWeightedF1 = [hereLit|Each line is a sequence of tags encoded in the BIO format, i.e. O, B-tag, I-tag;
+B-tags and I-tags can accompanied by an extra label after a slash.
+|]
+
 
 scoreExplanation :: EvaluationScheme -> Maybe String
 scoreExplanation (EvaluationScheme (MultiLabelFMeasure _ ExactMatch) [])
@@ -332,6 +347,11 @@ scoreExplanation (EvaluationScheme CER [])
   = Just [hereLit|The total length of expected output (in characters) is 27. There are 4 errors
 (1 word substituted, 1 inserted, 1 deleted)  in the actual output. Hence,
 CER = (2+1+1) / 27 = 4 / 27 = 0.14814.|]
+scoreExplanation (EvaluationScheme Haversine []) = Nothing
+scoreExplanation (EvaluationScheme BIOWeightedF1 [])
+  = Just [hereLit|There are two labels (firstname and surname, O is not considered). Firstname was
+predicted in the perfect way, hence F1=1, whereas for surname recall is 1, precision - 2/3 and F1 - 4/5.
+The weighted average is (1 * 1 + 2 * 4/5) / 3 = 13/15 = 0.8667.|]
 
 pasteLines :: String -> String -> String
 pasteLines a b = printf "%-35s %s\n" a b

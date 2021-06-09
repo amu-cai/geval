@@ -20,7 +20,7 @@ import GEval.Common
 import GEval.BLEU (bleuStep, gleuStep)
 import GEval.WER (werStep)
 import GEval.Clippings (totalArea, coveredBy, clippEUMatchStep)
-import GEval.BIO (gatherCountsForBIO)
+import GEval.BIO (gatherCountsForBIO, gatherSeparatedCountsForBIO)
 
 import GEval.Probability
 import GEval.PrecisionRecall (weightedMaxMatch, fMeasureOnCounts, calculateMAPForOneResult, getProbabilisticCounts, getCounts)
@@ -45,13 +45,15 @@ import GEval.ProbList (ProbList(..), parseIntoProbList, WordWithProb(..), countL
 import GEval.MatchingSpecification
 import GEval.Haversine
 
+import qualified Data.HashMap.Strict as M
+
 -- | Helper type so that singleton can be used.
 -- | (The problem is that some metrics are parametrized by Double
 -- | Word32 and this is not handled by the singleton libary.)
 singletons [d|data AMetric = ARMSE | AMSE | APearson | ASpearman | ABLEU | AGLEU | AWER | ACER | AAccuracy | AClippEU
                              | AFMeasure | AMacroFMeasure | ANMI
                              | ALogLossHashed | ACharMatch | AMAP | ALogLoss | ALikelihood
-                             | ABIOF1 | ABIOF1Labels | ATokenAccuracy | ASegmentAccuracy | ALikelihoodHashed | AMAE | ASMAPE | AMultiLabelFMeasure MatchingSpecification
+                             | ABIOF1 | ABIOWeightedF1 | ABIOF1Labels | ATokenAccuracy | ASegmentAccuracy | ALikelihoodHashed | AMAE | ASMAPE | AMultiLabelFMeasure MatchingSpecification
                              | AMultiLabelLogLoss | AMultiLabelLikelihood
                              | ASoftFMeasure | AProbabilisticMultiLabelFMeasure | AProbabilisticSoftFMeasure | ASoft2DFMeasure
                              | AFLCFMeasure | AHaversine
@@ -79,6 +81,7 @@ toHelper MAP = AMAP
 toHelper LogLoss = ALogLoss
 toHelper Likelihood = ALikelihood
 toHelper BIOF1 = ABIOF1
+toHelper BIOWeightedF1 = ABIOWeightedF1
 toHelper BIOF1Labels = ABIOF1Labels
 toHelper TokenAccuracy = ATokenAccuracy
 toHelper SegmentAccuracy = ASegmentAccuracy
@@ -125,6 +128,7 @@ type family ParsedExpectedType (t :: AMetric) :: * where
   ParsedExpectedType ALogLoss = Double
   ParsedExpectedType ALikelihood = Double
   ParsedExpectedType ABIOF1 = [TaggedEntity]
+  ParsedExpectedType ABIOWeightedF1 = [TaggedEntity]
   ParsedExpectedType ABIOF1Labels = [TaggedEntity]
   ParsedExpectedType ATokenAccuracy = [Text]
   ParsedExpectedType ASegmentAccuracy = [Annotation]
@@ -161,6 +165,7 @@ expectedParser SAMAP = splitByTabs
 expectedParser SALogLoss = doubleParser
 expectedParser SALikelihood = doubleParser
 expectedParser SABIOF1 = parseBioSequenceIntoEntities
+expectedParser SABIOWeightedF1 = parseBioSequenceIntoEntities
 expectedParser SABIOF1Labels = parseBioSequenceIntoEntitiesWithoutNormalization
 expectedParser SATokenAccuracy = intoWords
 expectedParser SASegmentAccuracy = parseSegmentAnnotations
@@ -211,6 +216,7 @@ outputParser SAMAP = splitByTabs
 outputParser SALogLoss = doubleParser
 outputParser SALikelihood = doubleParser
 outputParser SABIOF1 = parseBioSequenceIntoEntities
+outputParser SABIOWeightedF1 = parseBioSequenceIntoEntities
 outputParser SABIOF1Labels = parseBioSequenceIntoEntitiesWithoutNormalization
 outputParser SATokenAccuracy = intoWords
 outputParser SASegmentAccuracy = parseSegmentAnnotations
@@ -232,6 +238,7 @@ type family ItemIntermediateRepresentationType (t :: AMetric) :: * where
   ItemIntermediateRepresentationType AClippEU = (Int, Int, Int)
   ItemIntermediateRepresentationType ANMI = (Text, Text)
   ItemIntermediateRepresentationType ABIOF1 = (Int, Int, Int)
+  ItemIntermediateRepresentationType ABIOWeightedF1 = M.HashMap Text (Int, Int, Int)
   ItemIntermediateRepresentationType ABIOF1Labels = (Int, Int, Int)
   ItemIntermediateRepresentationType ATokenAccuracy = (Int, Int)
   ItemIntermediateRepresentationType AProbabilisticMultiLabelFMeasure = ([Double], [Double], Double, Int)
@@ -277,6 +284,7 @@ itemStep SAMAP = uncurry calculateMAPForOneResult
 itemStep SALogLoss = itemLogLossError
 itemStep SALikelihood = itemLogLossError
 itemStep SABIOF1 = uncurry gatherCountsForBIO
+itemStep SABIOWeightedF1 = uncurry gatherSeparatedCountsForBIO
 itemStep SABIOF1Labels = uncurry gatherCountsForBIO
 itemStep SATokenAccuracy = countHitsAndTotals
 itemStep SASegmentAccuracy = uncurry segmentAccuracy

@@ -7,8 +7,10 @@ module GEval.PrecisionRecall(calculateMAPForOneResult,
                              precisionAndRecall, precisionAndRecallFromCounts,
                              maxMatch, maxMatchOnOrdered, getCounts, weightedMaxMatch, weightedMaxMatching,
                              getProbabilisticCounts,
-                             countFragFolder)
+                             countFragFolder, fMeasureOnSeparatedCounts, f1MeasureOnSeparatedCounts)
        where
+
+import Debug.Trace
 
 import GEval.Common
 import GEval.Probability
@@ -21,6 +23,7 @@ import Data.List (find, foldl', nub)
 import Data.Algorithm.Munkres
 import qualified Data.Array.IArray as DAI
 
+import qualified Data.HashMap.Strict as M
 
 calculateMAPForOneResult :: (Eq a) => [a] -> [a] -> Double
 calculateMAPForOneResult expected got = precisionSum / fromIntegral (length expected)
@@ -68,6 +71,15 @@ fMeasureOnFragCounts beta (rC, pC, nbExpected, nbGot) =
   weightedHarmonicMean beta p r
   where r = rC /. nbExpected
         p = pC /. nbGot
+
+f1MeasureOnSeparatedCounts :: M.HashMap a (Int, Int, Int) -> Double
+f1MeasureOnSeparatedCounts m = fMeasureOnSeparatedCounts 1.0 m
+
+fMeasureOnSeparatedCounts :: Double -> M.HashMap a (Int, Int, Int) -> Double
+fMeasureOnSeparatedCounts beta m = (sum $ map (\c@(_, t, _) -> (fromIntegral t) * (fMeasureOnCounts beta c)) mAsList) /. total
+  where mAsList = M.elems m
+        total = sum $ map (\(_, t, _) -> t) mAsList
+
 
 countFolder :: (Num n, Num v) => (n, v, v) -> (n, v, v) -> (n, v, v)
 countFolder (a1, a2, a3) (b1, b2, b3) = (a1+b1, a2+b2, a3+b3)
