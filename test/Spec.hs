@@ -443,6 +443,8 @@ main = hspec $ do
       runGEvalTest "flags-sort" `shouldReturnAlmost` 0.3
     it "filtering" $ do
       runGEvalTest "flags-filtering" `shouldReturnAlmost` 0.25
+    it "filtering and matching" $ do
+      runGEvalTest "flags-filter-and-match" `shouldReturnAlmost` 0.8
   describe "evaluating single lines" $ do
     it "RMSE" $ do
       (MetricOutput (SimpleRun v) _) <- gevalCoreOnSingleLines RMSE id RawItemTarget

@@ -188,6 +188,9 @@ isPreprocessable MultiLabelLikelihood = False
 isPreprocessable (Mean metric) = isPreprocessable metric
 isPreprocessable Haversine = False
 
+isInputModifiable CharMatch = True
+isInputModifiable _ = False
+
 defaultOutDirectory = "."
 defaultTestName = "test-A"
 defaultOutFile = "out.tsv"
@@ -325,14 +328,15 @@ dataSourceToLineSourcesSpecification dataSource = LineSourcesSpecification {
         outSource = dataSourceOut dataSource
         outOptions = FileProcessingOptions {
           fileProcessingOptionsSelector = mSelector,
-          fileProcessingOptionsPreprocess = preprocess,
+          fileProcessingOptionsPreprocess = outPreprocess,
           fileProcessingOptionsHeader = mOutHeader }
         inOptions = FileProcessingOptions {
           fileProcessingOptionsSelector = mSelector,
-          fileProcessingOptionsPreprocess = preprocess,
+          fileProcessingOptionsPreprocess = inPreprocess,
           fileProcessingOptionsHeader = mInHeader }
         mSelector = challengeDataSourceSelector chDataSource
-        preprocess = challengeDataSourcePreprocess chDataSource
+        outPreprocess = challengeDataSourceOutPreprocess chDataSource
+        inPreprocess = challengeDataSourceInPreprocess chDataSource
         mInHeader = challengeDataSourceInHeader chDataSource
         mOutHeader = challengeDataSourceOutHeader chDataSource
 
@@ -357,12 +361,18 @@ gevalOnSingleOut gevalSpec dataSource = do
         schemes = gesMetrics gevalSpec
 
 addSchemeSpecifics :: EvaluationScheme -> DataSource -> DataSource
-addSchemeSpecifics scheme dataSource =
+addSchemeSpecifics scheme@(EvaluationScheme metric _) dataSource =
   dataSource {
      dataSourceChallengeData = (dataSourceChallengeData dataSource) {
          challengeDataSourceFilter = getFilterForScheme (challengeDataSourceInHeader $ dataSourceChallengeData dataSource) scheme,
-         challengeDataSourcePreprocess =
-             (challengeDataSourcePreprocess $ dataSourceChallengeData dataSource) . (applyPreprocessingOperations scheme) }}
+         challengeDataSourceOutPreprocess = outPreprocess,
+         challengeDataSourceInPreprocess = inPreprocess
+         }}
+  where outPreprocess = (challengeDataSourceOutPreprocess $ dataSourceChallengeData dataSource) . (applyPreprocessingOperations scheme)
+        inPreprocess = (challengeDataSourceInPreprocess $ dataSourceChallengeData dataSource) . (if isInputModifiable metric
+                                                                                                 then (applyPreprocessingOperations scheme)
+                                                                                                 else id)
+
 
 readHeaderFileWrapper :: Maybe FilePath -> IO (Maybe TabularHeader)
 readHeaderFileWrapper Nothing = return Nothing
@@ -415,7 +425,8 @@ checkAndGetDataSources forceInput gevalSpec = do
         challengeDataSourceInput = inputSource,
         challengeDataSourceExpected = expectedSource,
         challengeDataSourceSelector = mSelector,
-        challengeDataSourcePreprocess = preprocess,
+        challengeDataSourceOutPreprocess = preprocess,
+        challengeDataSourceInPreprocess = preprocess,
         challengeDataSourceFilter = noFilter,
         challengeDataSourceInHeader = mInHeader,
         challengeDataSourceOutHeader = mOutHeader,

@@ -10,6 +10,8 @@ module GEval.EvaluationScheme
 
 import GEval.Metric
 
+import Debug.Trace
+
 import Text.Regex.PCRE.Heavy
 import Text.Regex.PCRE.Light.Base (Regex(..))
 import Text.Regex.PCRE.Light (compile)
