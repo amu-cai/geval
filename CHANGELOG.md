@@ -1,4 +1,11 @@
 
+## 1.40.0.0
+
+New features:
+
+* Add BIO-Weighted-F1 metric
+* Handle filter & match combination of flags properly
+
 ## 1.39.0.0
 
 New features:
