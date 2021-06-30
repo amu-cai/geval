@@ -1,4 +1,10 @@
 
+## 1.40.1.0
+
+Improvements:
+
+* Handle DOS/Windows end-of-lines
+
 ## 1.40.0.0
 
 New features:
