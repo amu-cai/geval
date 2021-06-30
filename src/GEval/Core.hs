@@ -5,7 +5,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE PackageImports #-}
-
+{-# LANGUAGE OverloadedStrings #-}
 
 module GEval.Core
     ( geval,
@@ -509,10 +509,12 @@ data FileProcessingOptions = FileProcessingOptions {
   fileProcessingOptionsPreprocess :: (Text -> Text),
   fileProcessingOptionsHeader :: Maybe TabularHeader }
 
+cleanLine :: Text -> Text
+cleanLine = replace "\r" ""
 
 fileAsLineSource :: SourceSpec -> FileProcessingOptions -> LineSource (ResourceT IO)
 fileAsLineSource spec options =
-  LineSource ((smartSource spec) .| autoDecompress .| CT.decodeUtf8Lenient .| CT.lines .| processHeader mHeader) (select (getDataFormat spec) mSelector) preprocess spec 1
+  LineSource ((smartSource spec) .| autoDecompress .| CT.decodeUtf8Lenient .| CT.lines .| CL.map cleanLine .| processHeader mHeader) (select (getDataFormat spec) mSelector) preprocess spec 1
   where mSelector = fileProcessingOptionsSelector options
         preprocess = fileProcessingOptionsPreprocess options
         mHeader = fileProcessingOptionsHeader options
