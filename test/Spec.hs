@@ -9,6 +9,7 @@ import GEval.MetricsMeta (listOfAvailableEvaluationSchemes, isEvaluationSchemeDe
 import GEval.Core
 import GEval.Common
 import GEval.EvaluationScheme
+import GEval.MatchingSpecification
 import GEval.OptionsParser
 import GEval.BLEU
 import GEval.Clippings
@@ -149,6 +150,8 @@ main = hspec $ do
       runGEvalTest "accuracy-filtering" `shouldReturnAlmost` 0.6666
     it "with filtering 2" $
       runGEvalTest "accuracy-multiple-filtering" `shouldReturnAlmost` 0.5
+    it "with fuzzy match" $
+      runGEvalTest "fuzzy-match-accuracy" `shouldReturnAlmost` 0.6
   describe "F-measure" $ do
     it "simple example" $
       runGEvalTest "f-measure-simple" `shouldReturnAlmost` 0.57142857
@@ -282,7 +285,7 @@ main = hspec $ do
       runGEvalTest "clippeu-simple" `shouldReturnAlmost` 0.399999999999
   describe "evaluation metric specification is parsed" $ do
     it "for simple names" $ do
-      let metrics = [RMSE, MSE, BLEU, Accuracy, ClippEU]
+      let metrics = [RMSE, MSE, BLEU, Accuracy ExactMatch, ClippEU]
       let parsedMetrics = Prelude.map (read . show) metrics
       metrics `shouldBe` parsedMetrics
     it "for F-Measure" $ do

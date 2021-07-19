@@ -124,7 +124,7 @@ Compute distance between two points on a sphere given their longitudes and latit
 This is a sample fake challenge for Gonito framework. Replace it with
 the description of your challenge.|] ++ (commonReadmeMDContents testName)
 
-readmeMDContents Accuracy testName = [i|
+readmeMDContents (Accuracy _) testName = [i|
 GEval sample classification challenge
 =====================================
 
@@ -509,7 +509,7 @@ trainContents Haversine = [hereLit|30.47547	-90.100911	some text
 33.399478	-110.87095	Another text
 |]
 
-trainContents Accuracy = [hereLit|Y	10	none	yes
+trainContents (Accuracy _) = [hereLit|Y	10	none	yes
 N	-2	strong	no
 Y	-3	mild	no
 N	-1	mild	yes
@@ -612,7 +612,7 @@ devInContents WER = devInContents BLEU
 devInContents CER = [hereLit|dev1.pdf
 dev2.pdf
 |]
-devInContents Accuracy = [hereLit|-8	none	no
+devInContents (Accuracy _) = [hereLit|-8	none	no
 1	mild	no
 |]
 devInContents NMI = [hereLit|When in Rome, do as the Romans.
@@ -687,7 +687,7 @@ devExpectedContents WER = devExpectedContents BLEU
 devExpectedContents CER = [hereLit|et facta est lux
 Et tu, Brute?
 |]
-devExpectedContents Accuracy = [hereLit|N
+devExpectedContents (Accuracy _) = [hereLit|N
 Y
 |]
 devExpectedContents (FMeasure _) = [hereLit|0
@@ -765,7 +765,7 @@ testInContents WER = testInContents BLEU
 testInContents CER = [hereLit|test1.pdf
 test2.pdf
 |]
-testInContents Accuracy = [hereLit|2	mild	yes
+testInContents (Accuracy _) = [hereLit|2	mild	yes
 -5	mild	no
 |]
 testInContents (FMeasure _) = [hereLit|b	b	W	15210	527	-64	-56	a	0	0	0	0	0	0	0	0	0	0
@@ -843,7 +843,7 @@ testExpectedContents CER = [hereLit|esse est percipi
 tabula rasa
 |]
 testExpectedContents WER = testExpectedContents BLEU
-testExpectedContents Accuracy = [hereLit|N
+testExpectedContents (Accuracy _) = [hereLit|N
 Y
 |]
 testExpectedContents (FMeasure _) = [hereLit|0
@@ -922,7 +922,7 @@ inHeaderContents GLEU = Nothing
 inHeaderContents BLEU = Nothing
 inHeaderContents WER = Nothing
 inHeaderContents CER = Just ["Filename"]
-inHeaderContents Accuracy = Just ["Temperature", "Wind", "Rain"]
+inHeaderContents (Accuracy _) = Just ["Temperature", "Wind", "Rain"]
 inHeaderContents (FMeasure _) = Just ["seismic",
                                       "seismoacoustic",
                                       "shift",
@@ -972,7 +972,7 @@ outHeaderContents BLEU = Nothing
 outHeaderContents GLEU = Nothing
 outHeaderContents WER = Nothing
 outHeaderContents CER = Just ["OCRedText"]
-outHeaderContents Accuracy = Just ["ShouldYouKidForWalk"]
+outHeaderContents (Accuracy _) = Just ["ShouldYouKidForWalk"]
 outHeaderContents (FMeasure _) = Just ["IsSeismicBump"]
 outHeaderContents (MacroFMeasure _) = Just ["LanguageCode"]
 outHeaderContents (ProbabilisticSoftFMeasure b) = outHeaderContents (SoftFMeasure b)

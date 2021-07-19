@@ -25,7 +25,7 @@ import Data.Attoparsec.Text (parseOnly)
 -- the evaluation procedures are defined in GEval.Core
 
 -- | evaluation metric
-data Metric = RMSE | MSE | Pearson | Spearman | BLEU | GLEU | WER | CER | Accuracy | ClippEU
+data Metric = RMSE | MSE | Pearson | Spearman | BLEU | GLEU | WER | CER | Accuracy MatchingSpecification | ClippEU
               | FMeasure Double | MacroFMeasure Double | NMI
               | LogLossHashed Word32 | CharMatch | MAP | LogLoss | Likelihood
               | BIOF1 | BIOWeightedF1 | BIOF1Labels | TokenAccuracy | SegmentAccuracy | LikelihoodHashed Word32 | MAE | SMAPE
@@ -50,7 +50,14 @@ instance Show Metric where
   show GLEU = "GLEU"
   show WER = "WER"
   show CER = "CER"
-  show Accuracy = "Accuracy"
+  show (Accuracy ExactMatch) = "Accuracy"
+  show (Accuracy FuzzyMatch) = "Fuzzy/" ++ (show $ Accuracy ExactMatch)
+  show (Accuracy (CutLabel matchSpec)) = "CutLabel/" ++ (show $ Accuracy matchSpec)
+  show (Accuracy (SmartMatch matchSpec)) = "Smart/" ++ (show $ Accuracy matchSpec)
+  show (Accuracy (Harden matchSpec)) = "Harden/" ++ (show $ Accuracy matchSpec)
+  show (Accuracy (LenientHarden matchSpec)) = "LenientHarden/" ++ (show $ Accuracy matchSpec)
+  show (Accuracy (Lower matchSpec)) = "Lower/" ++ (show $ Accuracy matchSpec)
+  show (Accuracy (ExtractNumber matchSpec)) = "ExtractNumber/" ++ (show $ Accuracy matchSpec)
   show ClippEU = "ClippEU"
   show (FMeasure beta) = "F" ++ (show beta)
   show (MacroFMeasure beta) = "Macro-F" ++ (show beta)
@@ -88,6 +95,9 @@ instance Show Metric where
   show (MultiLabelFMeasure beta (CutLabel matchSpec)) = "CutLabel/" ++ (show $ MultiLabelFMeasure beta matchSpec)
   show (MultiLabelFMeasure beta (SmartMatch matchSpec)) = "Smart/" ++ (show $ MultiLabelFMeasure beta matchSpec)
   show (MultiLabelFMeasure beta (Harden matchSpec)) = "Harden/" ++ (show $ MultiLabelFMeasure beta matchSpec)
+  show (MultiLabelFMeasure beta (LenientHarden matchSpec)) = "LenientHarden/" ++ (show $ MultiLabelFMeasure beta matchSpec)
+  show (MultiLabelFMeasure beta (Lower matchSpec)) = "Lower/" ++ (show $ MultiLabelFMeasure beta matchSpec)
+  show (MultiLabelFMeasure beta (ExtractNumber matchSpec)) = "ExtractNumber/" ++ (show $ MultiLabelFMeasure beta matchSpec)
   show MultiLabelLogLoss = "MultiLabel-Logloss"
   show MultiLabelLikelihood = "MultiLabel-Likelihood"
   show Haversine = "Haversine"
@@ -98,6 +108,8 @@ applyMatchingSpecification :: (MatchingSpecification -> MatchingSpecification)
                            -> Metric
 applyMatchingSpecification fun (MultiLabelFMeasure beta matchSpec)
   = MultiLabelFMeasure beta (fun matchSpec)
+applyMatchingSpecification fun (Accuracy matchSpec)
+  = Accuracy (fun matchSpec)
 applyMatchingSpecification _ metric = error $ "Matching specification cannot be applied to the " ++ (show metric) ++ " metric"
 
 instance Read Metric where
@@ -116,6 +128,15 @@ instance Read Metric where
   readsPrec p ('H':'a':'r':'d':'e':'n':'/':theRest) = case readsPrec p theRest of
     [(metric, theRest)] -> [(applyMatchingSpecification Harden metric, theRest)]
     _ -> []
+  readsPrec p ('L':'e':'n':'i':'e':'n':'t':'H':'a':'r':'d':'e':'n':'/':theRest) = case readsPrec p theRest of
+    [(metric, theRest)] -> [(applyMatchingSpecification LenientHarden metric, theRest)]
+    _ -> []
+  readsPrec p ('L':'o':'w':'e':'r':'/':theRest) = case readsPrec p theRest of
+    [(metric, theRest)] -> [(applyMatchingSpecification Lower metric, theRest)]
+    _ -> []
+  readsPrec p ('E':'x':'t':'r':'a':'c':'t':'N':'u':'m':'b':'e':'r':'/':theRest) = case readsPrec p theRest of
+    [(metric, theRest)] -> [(applyMatchingSpecification ExtractNumber metric, theRest)]
+    _ -> []
   readsPrec _ ('R':'M':'S':'E':theRest) = [(RMSE, theRest)]
   readsPrec _ ('M':'S':'E':theRest) = [(MSE, theRest)]
   readsPrec _ ('P':'e':'a':'r':'s':'o':'n':theRest) = [(Pearson, theRest)]
@@ -124,7 +145,7 @@ instance Read Metric where
   readsPrec _ ('G':'L':'E':'U':theRest) = [(GLEU, theRest)]
   readsPrec _ ('W':'E':'R':theRest) = [(WER, theRest)]
   readsPrec _ ('C':'E':'R':theRest) = [(CER, theRest)]
-  readsPrec _ ('A':'c':'c':'u':'r':'a':'c':'y':theRest) = [(Accuracy, theRest)]
+  readsPrec _ ('A':'c':'c':'u':'r':'a':'c':'y':theRest) = [(Accuracy ExactMatch, theRest)]
   readsPrec _ ('C':'l':'i':'p':'p':'E':'U':theRest) = [(ClippEU, theRest)]
   readsPrec _ ('N':'M':'I':theRest) = [(NMI, theRest)]
   readsPrec p ('F':'L':'C':'-':'F':theRest) = case readsPrec p theRest of
@@ -186,7 +207,7 @@ getMetricOrdering BLEU     = TheHigherTheBetter
 getMetricOrdering GLEU     = TheHigherTheBetter
 getMetricOrdering WER      = TheLowerTheBetter
 getMetricOrdering CER      = TheLowerTheBetter
-getMetricOrdering Accuracy = TheHigherTheBetter
+getMetricOrdering (Accuracy _) = TheHigherTheBetter
 getMetricOrdering ClippEU  = TheHigherTheBetter
 getMetricOrdering (FMeasure _) = TheHigherTheBetter
 getMetricOrdering (MacroFMeasure _) = TheHigherTheBetter
@@ -230,6 +251,8 @@ fixedNumberOfColumnsInExpected (Mean metric) = fixedNumberOfColumnsInExpected me
 fixedNumberOfColumnsInExpected MAP = False
 fixedNumberOfColumnsInExpected BLEU = False
 fixedNumberOfColumnsInExpected GLEU = False
+fixedNumberOfColumnsInExpected (Accuracy ExactMatch) = True
+fixedNumberOfColumnsInExpected (Accuracy _) = False
 fixedNumberOfColumnsInExpected _ = True
 
 fixedNumberOfColumnsInInput :: Metric -> Bool
@@ -246,6 +269,8 @@ perfectOutLineFromExpectedLine (LikelihoodHashed _) t = t <> ":1.0"
 perfectOutLineFromExpectedLine BLEU t = getFirstColumn t
 perfectOutLineFromExpectedLine GLEU t = getFirstColumn t
 perfectOutLineFromExpectedLine ClippEU t = cleanMarginFromClippEU t
+perfectOutLineFromExpectedLine (Accuracy ExactMatch) t = t
+perfectOutLineFromExpectedLine (Accuracy _) t = getFirstColumn t
 perfectOutLineFromExpectedLine _ t = t
 
 getFirstColumn :: Text -> Text

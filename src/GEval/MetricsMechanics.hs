@@ -50,7 +50,7 @@ import qualified Data.HashMap.Strict as M
 -- | Helper type so that singleton can be used.
 -- | (The problem is that some metrics are parametrized by Double
 -- | Word32 and this is not handled by the singleton libary.)
-singletons [d|data AMetric = ARMSE | AMSE | APearson | ASpearman | ABLEU | AGLEU | AWER | ACER | AAccuracy | AClippEU
+singletons [d|data AMetric = ARMSE | AMSE | APearson | ASpearman | ABLEU | AGLEU | AWER | ACER | AAccuracy MatchingSpecification | AClippEU
                              | AFMeasure | AMacroFMeasure | ANMI
                              | ALogLossHashed | ACharMatch | AMAP | ALogLoss | ALikelihood
                              | ABIOF1 | ABIOWeightedF1 | ABIOF1Labels | ATokenAccuracy | ASegmentAccuracy | ALikelihoodHashed | AMAE | ASMAPE | AMultiLabelFMeasure MatchingSpecification
@@ -70,7 +70,7 @@ toHelper BLEU = ABLEU
 toHelper GLEU = AGLEU
 toHelper WER = AWER
 toHelper CER = ACER
-toHelper Accuracy = AAccuracy
+toHelper (Accuracy matchingSpec) = AAccuracy matchingSpec
 toHelper ClippEU = AClippEU
 toHelper (FMeasure _) = AFMeasure
 toHelper (MacroFMeasure _) = AMacroFMeasure
@@ -111,7 +111,7 @@ type family ParsedExpectedType (t :: AMetric) :: * where
   ParsedExpectedType AGLEU     = [[String]]
   ParsedExpectedType AWER      = [String]
   ParsedExpectedType ACER      = String
-  ParsedExpectedType AAccuracy = Text
+  ParsedExpectedType (AAccuracy _) = Text
   ParsedExpectedType AClippEU  = [ClippingSpec]
   ParsedExpectedType AFMeasure = Bool
   ParsedExpectedType AMacroFMeasure = Maybe Text
@@ -148,7 +148,7 @@ expectedParser SABLEU = alternativeSentencesParser
 expectedParser SAGLEU = alternativeSentencesParser
 expectedParser SAWER = intoStringWords
 expectedParser SACER = Right . unpack
-expectedParser SAAccuracy = onlyStrip
+expectedParser (SAAccuracy _) = onlyStrip
 expectedParser SAClippEU = controlledParse lineClippingSpecsParser
 expectedParser SAFMeasure = zeroOneParser
 expectedParser SAMacroFMeasure = justStrip
@@ -199,7 +199,7 @@ outputParser SABLEU = Right . Prelude.words . unpack
 outputParser SAGLEU = Right . Prelude.words . unpack
 outputParser SAWER = expectedParser SAWER
 outputParser SACER = expectedParser SACER
-outputParser SAAccuracy = expectedParser SAAccuracy
+outputParser p@(SAAccuracy _) = expectedParser p
 outputParser SAClippEU = controlledParse lineClippingsParser
 outputParser SAFMeasure = probToZeroOneParser
 outputParser SAMacroFMeasure = Right . predictedParser . strip
@@ -257,6 +257,13 @@ type family ItemIntermediateRepresentationType (t :: AMetric) :: * where
   ItemIntermediateRepresentationType AHaversine = Double
   ItemIntermediateRepresentationType t = Double
 
+findBest :: (Text -> Text -> Double) -> (Text -> Text -> Double)
+findBest fun expected got = Prelude.maximum $ Prelude.map (fun got) expectedVals
+  where expectedVals = case splitOn "\t" expected of
+                         [] -> [""]
+                         l -> l
+
+
 itemStep :: SAMetric t -> (ParsedExpectedType t, ParsedOutputType t) -> ItemIntermediateRepresentationType t
 itemStep SARMSE = itemSquaredError
 itemStep SAMSE = itemSquaredError
@@ -267,7 +274,8 @@ itemStep SAGLEU = uncurry gleuStep
 itemStep SAWER = uncurry werStep
 -- strings are character lists, so we could re-use werStep
 itemStep SACER = uncurry werStep
-itemStep SAAccuracy = hitOrMiss
+itemStep (SAAccuracy SExactMatch) = hitOrMiss
+itemStep (SAAccuracy smatchSpec) = uncurry (findBest $ getMatchingFunctionForText $ fromSing smatchSpec)
 itemStep SAClippEU = clippEUMatchStep
 itemStep SAFMeasure = getCount
 itemStep SAMacroFMeasure = getClassesInvolved

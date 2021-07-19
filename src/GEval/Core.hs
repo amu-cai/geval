@@ -159,7 +159,7 @@ isPreprocessable BLEU     = True
 isPreprocessable GLEU     = True
 isPreprocessable WER      = True
 isPreprocessable CER      = True
-isPreprocessable Accuracy = True
+isPreprocessable (Accuracy _) = True
 isPreprocessable ClippEU  = False
 isPreprocessable (FMeasure _) = False
 isPreprocessable (MacroFMeasure _) = False
@@ -963,7 +963,7 @@ continueGEvalCalculations SACER CER = defineContinuation cerAgg cerFinal noGraph
         cerFuse (a1, a2) (b1, b2) = (a1 + b1, a2 + b2)
         cerFinal (errors, ref) = errors /. ref
 
-continueGEvalCalculations SAAccuracy Accuracy = defineContinuation averageC id noGraph
+continueGEvalCalculations (SAAccuracy _) (Accuracy _) = defineContinuation averageC id noGraph
 
 continueGEvalCalculations SAFMeasure (FMeasure beta) = defineContinuation countAgg (fMeasureOnCounts beta) noGraph
 
