@@ -1,4 +1,10 @@
 
+## 1.40.2.0
+
+Enhancements:
+
+* Matching specifications (e.g. fuzzy matching) can be used for Accuracy
+
 ## 1.40.1.0
 
 Improvements:
