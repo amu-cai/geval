@@ -1,4 +1,10 @@
 
+## 1.40.3.0
+
+Fix:
+
+* Properly validate the train set
+
 ## 1.40.2.0
 
 Enhancements:
