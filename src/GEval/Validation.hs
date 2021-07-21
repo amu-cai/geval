@@ -207,7 +207,7 @@ checkTrainDirectory spec challengeDirectory = do
       putStrLn "WARNING: (Though, there might still be some cases when `train.tsv` is needed, e.g. for training LMs.)"
     else
      do
-      runOnTest spec trainDirectory
+      checkTestDirectory spec trainDirectory
 
 checkColumns :: FilePath -> IO ()
 checkColumns filePath = do
