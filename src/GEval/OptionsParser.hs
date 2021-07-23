@@ -471,7 +471,13 @@ groupByMetric metrics results = filter (\(_, ss) -> not (null ss))
 
 
 plotGraph :: FilePath -> (EvaluationScheme, [(SourceSpec, GraphSeries)]) -> IO ()
-plotGraph graphFile (scheme@(EvaluationScheme (ProbabilisticSoftFMeasure _) _), seriesSpecs) = do
+plotGraph graphFile (scheme@(EvaluationScheme (ProbabilisticSoftFMeasure _) _), seriesSpecs)
+  = calibrationPlot graphFile scheme seriesSpecs
+plotGraph graphFile (scheme@(EvaluationScheme (ProbabilisticMultiLabelFMeasure _) _), seriesSpecs)
+  = calibrationPlot graphFile scheme seriesSpecs
+plotGraph _ (scheme, _) = error $ "No graph for metric!" ++ (show scheme)
+
+calibrationPlot graphFile scheme seriesSpecs = do
   toFile def graphFile $ do
     layoutlr_title .= "GEval Graph / Calibration / Loess / " ++ (show scheme)
     let perfectSeries = (FilePathSpec "Perfect",
@@ -481,7 +487,6 @@ plotGraph graphFile (scheme@(EvaluationScheme (ProbabilisticSoftFMeasure _) _), 
   where
     plotOneSeries :: (SourceSpec, GraphSeries) -> EC (LayoutLR Double Double Double) ()
     plotOneSeries (sspec, GraphSeries series) = plotLeft (line (recoverPath sspec) [series])
-plotGraph _ _ = error "No graph for this metric!"
 
 
 initChallenge :: GEvalSpecification -> IO ()
