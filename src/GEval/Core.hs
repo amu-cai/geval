@@ -680,60 +680,60 @@ gevalCoreOnSources (LikelihoodHashed nbOfBits) = helperLogLossHashed nbOfBits lo
 
 
 gevalCoreOnSources (Mean (MultiLabelFMeasure beta matchingSpec))
-  = gevalCoreWithoutInputOnItemTargets (Right . intoWords)
-                                       (Right . getWords)
-                                       ((fMeasureOnCounts beta) . (getWeightedCounts (getMatchingFunctionForString matchingSpec)))
+  = gevalCoreWithoutInputOnItemTargets intoWords
+                                       getWords
+                                       ((fMeasureOnCounts beta) . (getWeightedCounts (getMatchingFunctionForText matchingSpec)))
                                        averageC
                                        id
                                        noGraph
     where
       -- repeated as below, as it will be refactored into dependent types soon anyway
-      getWords (RawItemTarget t) = Prelude.map unpack $ selectByStandardThreshold $ parseIntoProbList t
-      getWords (PartiallyParsedItemTarget ts) = Prelude.map unpack ts
-      intoWords (RawItemTarget t) = Prelude.map unpack $ Data.Text.words t
-      intoWords (PartiallyParsedItemTarget ts) = Prelude.map unpack ts
+      getWords (RawItemTarget t) = outputParser (SAMultiLabelFMeasure SExactMatch) t
+      getWords (PartiallyParsedItemTarget ts) = Right ts
+      intoWords (RawItemTarget t) = expectedParser (SAMultiLabelFMeasure SExactMatch) t
+      intoWords (PartiallyParsedItemTarget ts) = Right ts
 
 gevalCoreOnSources (Mean WER)
-  = gevalCoreWithoutInputOnItemTargets (Right . intoWords)
-                                       (Right . getWords)
+  = gevalCoreWithoutInputOnItemTargets intoWords
+                                       getWords
                                        ((uncurry (/.)) . (uncurry werStep))
                                        averageC
                                        id
                                        noGraph
     where
       -- repeated as below, as it will be refactored into dependent types soon anyway
-      getWords (RawItemTarget t) = Prelude.map unpack $ selectByStandardThreshold $ parseIntoProbList t
-      getWords (PartiallyParsedItemTarget ts) = Prelude.map unpack ts
-      intoWords (RawItemTarget t) = Prelude.map unpack $ Data.Text.words t
-      intoWords (PartiallyParsedItemTarget ts) = Prelude.map unpack ts
+      getWords (RawItemTarget t) = outputParser SAWER t
+      getWords (PartiallyParsedItemTarget ts) = Right $ Prelude.map unpack ts
+      intoWords (RawItemTarget t) = expectedParser SAWER t
+      intoWords (PartiallyParsedItemTarget ts) = Right $ Prelude.map unpack ts
 
 gevalCoreOnSources (Mean CER)
-  = gevalCoreWithoutInputOnItemTargets (Right . getString)
-                                       (Right . getString)
+  = gevalCoreWithoutInputOnItemTargets getString
+                                       getString
                                        ((uncurry (/.)) . (uncurry werStep))
                                        averageC
                                        id
                                        noGraph
     where
       -- repeated as below, as it will be refactored into dependent types soon anyway
-      getString (RawItemTarget t) = unpack t
-      getString (PartiallyParsedItemTarget ts) = Prelude.unwords $ Prelude.map unpack ts
+      getString (RawItemTarget t) = expectedParser SACER t
+      getString (PartiallyParsedItemTarget ts) = Right $ Prelude.unwords $ Prelude.map unpack ts
 
 gevalCoreOnSources (Mean _) = error $ "Mean/ meta-metric defined only for MultiLabel-F1, WER and CER for the time being"
 
 -- only MultiLabel-F1 handled for JSONs for the time being...
 gevalCoreOnSources (MultiLabelFMeasure beta matchingSpec) =
-  gevalCoreWithoutInputOnItemTargets (Right . intoWords)
-                                     (Right . getWords)
-                                     (getWeightedCounts (getMatchingFunctionForString matchingSpec))
+  gevalCoreWithoutInputOnItemTargets intoWords
+                                     getWords
+                                     (getWeightedCounts (getMatchingFunctionForText matchingSpec))
                                      countAgg
                                      (fMeasureOnCounts beta)
                                      noGraph
     where
-      getWords (RawItemTarget t) = Prelude.map unpack $ selectByStandardThreshold $ parseIntoProbList t
-      getWords (PartiallyParsedItemTarget ts) = Prelude.map unpack ts
-      intoWords (RawItemTarget t) = Prelude.map unpack $ Data.Text.words t
-      intoWords (PartiallyParsedItemTarget ts) = Prelude.map unpack ts
+      getWords (RawItemTarget t) = outputParser (SAMultiLabelFMeasure SExactMatch) t
+      getWords (PartiallyParsedItemTarget ts) = Right ts
+      intoWords (RawItemTarget t) = expectedParser (SAMultiLabelFMeasure SExactMatch) t
+      intoWords (PartiallyParsedItemTarget ts) = Right ts
 
 gevalCoreOnSources Pearson = gevalCoreByCorrelationMeasure pearson
 gevalCoreOnSources Spearman = gevalCoreByCorrelationMeasure spearman

@@ -13,7 +13,7 @@ module GEval.Metric
   where
 
 import Data.Word
-import Data.Text
+import Data.Text hiding (map)
 import Data.Monoid ((<>))
 
 import GEval.Common
@@ -262,16 +262,20 @@ fixedNumberOfColumnsInInput (ProbabilisticSoftFMeasure _) = False
 fixedNumberOfColumnsInInput (Soft2DFMeasure _) = False
 fixedNumberOfColumnsInInput _ = True
 
+
 perfectOutLineFromExpectedLine :: Metric -> Text -> Text
 perfectOutLineFromExpectedLine (Mean metric) t = perfectOutLineFromExpectedLine metric t
-perfectOutLineFromExpectedLine (LogLossHashed _) t = t <> ":1.0"
-perfectOutLineFromExpectedLine (LikelihoodHashed _) t = t <> ":1.0"
+perfectOutLineFromExpectedLine (LogLossHashed _) t = addProbOne t
+perfectOutLineFromExpectedLine (LikelihoodHashed _) t = addProbOne t
 perfectOutLineFromExpectedLine BLEU t = getFirstColumn t
 perfectOutLineFromExpectedLine GLEU t = getFirstColumn t
 perfectOutLineFromExpectedLine ClippEU t = cleanMarginFromClippEU t
 perfectOutLineFromExpectedLine (Accuracy ExactMatch) t = t
 perfectOutLineFromExpectedLine (Accuracy _) t = getFirstColumn t
 perfectOutLineFromExpectedLine _ t = t
+
+addProbOne :: Text -> Text
+addProbOne = (<> ":1.0")
 
 getFirstColumn :: Text -> Text
 getFirstColumn t = case splitOn "\t" t of
@@ -280,7 +284,7 @@ getFirstColumn t = case splitOn "\t" t of
 
 cleanMarginFromClippEU :: Text -> Text
 cleanMarginFromClippEU t = Data.Text.unwords outs
-  where outs = Prelude.map toOut specs
+  where outs = map toOut specs
         (Right specs) = parseOnly lineClippingSpecsParser t
         toOut (ClippingSpec (PageNumber pageNumber) (Rectangle (Point x0 y0) (Point x1 y1)) _) =
           pack ((show pageNumber) ++ "/" ++ (show x0) ++ "," ++ (show y0) ++ "," ++ (show x1) ++ "," ++ (show y1))

@@ -27,7 +27,7 @@ import GEval.PrecisionRecall (weightedMaxMatch, fMeasureOnCounts, calculateMAPFo
 
 import Control.Exception
 
-import Data.Text
+import Data.Text hiding (map, maximum, zip)
 import Data.Text.Read as TR
 import qualified Data.List.Split as DLS
 import Data.Attoparsec.Text (parseOnly)
@@ -41,7 +41,8 @@ import GEval.Annotation (Annotation, ObtainedAnnotation,
 import GEval.Clippings (Clipping, ClippingSpec, LabeledClipping, lineClippingsParser, lineClippingSpecsParser, lineLabeledClippingsParser)
 import GEval.BIO (TaggedEntity, parseBioSequenceIntoEntities, parseBioSequenceIntoEntitiesWithoutNormalization)
 import GEval.LogLossHashed (parseWordSpecs, wordSpecToPair)
-import GEval.ProbList (ProbList(..), parseIntoProbList, WordWithProb(..), countLogLossOnProbList)
+import GEval.ProbList (ProbList(..), WordWithProb(..),
+                       parseIntoProbList, countLogLossOnProbList, selectByStandardThreshold)
 import GEval.MatchingSpecification
 import GEval.Haversine
 
@@ -222,7 +223,7 @@ outputParser SATokenAccuracy = intoWords
 outputParser SASegmentAccuracy = parseSegmentAnnotations
 outputParser SAMAE = doubleParser
 outputParser SASMAPE = doubleParser
-outputParser (SAMultiLabelFMeasure _) = intoWords
+outputParser (SAMultiLabelFMeasure _) = Right . selectByStandardThreshold . parseIntoProbList
 outputParser SAMultiLabelLogLoss = Right . parseIntoProbList
 outputParser SAMultiLabelLikelihood = Right . parseIntoProbList
 outputParser SAHaversine = parseSpherePoints
@@ -258,7 +259,7 @@ type family ItemIntermediateRepresentationType (t :: AMetric) :: * where
   ItemIntermediateRepresentationType t = Double
 
 findBest :: (Text -> Text -> Double) -> (Text -> Text -> Double)
-findBest fun expected got = Prelude.maximum $ Prelude.map (fun got) expectedVals
+findBest fun expected got = maximum $ map (fun got) expectedVals
   where expectedVals = case splitOn "\t" expected of
                          [] -> [""]
                          l -> l
@@ -310,7 +311,7 @@ intoWords = Right . Data.Text.words
 
 intoStringWords = Right . Prelude.words . unpack
 
-alternativeSentencesParser = Right . Prelude.map Prelude.words . DLS.splitOn "\t" . unpack
+alternativeSentencesParser = Right . map Prelude.words . DLS.splitOn "\t" . unpack
 
 onlyStrip = Right . strip
 
@@ -322,8 +323,8 @@ predictedParser got =
   case parseWordSpecs got of
     Right wordSpecs -> if Prelude.null pairs
                       then Nothing
-                      else Just $ snd $ Prelude.maximum pairs
-      where pairs = catMaybes $ Prelude.map wordSpecToPair wordSpecs
+                      else Just $ snd $ maximum pairs
+      where pairs = catMaybes $ map wordSpecToPair wordSpecs
     Left _ -> Just got
 
 splitByTabs = Right . DLS.splitOn "\t" . unpack
@@ -361,8 +362,8 @@ hitOrMiss (exp, got) =
   case parseWordSpecs got of
     Right wordSpecs -> if Prelude.null pairs
                       then 0.0
-                      else indicator (exp == (snd $ Prelude.maximum pairs))
-      where pairs = catMaybes $ Prelude.map wordSpecToPair wordSpecs
+                      else indicator (exp == (snd $ maximum pairs))
+      where pairs = catMaybes $ map wordSpecToPair wordSpecs
     Left _ ->  indicator ((normalizeProbForAccuracy exp got) == exp)
               -- if the expected value is 0 or 1 treat values
               -- between 0.0 and 1.0 as probabilities
@@ -405,7 +406,7 @@ getSoft2DCounts (expected, got) = (tpArea, expArea, gotArea)
 
 getFragCounts :: CoverableEntityWithProbability e => ([BareEntity e], [e]) -> (Double, Double, Int, Int)
 getFragCounts (expected, got)
-  | allDisjoint (Prelude.map getBareEntity got) = (
+  | allDisjoint (map getBareEntity got) = (
       recallScoreTotal expected got,
       precisionScoreTotal got expected,
       Prelude.length expected,
@@ -418,7 +419,7 @@ countHitsAndTotals (es, os) =
   then throw $ OtherException "wrong number of tokens"
   else Prelude.foldl matchFun
                      (0, 0)
-                     (Prelude.zip es os)
+                     (zip es os)
   where  matchFun :: (Int, Int) -> (Text, Text) -> (Int, Int)
          matchFun (h, t) (e, o)
            | e == (pack "*") = (h, t)
