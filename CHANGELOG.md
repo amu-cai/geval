@@ -1,4 +1,12 @@
 
+## 1.40.4.0 (2021-07-23)
+
+Fixes:
+
+* Fix inconsistencies in handling probabilities in MultiLabel-F-score
+* Plot calibration graphs for Probabilities-MultiLabel-F-score
+* Improve diagnostics for unknown or broken metric definitions
+
 ## 1.40.3.0
 
 Fix:
