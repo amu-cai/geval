@@ -135,6 +135,7 @@ data GEvalException = NoExpectedFile FilePath
                       | UnexpectedMultipleOutputs
                       | OtherException String
                       | NoHeaderFile FilePath
+                      | UnknownMetric String
                       deriving (Eq)
 
 instance Exception GEvalException
@@ -157,6 +158,7 @@ instance Show GEvalException where
   show UnexpectedMultipleOutputs = "Multiple outputs are not possible in this mode, use -o option to select an output file"
   show (OtherException message) = message
   show (NoHeaderFile filePath) = somethingWrongWithFilesMessage "No file with header specification" filePath
+  show (UnknownMetric t) = "Unknown or broken metric definition: " ++ t
 
 somethingWrongWithFilesMessage :: String -> FilePath -> String
 somethingWrongWithFilesMessage msg filePath = Prelude.concat

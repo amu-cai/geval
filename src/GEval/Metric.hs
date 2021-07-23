@@ -15,6 +15,7 @@ module GEval.Metric
 import Data.Word
 import Data.Text hiding (map)
 import Data.Monoid ((<>))
+import Control.Exception
 
 import GEval.Common
 import GEval.Clippings
@@ -192,7 +193,7 @@ instance Read Metric where
   readsPrec _ ('M':'u':'l':'t':'i':'L':'a':'b':'e':'l':'-':'L':'o':'g':'L':'o':'s':'s':theRest) = [(MultiLabelLogLoss, theRest)]
   readsPrec _ ('M':'u':'l':'t':'i':'L':'a':'b':'e':'l':'-':'L':'i':'k':'e':'l':'i':'h':'o':'o':'d':theRest) = [(MultiLabelLikelihood, theRest)]
   readsPrec _ ('H':'a':'v':'e':'r':'s':'i':'n':'e':theRest) = [(Haversine, theRest)]
-
+  readsPrec _ t = throw $ UnknownMetric t
 
 
 data MetricOrdering = TheLowerTheBetter | TheHigherTheBetter
