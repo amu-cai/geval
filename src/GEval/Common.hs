@@ -136,6 +136,7 @@ data GEvalException = NoExpectedFile FilePath
                       | OtherException String
                       | NoHeaderFile FilePath
                       | UnknownMetric String
+                      | UnknownFlags String
                       deriving (Eq)
 
 instance Exception GEvalException
@@ -159,6 +160,7 @@ instance Show GEvalException where
   show (OtherException message) = message
   show (NoHeaderFile filePath) = somethingWrongWithFilesMessage "No file with header specification" filePath
   show (UnknownMetric t) = "Unknown or broken metric definition: " ++ t
+  show (UnknownFlags t) = "Unknown or broken metric flags: " ++ t
 
 somethingWrongWithFilesMessage :: String -> FilePath -> String
 somethingWrongWithFilesMessage msg filePath = Prelude.concat

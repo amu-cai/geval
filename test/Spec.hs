@@ -700,6 +700,10 @@ main = hspec $ do
                   gesFormatting = FormattingOptions (Just 4) False }
             createChallenge True tempDir spec
             validationChallenge tempDir spec
+  describe "check validation on broken challenges" $ do
+    it "broken metric" $ do
+      (hSilence [stderr] $ runGEval ["--validate", "--expected-directory", "test/_validation/broken-metric"]) `shouldThrow` anyException
+
   describe "test sample outputs" $ do
     (flip mapM_ ) (Prelude.filter isEvaluationSchemeDescribed listOfAvailableEvaluationSchemes) $ \scheme@(EvaluationScheme metric _) -> do
       it (show scheme) $ do

@@ -9,15 +9,16 @@ module GEval.EvaluationScheme
   where
 
 import GEval.Metric
+import GEval.Common
 
-import Debug.Trace
+import Control.Exception
 
 import Text.Regex.PCRE.Heavy
 import Text.Regex.PCRE.Light.Base (Regex(..))
 import Text.Regex.PCRE.Light (compile)
-import Data.Text (Text(..), concat, toCaseFold, toLower, toUpper, pack, unpack, words, unwords)
+import Data.Text (Text, concat, toCaseFold, toLower, toUpper, pack, unpack, words, unwords)
 import Data.List (intercalate, break, sort)
-import Data.Either
+import Data.Char (isLetter)
 import Data.Maybe (fromMaybe, catMaybes)
 import qualified Data.ByteString.UTF8 as BSU
 
@@ -66,13 +67,17 @@ readOps ('N':theRest) = handleParametrizedOp (SetName . pack) theRest
 readOps ('P':theRest) = handleParametrizedOp (SetPriority . read) theRest
 readOps ('s':theRest) = handleParametrizedBinaryOp (\a b -> RegexpSubstition (compile (BSU.fromString a) []) (pack b)) theRest
 readOps ('f':theRest) = handleParametrizedOp (FeatureFilter . pack) theRest
-readOps s = ([], s)
+-- this is not the right way to do this, but try catch at least unknown flags
+readOps t@(c:_) = if isLetter c
+                  then throw $ UnknownFlags t
+                  else ([], t)
+readOps "" = ([], "")
 
 getRegexpMatch :: EvaluationScheme -> Maybe Regex
 getRegexpMatch (EvaluationScheme _ ops) = getRegexpMatch' ops
   where getRegexpMatch' [] = Nothing
         getRegexpMatch' ((RegexpMatch regex):_) = Just regex
-        getRegexpMatch' (_:ops) = getRegexpMatch' ops
+        getRegexpMatch' (_:ops') = getRegexpMatch' ops'
 
 handleParametrizedOp :: (String -> PreprocessingOperation) -> String -> ([PreprocessingOperation], String)
 handleParametrizedOp constructor theRest =
@@ -92,11 +97,13 @@ handleParametrizedBinaryOp constructor theRest =
                                    in ((constructor paramA paramB):ops, theRest''')
 
 parseParameter :: String -> (Maybe String, String)
-parseParameter (leftParameterBracket:theRest) =
-  case break (== rightParameterBracket) theRest of
-    (s, []) -> (Nothing, s)
-    (param, (_:theRest')) -> (Just param, theRest')
-parseParameter s = (Nothing, s)
+parseParameter [] = (Nothing, [])
+parseParameter t@(fChar:theRest) =
+  if fChar == leftParameterBracket
+  then case break (== rightParameterBracket) theRest of
+         (s, []) -> throw $ UnknownFlags t
+         (param, (_:theRest')) -> (Just param, theRest')
+  else throw $ UnknownFlags t
 
 
 instance Show EvaluationScheme where
@@ -105,9 +112,10 @@ instance Show EvaluationScheme where
                                                                 else ":" ++ (Prelude.concat (map show operations)))
 
 evaluationSchemeName :: EvaluationScheme -> String
-evaluationSchemeName scheme@(EvaluationScheme metric operations) = fromMaybe (show scheme) (findNameSet operations)
+evaluationSchemeName scheme@(EvaluationScheme _ operations) = fromMaybe (show scheme) (findNameSet operations)
 
-evaluationSchemePriority scheme@(EvaluationScheme _ operations) = fromMaybe defaultPriority (findPrioritySet operations)
+evaluationSchemePriority :: EvaluationScheme -> Int
+evaluationSchemePriority (EvaluationScheme _ operations) = fromMaybe defaultPriority (findPrioritySet operations)
   where defaultPriority = 1
 
 findNameSet :: [PreprocessingOperation] -> Maybe String
