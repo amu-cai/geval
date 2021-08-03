@@ -1,4 +1,10 @@
 
+## 1.40.4.1 (2021-08-03)
+
+Fixes:
+
+* Improve diagnostics for broken metric definitions
+
 ## 1.40.4.0 (2021-07-23)
 
 Fixes:
