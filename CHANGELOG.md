@@ -1,4 +1,10 @@
 
+## 1.40.5.0 (2021-08-20)
+
+Enhancements:
+
+* Add PerplexityHashed metric
+
 ## 1.40.4.1 (2021-08-03)
 
 Fixes:
