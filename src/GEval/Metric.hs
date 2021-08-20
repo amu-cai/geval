@@ -29,7 +29,8 @@ import Data.Attoparsec.Text (parseOnly)
 data Metric = RMSE | MSE | Pearson | Spearman | BLEU | GLEU | WER | CER | Accuracy MatchingSpecification | ClippEU
               | FMeasure Double | MacroFMeasure Double | NMI
               | LogLossHashed Word32 | CharMatch | MAP | LogLoss | Likelihood
-              | BIOF1 | BIOWeightedF1 | BIOF1Labels | TokenAccuracy | SegmentAccuracy | LikelihoodHashed Word32 | MAE | SMAPE
+              | BIOF1 | BIOWeightedF1 | BIOF1Labels | TokenAccuracy | SegmentAccuracy | LikelihoodHashed Word32 | PerplexityHashed Word32
+              | MAE | SMAPE
               | MultiLabelFMeasure Double MatchingSpecification
               | MultiLabelLogLoss | MultiLabelLikelihood
               | SoftFMeasure Double | ProbabilisticMultiLabelFMeasure Double
@@ -80,6 +81,12 @@ instance Show Metric where
                                                               ""
                                                             else
                                                               (show nbOfBits))
+  show (PerplexityHashed nbOfBits) = "PerplexityHashed" ++ (if
+                                                               nbOfBits == defaultLogLossHashedSize
+                                                            then
+                                                              ""
+                                                            else
+                                                              (show nbOfBits))
   show CharMatch = "CharMatch"
   show MAP = "MAP"
   show LogLoss = "LogLoss"
@@ -115,28 +122,28 @@ applyMatchingSpecification _ metric = error $ "Matching specification cannot be 
 
 instance Read Metric where
   readsPrec p ('M':'e':'a':'n':'/':theRest) = case readsPrec p theRest of
-    [(metric, theRest)] -> [(Mean metric, theRest)]
+    [(metric, theRest')] -> [(Mean metric, theRest')]
     _ -> []
   readsPrec p ('F':'u':'z':'z':'y':'/':theRest) = case readsPrec p theRest of
-    [(metric, theRest)] -> [(applyMatchingSpecification (const FuzzyMatch) metric, theRest)]
+    [(metric, theRest')] -> [(applyMatchingSpecification (const FuzzyMatch) metric, theRest')]
     _ -> []
   readsPrec p ('C':'u':'t':'L':'a':'b':'e':'l':'/':theRest) = case readsPrec p theRest of
-    [(metric, theRest)] -> [(applyMatchingSpecification CutLabel metric, theRest)]
+    [(metric, theRest')] -> [(applyMatchingSpecification CutLabel metric, theRest')]
     _ -> []
   readsPrec p ('S':'m':'a':'r':'t':'/':theRest) = case readsPrec p theRest of
-    [(metric, theRest)] -> [(applyMatchingSpecification SmartMatch metric, theRest)]
+    [(metric, theRest')] -> [(applyMatchingSpecification SmartMatch metric, theRest')]
     _ -> []
   readsPrec p ('H':'a':'r':'d':'e':'n':'/':theRest) = case readsPrec p theRest of
-    [(metric, theRest)] -> [(applyMatchingSpecification Harden metric, theRest)]
+    [(metric, theRest')] -> [(applyMatchingSpecification Harden metric, theRest')]
     _ -> []
   readsPrec p ('L':'e':'n':'i':'e':'n':'t':'H':'a':'r':'d':'e':'n':'/':theRest) = case readsPrec p theRest of
-    [(metric, theRest)] -> [(applyMatchingSpecification LenientHarden metric, theRest)]
+    [(metric, theRest')] -> [(applyMatchingSpecification LenientHarden metric, theRest')]
     _ -> []
   readsPrec p ('L':'o':'w':'e':'r':'/':theRest) = case readsPrec p theRest of
-    [(metric, theRest)] -> [(applyMatchingSpecification Lower metric, theRest)]
+    [(metric, theRest')] -> [(applyMatchingSpecification Lower metric, theRest')]
     _ -> []
   readsPrec p ('E':'x':'t':'r':'a':'c':'t':'N':'u':'m':'b':'e':'r':'/':theRest) = case readsPrec p theRest of
-    [(metric, theRest)] -> [(applyMatchingSpecification ExtractNumber metric, theRest)]
+    [(metric, theRest')] -> [(applyMatchingSpecification ExtractNumber metric, theRest')]
     _ -> []
   readsPrec _ ('R':'M':'S':'E':theRest) = [(RMSE, theRest)]
   readsPrec _ ('M':'S':'E':theRest) = [(MSE, theRest)]
@@ -150,38 +157,41 @@ instance Read Metric where
   readsPrec _ ('C':'l':'i':'p':'p':'E':'U':theRest) = [(ClippEU, theRest)]
   readsPrec _ ('N':'M':'I':theRest) = [(NMI, theRest)]
   readsPrec p ('F':'L':'C':'-':'F':theRest) = case readsPrec p theRest of
-    [(beta, theRest)] -> [(FLCFMeasure beta, theRest)]
+    [(beta, theRest')] -> [(FLCFMeasure beta, theRest')]
     _ -> []
   readsPrec p ('F':theRest) = case readsPrec p theRest of
-    [(beta, theRest)] -> [(FMeasure beta, theRest)]
+    [(beta, theRest')] -> [(FMeasure beta, theRest')]
     _ -> []
   readsPrec p ('M':'a':'c':'r':'o':'-':'F':theRest) = case readsPrec p theRest of
-    [(beta, theRest)] -> [(MacroFMeasure beta, theRest)]
+    [(beta, theRest')] -> [(MacroFMeasure beta, theRest')]
     _ -> []
   readsPrec p ('M':'u':'l':'t':'i':'L':'a':'b':'e':'l':'-':'F':theRest) = case readsPrec p theRest of
-    [(beta, theRest)] -> [(MultiLabelFMeasure beta ExactMatch, theRest)]
+    [(beta, theRest')] -> [(MultiLabelFMeasure beta ExactMatch, theRest')]
     _ -> []
   readsPrec p ('S':'o':'f':'t':'2':'D':'-':'F':theRest) = case readsPrec p theRest of
-    [(beta, theRest)] -> [(Soft2DFMeasure beta, theRest)]
+    [(beta, theRest')] -> [(Soft2DFMeasure beta, theRest')]
     _ -> []
   readsPrec p ('S':'o':'f':'t':'-':'F':theRest) = case readsPrec p theRest of
-    [(beta, theRest)] -> [(SoftFMeasure beta, theRest)]
+    [(beta, theRest')] -> [(SoftFMeasure beta, theRest')]
     _ -> []
   readsPrec p ('P':'r':'o':'b':'a':'b':'i':'l':'i':'s':'t':'i':'c':'-':'M':'u':'l':'t':'i':'L':'a':'b':'e':'l':'-':'F':theRest) = case readsPrec p theRest of
-    [(beta, theRest)] -> [(ProbabilisticMultiLabelFMeasure beta, theRest)]
+    [(beta, theRest')] -> [(ProbabilisticMultiLabelFMeasure beta, theRest')]
     _ -> []
   readsPrec p ('P':'r':'o':'b':'a':'b':'i':'l':'i':'s':'t':'i':'c':'-':'S':'o':'f':'t':'-':'F':theRest) = case readsPrec p theRest of
-    [(beta, theRest)] -> [(ProbabilisticSoftFMeasure beta, theRest)]
+    [(beta, theRest')] -> [(ProbabilisticSoftFMeasure beta, theRest')]
     _ -> []
   readsPrec p ('L':'o':'g':'L':'o':'s':'s':'H':'a':'s':'h':'e':'d':theRest) = case readsPrec p theRest of
-    [(nbOfBits, theRest)] -> [(LogLossHashed nbOfBits, theRest)]
+    [(nbOfBits, theRest')] -> [(LogLossHashed nbOfBits, theRest')]
     _ -> [(LogLossHashed defaultLogLossHashedSize, theRest)]
   readsPrec p ('L':'i':'k':'e':'l':'i':'h':'o':'o':'d':'H':'a':'s':'h':'e':'d':theRest) = case readsPrec p theRest of
-    [(nbOfBits, theRest)] -> [(LikelihoodHashed nbOfBits, theRest)]
+    [(nbOfBits, theRest')] -> [(LikelihoodHashed nbOfBits, theRest')]
     _ -> [(LikelihoodHashed defaultLogLossHashedSize, theRest)]
+  readsPrec p ('P':'e':'r':'p':'l':'e':'x':'i':'t':'y':'H':'a':'s':'h':'e':'d':theRest) = case readsPrec p theRest of
+    [(nbOfBits, theRest')] -> [(PerplexityHashed nbOfBits, theRest')]
+    _ -> [(PerplexityHashed defaultLogLossHashedSize, theRest)]
   readsPrec _ ('L':'o':'g':'L':'o':'s':'s':theRest) = [(LogLoss, theRest)]
   readsPrec _ ('L':'i':'k':'e':'l':'i':'h':'o':'o':'d':theRest) = [(Likelihood, theRest)]
-  readsPrec p ('C':'h':'a':'r':'M':'a':'t':'c':'h':theRest) = [(CharMatch, theRest)]
+  readsPrec _ ('C':'h':'a':'r':'M':'a':'t':'c':'h':theRest) = [(CharMatch, theRest)]
   readsPrec _ ('M':'A':'P':theRest) = [(MAP, theRest)]
   readsPrec _ ('B':'I':'O':'-':'F':'1':'-':'L':'a':'b':'e':'l':'s':theRest) = [(BIOF1Labels, theRest)]
   readsPrec _ ('B':'I':'O':'-':'W':'e':'i':'g':'h':'t':'e':'d':'-':'F':'1': theRest) = [(BIOWeightedF1, theRest)]
@@ -220,6 +230,7 @@ getMetricOrdering (FLCFMeasure _) = TheHigherTheBetter
 getMetricOrdering NMI = TheHigherTheBetter
 getMetricOrdering (LogLossHashed _) = TheLowerTheBetter
 getMetricOrdering (LikelihoodHashed _) = TheHigherTheBetter
+getMetricOrdering (PerplexityHashed _) = TheLowerTheBetter
 getMetricOrdering CharMatch = TheHigherTheBetter
 getMetricOrdering MAP = TheHigherTheBetter
 getMetricOrdering LogLoss = TheLowerTheBetter
@@ -239,10 +250,11 @@ getMetricOrdering (Mean metric) = getMetricOrdering metric
 
 metricCompare :: Metric -> MetricValue -> MetricValue -> Ordering
 metricCompare metric a b = metricCompare' (getMetricOrdering metric) a b
-  where metricCompare' TheHigherTheBetter a b = a `compare` b
-        metricCompare' TheLowerTheBetter a b = b `compare` a
+  where metricCompare' TheHigherTheBetter a' b' = a' `compare` b'
+        metricCompare' TheLowerTheBetter a' b' = b' `compare` a'
 
 bestPossibleValue :: Metric -> MetricValue
+bestPossibleValue (PerplexityHashed _) = 1.0
 bestPossibleValue metric = case getMetricOrdering metric of
   TheLowerTheBetter -> 0.0
   TheHigherTheBetter -> 1.0
@@ -268,6 +280,7 @@ perfectOutLineFromExpectedLine :: Metric -> Text -> Text
 perfectOutLineFromExpectedLine (Mean metric) t = perfectOutLineFromExpectedLine metric t
 perfectOutLineFromExpectedLine (LogLossHashed _) t = addProbOne t
 perfectOutLineFromExpectedLine (LikelihoodHashed _) t = addProbOne t
+perfectOutLineFromExpectedLine (PerplexityHashed _) t = addProbOne t
 perfectOutLineFromExpectedLine BLEU t = getFirstColumn t
 perfectOutLineFromExpectedLine GLEU t = getFirstColumn t
 perfectOutLineFromExpectedLine ClippEU t = cleanMarginFromClippEU t

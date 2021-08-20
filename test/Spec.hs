@@ -209,6 +209,9 @@ main = hspec $ do
       runGEvalTest "log-loss-hashed-probs-normalized" `shouldReturnAlmost` 1.55537749098853
     it "with log probs whose probs are summing up to less than 1.0" $ do
       runGEvalTest "log-loss-hashed-normalization" `shouldReturnAlmost` 5.16395069238851
+  describe "PerplexityHashed challenge" $ do
+    it "simple example" $ do
+      runGEvalTest "perplexity-hashed-simple" `shouldReturnAlmost` 11.006423790840
   describe "LikelihoodHashed challenge" $ do
     it "example with unnormalized values" $ do
       runGEvalTest "likelihood-hashed-not-normalized" `shouldReturnAlmost` 0.351043364110715

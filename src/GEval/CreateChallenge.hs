@@ -15,9 +15,7 @@ import qualified System.Directory as D
 import Control.Conditional (whenM)
 import Data.Maybe (catMaybes)
 
-import System.IO
 import System.FilePath
-import Control.Exception
 import Control.Monad.Trans.Resource
 import Data.String.Here
 
@@ -60,6 +58,7 @@ createChallenge withDataFiles expectedDirectory spec = do
         testDirectory = expectedDirectory </> testName
         expectedFile = gesExpectedFile spec
 
+createHeaderFile :: FilePath -> FilePath -> Maybe [[Char]] -> IO ()
 createHeaderFile _ _ Nothing = return ()
 createHeaderFile expectedDirectory headerFile (Just fields) = do
   createFile (expectedDirectory </> headerFile) $ (intercalate "\t" fields) ++ "\n"
@@ -67,10 +66,12 @@ createHeaderFile expectedDirectory headerFile (Just fields) = do
 createTrainFiles :: Metric -> FilePath -> FilePath -> IO ()
 createTrainFiles metric@(LogLossHashed _) trainDirectory _ = createSingleTrainFile metric trainDirectory
 createTrainFiles metric@(LikelihoodHashed _) trainDirectory _ = createSingleTrainFile metric trainDirectory
+createTrainFiles metric@(PerplexityHashed _) trainDirectory _ = createSingleTrainFile metric trainDirectory
 createTrainFiles metric trainDirectory expectedFile = do
   createFile (trainDirectory </> "in.tsv") $ trainInContents metric
   createFile (trainDirectory </> expectedFile) $ trainExpectedContents metric
 
+createSingleTrainFile :: Metric -> FilePath -> IO ()
 createSingleTrainFile metric trainDirectory =
   createFile (trainDirectory </> "train.tsv") $ trainContents metric
 
@@ -199,6 +200,7 @@ This is a sample challenge for flat clustering (unsupervised learning challenge)
 |] ++ (commonReadmeMDContents testName)
 
 readmeMDContents (LikelihoodHashed b) testname = readmeMDContents (LogLossHashed b) testname
+readmeMDContents (PerplexityHashed b) testname = readmeMDContents (LogLossHashed b) testname
 
 readmeMDContents (LogLossHashed _) testName = [i|
 GEval sample challenge — language model evaluation
@@ -356,7 +358,7 @@ character (inclusively).
 |] ++ (commonReadmeMDContents testName)
 
 readmeMDContents (ProbabilisticMultiLabelFMeasure beta) testName = readmeMDContents (MultiLabelFMeasure beta ExactMatch) testName
-readmeMDContents (MultiLabelFMeasure beta _) testName = [i|
+readmeMDContents (MultiLabelFMeasure _ _) testName = [i|
 Tag names and their component
 =============================
 
@@ -547,6 +549,7 @@ en	The pen is mightier than the sword.
 pl	Baba z wozu, koniom lżej.
 |]
 trainContents (LikelihoodHashed b) = trainContents (LogLossHashed b)
+trainContents (PerplexityHashed b) = trainContents (LogLossHashed b)
 trainContents (LogLossHashed _) = [hereLit|Ala ma psa i kota
 Basia ma psa
 Nie kupujemy kota w worku
@@ -631,6 +634,7 @@ devInContents (SoftFMeasure _) = [hereLit|I have two kids
 7 April 2003
 |]
 devInContents (LikelihoodHashed b) = devInContents (LogLossHashed b)
+devInContents (PerplexityHashed b) = devInContents (LogLossHashed b)
 devInContents (LogLossHashed _) = [hereLit|Nie kupuj	w worku
 Ona	psa
 |]
@@ -706,6 +710,7 @@ pl
 en
 |]
 devExpectedContents (LikelihoodHashed b) = devExpectedContents (LogLossHashed b)
+devExpectedContents (PerplexityHashed b) = devExpectedContents (LogLossHashed b)
 devExpectedContents (LogLossHashed _) = [hereLit|kota
 ma
 |]
@@ -786,6 +791,7 @@ A cada necio agrada su porrada.
 Kwiecień plecień, bo przeplata trochę zimy, trochę lata.
 |]
 testInContents (LikelihoodHashed b) = testInContents (LogLossHashed b)
+testInContents (PerplexityHashed b) = testInContents (LogLossHashed b)
 testInContents (LogLossHashed _) = [hereLit|Ala	ma
 Ona ma kota	worku
 |]
@@ -864,6 +870,7 @@ es
 pl
 |]
 testExpectedContents (LikelihoodHashed b) = testExpectedContents (LogLossHashed b)
+testExpectedContents (PerplexityHashed b) = testExpectedContents (LogLossHashed b)
 testExpectedContents (LogLossHashed _) = [hereLit|ma
 w
 |]
@@ -947,6 +954,7 @@ inHeaderContents (ProbabilisticSoftFMeasure b) = inHeaderContents (SoftFMeasure 
 inHeaderContents (SoftFMeasure _) = Just ["Text"]
 inHeaderContents NMI = Just ["Utterance"]
 inHeaderContents (LikelihoodHashed b) = inHeaderContents (LogLossHashed b)
+inHeaderContents (PerplexityHashed b) = inHeaderContents (LogLossHashed b)
 inHeaderContents (LogLossHashed _) = Just ["LeftContext", "RightContext"]
 inHeaderContents CharMatch = Just ["Text"]
 inHeaderContents MAP = Just ["Dialect", "PolishPhrase"]
@@ -979,6 +987,7 @@ outHeaderContents (ProbabilisticSoftFMeasure b) = outHeaderContents (SoftFMeasur
 outHeaderContents (SoftFMeasure _) = Just ["NamesFound"]
 outHeaderContents NMI = Just ["LanguageCode"]
 outHeaderContents (LikelihoodHashed b) = outHeaderContents (LogLossHashed b)
+outHeaderContents (PerplexityHashed b) = outHeaderContents (LogLossHashed b)
 outHeaderContents (LogLossHashed _) = Just ["GuessedWord"]
 outHeaderContents CharMatch = Just ["NormalizedText"]
 outHeaderContents MAP = Nothing

@@ -23,7 +23,6 @@ import GEval.MatchingSpecification (MatchingSpecification(ExactMatch))
 import Text.Regex.PCRE.Heavy
 import Data.Either (fromRight)
 import Data.String.Here
-import Data.Maybe (fromMaybe)
 
 import Data.List (intercalate)
 import Text.Printf
@@ -63,6 +62,7 @@ listOfAvailableMetrics = [RMSE,
                           ClippEU,
                           LogLossHashed defaultLogLossHashedSize,
                           LikelihoodHashed defaultLogLossHashedSize,
+                          PerplexityHashed defaultLogLossHashedSize,
                           BIOF1,
                           BIOWeightedF1,
                           BIOF1Labels,

@@ -171,6 +171,7 @@ isPreprocessable (FLCFMeasure _) = False
 isPreprocessable NMI = False
 isPreprocessable (LogLossHashed _) = False
 isPreprocessable (LikelihoodHashed _) = False
+isPreprocessable (PerplexityHashed _) = False
 isPreprocessable CharMatch = True
 isPreprocessable MAP = False
 isPreprocessable LogLoss = False
@@ -572,10 +573,11 @@ handleBootstrap (Mean _) = False
 handleBootstrap CharMatch = False
 handleBootstrap (LogLossHashed _) = False
 handleBootstrap (LikelihoodHashed _ ) = False
+handleBootstrap (PerplexityHashed _ ) = False
 handleBootstrap Pearson = False
 handleBootstrap Spearman = False
-handleBootstrap (ProbabilisticMultiLabelFMeasure beta) = False
-handleBootstrap (ProbabilisticSoftFMeasure beta) = False
+handleBootstrap (ProbabilisticMultiLabelFMeasure _) = False
+handleBootstrap (ProbabilisticSoftFMeasure _) = False
 handleBootstrap _ = True
 
 -- | Runs evaluation for a given metric using the sources specified
@@ -601,7 +603,11 @@ isEmptyFileSource :: SourceSpec -> IO Bool
 isEmptyFileSource (FilePathSpec filePath) = isEmptyFile filePath
 isEmptyFileSource _ = return False
 
+logLossToLikehood :: Floating a => a -> a
 logLossToLikehood logLoss = exp (-logLoss)
+
+logLossToPerplexity :: Floating a => a -> a
+logLossToPerplexity logLoss = 1.0 / (logLossToLikehood logLoss)
 
 data LineInFile = LineInFile SourceSpec Word32 Text
                   deriving Show
@@ -677,6 +683,7 @@ gevalCoreOnSources CharMatch = helper
 
 gevalCoreOnSources (LogLossHashed nbOfBits) = helperLogLossHashed nbOfBits id
 gevalCoreOnSources (LikelihoodHashed nbOfBits) = helperLogLossHashed nbOfBits logLossToLikehood
+gevalCoreOnSources (PerplexityHashed nbOfBits) = helperLogLossHashed nbOfBits logLossToPerplexity
 
 
 gevalCoreOnSources (Mean (MultiLabelFMeasure beta matchingSpec))

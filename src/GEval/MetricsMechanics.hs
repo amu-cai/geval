@@ -54,7 +54,8 @@ import qualified Data.HashMap.Strict as M
 singletons [d|data AMetric = ARMSE | AMSE | APearson | ASpearman | ABLEU | AGLEU | AWER | ACER | AAccuracy MatchingSpecification | AClippEU
                              | AFMeasure | AMacroFMeasure | ANMI
                              | ALogLossHashed | ACharMatch | AMAP | ALogLoss | ALikelihood
-                             | ABIOF1 | ABIOWeightedF1 | ABIOF1Labels | ATokenAccuracy | ASegmentAccuracy | ALikelihoodHashed | AMAE | ASMAPE | AMultiLabelFMeasure MatchingSpecification
+                             | ABIOF1 | ABIOWeightedF1 | ABIOF1Labels | ATokenAccuracy | ASegmentAccuracy | ALikelihoodHashed | APerplexityHashed
+                             | AMAE | ASMAPE | AMultiLabelFMeasure MatchingSpecification
                              | AMultiLabelLogLoss | AMultiLabelLikelihood
                              | ASoftFMeasure | AProbabilisticMultiLabelFMeasure | AProbabilisticSoftFMeasure | ASoft2DFMeasure
                              | AFLCFMeasure | AHaversine
@@ -87,6 +88,7 @@ toHelper BIOF1Labels = ABIOF1Labels
 toHelper TokenAccuracy = ATokenAccuracy
 toHelper SegmentAccuracy = ASegmentAccuracy
 toHelper (LikelihoodHashed _) = ALikelihoodHashed
+toHelper (PerplexityHashed _) = APerplexityHashed
 toHelper MAE = AMAE
 toHelper SMAPE = ASMAPE
 toHelper (MultiLabelFMeasure _ matchingSpec) = AMultiLabelFMeasure matchingSpec
@@ -124,6 +126,7 @@ type family ParsedExpectedType (t :: AMetric) :: * where
   ParsedExpectedType ANMI = Text
   ParsedExpectedType ALogLossHashed = Text
   ParsedExpectedType ALikelihoodHashed = Text
+  ParsedExpectedType APerplexityHashed = Text
   ParsedExpectedType ACharMatch = Text
   ParsedExpectedType AMAP = [String]
   ParsedExpectedType ALogLoss = Double
@@ -161,6 +164,7 @@ expectedParser SASoft2DFMeasure = controlledParse lineLabeledClippingsParser
 expectedParser SANMI = Right . id
 expectedParser SALogLossHashed = onlyStrip
 expectedParser SALikelihoodHashed = onlyStrip
+expectedParser SAPerplexityHashed = onlyStrip
 expectedParser SACharMatch = Right
 expectedParser SAMAP = splitByTabs
 expectedParser SALogLoss = doubleParser
@@ -212,6 +216,7 @@ outputParser SASoft2DFMeasure = expectedParser SASoft2DFMeasure
 outputParser SANMI = expectedParser SANMI
 outputParser SALogLossHashed = onlyStrip
 outputParser SALikelihoodHashed = onlyStrip
+outputParser SAPerplexityHashed = onlyStrip
 outputParser SACharMatch = Right
 outputParser SAMAP = splitByTabs
 outputParser SALogLoss = doubleParser
@@ -252,6 +257,7 @@ type family ItemIntermediateRepresentationType (t :: AMetric) :: * where
   ItemIntermediateRepresentationType (AMultiLabelFMeasure _) = (Double, Int, Int)
   ItemIntermediateRepresentationType ALogLossHashed = (Text, Text)
   ItemIntermediateRepresentationType ALikelihoodHashed = (Text, Text)
+  ItemIntermediateRepresentationType APerplexityHashed = (Text, Text)
   ItemIntermediateRepresentationType ACharMatch = (Text, Text)
   ItemIntermediateRepresentationType AWER = (Int, Int)
   ItemIntermediateRepresentationType ACER = (Int, Int)
@@ -288,6 +294,7 @@ itemStep SASoft2DFMeasure = getSoft2DCounts
 itemStep SANMI = id
 itemStep SALogLossHashed = id
 itemStep SALikelihoodHashed = id
+itemStep SAPerplexityHashed = id
 itemStep SACharMatch = id
 itemStep SAMAP = uncurry calculateMAPForOneResult
 itemStep SALogLoss = itemLogLossError
