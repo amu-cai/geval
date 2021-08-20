@@ -23,7 +23,7 @@ import GEval.Clippings (totalArea, coveredBy, clippEUMatchStep)
 import GEval.BIO (gatherCountsForBIO, gatherSeparatedCountsForBIO)
 
 import GEval.Probability
-import GEval.PrecisionRecall (weightedMaxMatch, fMeasureOnCounts, calculateMAPForOneResult, getProbabilisticCounts, getCounts)
+import GEval.PrecisionRecall (weightedMaxMatch, calculateMAPForOneResult, getProbabilisticCounts)
 
 import Control.Exception
 
@@ -312,18 +312,25 @@ itemStep SAMultiLabelLikelihood = uncurry countLogLossOnProbList
 itemStep SAHaversine = haversine
 
 
+doubleParser :: Text -> Either String Double
 doubleParser = getValue . TR.double
 
+intoWords :: Text -> Either a [Text]
 intoWords = Right . Data.Text.words
 
+intoStringWords :: Text -> Either a [String]
 intoStringWords = Right . Prelude.words . unpack
 
+alternativeSentencesParser :: Text -> Either a [[String]]
 alternativeSentencesParser = Right . map Prelude.words . DLS.splitOn "\t" . unpack
 
+onlyStrip :: Text -> Either a Text
 onlyStrip = Right . strip
 
+justStrip :: Text -> Either a (Maybe Text)
 justStrip = Right . Just . strip
 
+predictedParser :: Text -> Maybe Text
 predictedParser got =
   -- first try to parse what we got as a probability distribution
   -- (like the one used for Likelikehood/LogLossHashed metric)
@@ -334,13 +341,16 @@ predictedParser got =
       where pairs = catMaybes $ map wordSpecToPair wordSpecs
     Left _ -> Just got
 
+splitByTabs :: Text -> Either a [[Char]]
 splitByTabs = Right . DLS.splitOn "\t" . unpack
 
+zeroOneParser :: Text -> Either String Bool
 zeroOneParser = expected <=< (getValue . TR.decimal)
   where expected 1 = Right True
         expected 0 = Right False
         expected _ = Left "expected 0 or 1"
 
+probToZeroOneParser :: Text -> Either String Bool
 probToZeroOneParser = detected <=< (getValue . TR.double)
   where -- output value could be a probability (for compatibility with other measures)
         detected prob
@@ -361,8 +371,10 @@ controlledParse parser t =
     (Right v) -> Right v
     (Left _) -> Left "cannot parse line"
 
+smape :: (Double, Double) -> Double
 smape (exp, out) = (abs (exp-out)) `safeDoubleDiv` ((abs exp) + (abs out))
 
+hitOrMiss :: (Text, Text) -> Double
 hitOrMiss (exp, got) =
   -- first try to parse what we got as a probability distribution
   -- (like the one used for Likelikehood/LogLossHashed metric)
@@ -393,6 +405,7 @@ getCount (True, False)  = (0, 1, 0)
 getCount (False, True)  = (0, 0, 1)
 getCount (False, False) = (0, 0, 0)
 
+getClassesInvolved :: Eq a => (Maybe a, Maybe a) -> (Maybe a, Maybe a, Maybe a)
 getClassesInvolved (Just a, Nothing) = (Nothing, Just a, Nothing)
 getClassesInvolved (Nothing, Just b) = (Nothing, Nothing, Just b) -- should not occur, for completeness
 getClassesInvolved (Just a, Just b) = if a == b
@@ -404,8 +417,10 @@ getWeightedCounts matchFun (expected, got) = (weightedMaxMatch matchFun expected
                                               Prelude.length expected,
                                               Prelude.length got)
 
+getSoftCounts :: EntityWithProbability e => ([BareEntity e], [e]) -> (Double, Int, Int)
 getSoftCounts args = getWeightedCounts matchScore args
 
+getSoft2DCounts :: ([LabeledClipping], [LabeledClipping]) -> (Integer, Integer, Integer)
 getSoft2DCounts (expected, got) = (tpArea, expArea, gotArea)
   where tpArea = coveredBy expected got
         expArea = totalArea expected

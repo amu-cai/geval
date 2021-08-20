@@ -66,13 +66,10 @@ import GEval.Model (ModelType)
 
 import Data.Conduit
 import Data.Conduit.Combinators as CC
-import qualified Data.Conduit.Binary as CB
 import qualified Data.Conduit.Text as CT
 import Control.Monad.Trans.Resource
 import qualified Data.Conduit.List as CL
 import Data.Text
-import Data.Text.Read as TR
-import Control.Applicative
 import Control.Exception
 import Control.Conditional (unlessM, whenM)
 import qualified System.Directory as D
@@ -80,35 +77,25 @@ import System.Posix
 import System.FilePath
 import Data.Maybe
 import Data.Either (rights)
-import Data.Tuple
-import qualified Data.List.Split as DLS
 import Data.List (sortBy, isSuffixOf, minimum, maximum)
 import Text.NaturalComp
 
 import Control.Monad.IO.Class
-import Control.Monad ((<=<), filterM)
 
-import Data.Attoparsec.Text (parseOnly)
 
 import Data.Conduit.SmartSource
 import Data.Conduit.Header
 
-import qualified Data.IntSet as IS
 
-import GEval.BLEU
 import GEval.Common
-import GEval.Clippings
 import GEval.PrecisionRecall
 import GEval.ClusteringMetrics
 import GEval.LogLossHashed
 import GEval.CharMatch
-import GEval.BIO
-import GEval.ProbList
 import GEval.WER
 import Data.Conduit.AutoDecompress
 import Text.Tokenizer
 import GEval.Selector
-import GEval.Annotation
 import GEval.BlackBoxDebugging
 import Data.Conduit.Bootstrap
 import GEval.DataSource
@@ -116,7 +103,6 @@ import GEval.MatchingSpecification
 
 import qualified Data.HashMap.Strict as M
 import qualified Data.Vector as V
-import qualified Data.Vector.Generic as VG
 
 import qualified Data.Vector.Unboxed as DVU
 
@@ -125,7 +111,6 @@ import Statistics.Correlation
 import Data.Statistics.Calibration (softCalibration)
 import Data.Statistics.Loess (clippedLoess)
 
-import Data.Proxy
 
 import Data.Word
 
@@ -145,6 +130,7 @@ isInputNeeded :: EvaluationScheme -> Bool
 isInputNeeded (EvaluationScheme CharMatch _) = True
 isInputNeeded (EvaluationScheme _ ops) = hasFiltering ops
 
+hasFiltering :: [PreprocessingOperation] -> Bool
 hasFiltering [] = False
 hasFiltering ((FeatureFilter _):_) = True
 hasFiltering (_:ops) = hasFiltering ops
@@ -189,13 +175,19 @@ isPreprocessable MultiLabelLikelihood = False
 isPreprocessable (Mean metric) = isPreprocessable metric
 isPreprocessable Haversine = False
 
+isInputModifiable :: Metric -> Bool
 isInputModifiable CharMatch = True
 isInputModifiable _ = False
 
+defaultOutDirectory :: FilePath
 defaultOutDirectory = "."
+defaultTestName :: String
 defaultTestName = "test-A"
+defaultOutFile :: FilePath
 defaultOutFile = "out.tsv"
+defaultExpectedFile :: String
 defaultExpectedFile = "expected.tsv"
+defaultInputFile :: String
 defaultInputFile = "in.tsv"
 
 defaultMetric :: Metric
@@ -250,6 +242,7 @@ getInHeader spec = getHeader spec gesInHeader
 getOutHeader :: GEvalSpecification -> Maybe FilePath
 getOutHeader spec = getHeader spec gesOutHeader
 
+getHeader :: GEvalSpecification -> (GEvalSpecification -> Maybe FilePath) -> Maybe FilePath
 getHeader spec selector = case selector spec of
   Just headerFile -> Just $ getExpectedDirectory spec </> headerFile
   Nothing -> Nothing
@@ -277,6 +270,7 @@ data GEvalOptions = GEvalOptions
                       geoMarkWorstFeatures :: Bool }
 
 
+defaultGEvalSpecification :: GEvalSpecification
 defaultGEvalSpecification = GEvalSpecification {
   gesOutDirectory = defaultOutDirectory,
   gesExpectedDirectory = Nothing,
@@ -540,6 +534,7 @@ getDataFormatFromFilePath path =
                   then dropExtension path
                   else path
 
+dataDecoder :: Monad m => DataFormat -> Maybe Selector -> ConduitT Text ItemTarget m ()
 dataDecoder fmt mSelector = CC.map (select fmt mSelector)
 
 gevalCoreOnSingleLines :: Metric
@@ -777,6 +772,7 @@ gevalCoreOnSourcesStandardWay metric lsSpec =
                              trans :: ((a, b) -> c) -> ParsedRecord (WithoutInput m a b) -> c
                              trans step (ParsedRecordWithoutInput x y) = step (x, y)
 
+helperLogLossHashed :: (MonadUnliftIO m, MonadThrow m) => Word32 -> (Double -> Double) -> LineSourcesSpecification (ResourceT m) -> m MetricOutput
 helperLogLossHashed nbOfBits finalStep lsSpec =
           gevalCore''' (ParserSpecWithoutInput (liftOp (Right . id)) (liftOp tentativeParser)) (\(lineNo, (t,d)) -> calculateLogLoss nbOfBits lineNo t (parseDistributionWrapper nbOfBits lineNo d)) averageC (finalStep . negate) noGraph (fromSpecificationToWithoutInput lsSpec)
   where -- Unfortunately, we're parsing the distribution twice. We need to
@@ -787,6 +783,7 @@ helperLogLossHashed nbOfBits finalStep lsSpec =
           Right _ -> Right t
           Left m -> Left m
 
+generalizedProbabilisticFMeasure :: (MonadUnliftIO m, MonadThrow m, ItemIntermediateRepresentationType t ~ ([Double], [Double], Double, Int)) => Double -> SAMetric t -> LineSourcesSpecification (ResourceT m) -> m MetricOutput
 generalizedProbabilisticFMeasure beta metric = gevalCoreWithoutInput metric
                                                probabilisticSoftAgg
                                                (fMeasureOnProbabilisticCounts beta)
@@ -1041,6 +1038,7 @@ defineContinuation aggregator finalStep generateGraph = do
   v <- aggregator
   return $ MetricOutput (SimpleRun $ finalStep v) (generateGraph v)
 
+fromSpecificationToWithoutInput :: LineSourcesSpecification (ResourceT m) -> WithoutInput m e o
 fromSpecificationToWithoutInput lsSpec = case lineSourcesFilter lsSpec of
      NoFilter -> WithoutInput expectedSource outSource
      theFilter -> WithoutInputButFiltered theFilter inputSource expectedSource outSource
@@ -1048,6 +1046,7 @@ fromSpecificationToWithoutInput lsSpec = case lineSourcesFilter lsSpec of
         outSource = lineSourcesOutputSource lsSpec
         inputSource = lineSourcesInputSource lsSpec
 
+fromSpecificationToWithInput :: LineSourcesSpecification (ResourceT m) -> WithInput m i e o
 fromSpecificationToWithInput lsSpec = WithInput theFilter inpSource expectedSource outSource
     where inpSource = lineSourcesInputSource lsSpec
           expectedSource = lineSourcesExpectedSource lsSpec
@@ -1113,6 +1112,7 @@ instance (MonadUnliftIO m, MonadIO m, MonadThrow m) => EvaluationContext (Withou
 
 data WithInput m i e o = WithInput Filter (LineSource (ResourceT m)) (LineSource (ResourceT m)) (LineSource (ResourceT m))
 
+getInputFilePath :: WithInput m i e o -> SourceSpec
 getInputFilePath (WithInput _ (LineSource _ _ _ inputFilePath _) _ _) = inputFilePath
 
 instance (MonadUnliftIO m, MonadIO m, MonadThrow m) => EvaluationContext (WithInput m i e o) m where
