@@ -382,6 +382,8 @@ main = hspec $ do
   describe "Preprocessing operations" $ do
     it "F1 with preprocessing" $ do
       runGEvalTest "f1-with-preprocessing" `shouldReturnAlmost` 0.57142857142857
+    it "BIO-F1 with preprocessing" $ do
+      runGEvalTest "bio-f1-flags" `shouldReturnAlmost` 0.75
     it "Regexp substition" $ do
       runGEvalTest "accuracy-with-flags" `shouldReturnAlmost` 0.8
     let sampleChallenge = GEvalSpecification
@@ -895,7 +897,7 @@ extractVal (Left result) = do
 
 runGEvalTest testName = do
   r <- runGEvalTestExtraOptions [] testName
---  _ <- runGEvalTestExtraOptions ["--line-by-line", "-i", "expected.tsv"] testName
+  --  _ <- runGEvalTestExtraOptions ["--line-by-line", "-i", "expected.tsv"] testName
   return r
 
 runGEvalTestExtraOptions extraOptions testName = (runGEval ([
