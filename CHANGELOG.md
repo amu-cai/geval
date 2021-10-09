@@ -1,4 +1,11 @@
 
+## 1.40.5.1 (2021-10-09)
+
+Bug fixes:
+
+* Improve line-by-line mode for BIO-F1
+* Fix clarifications for submitting solutions
+
 ## 1.40.5.0 (2021-08-20)
 
 Enhancements:
