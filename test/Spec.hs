@@ -555,7 +555,7 @@ main = hspec $ do
       runGEvalTest "charmatch-complex-compressed" `shouldReturnAlmost` 0.1923076923076923
   describe "headers" $ do
     it "simple" $ do
-      runGEvalTest "mse-simple-headers" `shouldReturnAlmost` 0.4166666666666667
+      runGEvalTestExtraOptions [] "mse-simple-headers" `shouldReturnAlmost` 0.4166666666666667
   describe "handling jsonl format" $ do
     it "simple test" $
       runGEvalTestExtraOptions ["-e", "expected.jsonl" ] "jsonl-simple" `shouldReturnAlmost` 0.571428571428
@@ -893,7 +893,10 @@ extractVal (Left result) = do
   handleParseResult result
   return $ error "something wrong"
 
-runGEvalTest = runGEvalTestExtraOptions []
+runGEvalTest testName = do
+  r <- runGEvalTestExtraOptions [] testName
+--  _ <- runGEvalTestExtraOptions ["--line-by-line", "-i", "expected.tsv"] testName
+  return r
 
 runGEvalTestExtraOptions extraOptions testName = (runGEval ([
   "--expected-directory",
