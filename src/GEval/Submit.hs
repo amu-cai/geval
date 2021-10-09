@@ -112,7 +112,7 @@ checkRemoteSynced = do
         return ()
       else
         failWith "Changes are not merged with remote branch."
-    Nothing -> failWith "No tracking branch found, use `git push -u origin BRANCH_NAME`"
+    Nothing -> failWith "No tracking branch found, use `git push -u origin BRANCH_NAME`.\nIf the repo was cloned with ``--single-branch` you might also need to do\n`git config remote.origin.fetch \"+refs/heads/*:refs/remotes/origin/*\"` first. "
 
 getCurrentBranch :: IO String
 getCurrentBranch = runCommand "git rev-parse --abbrev-ref HEAD"
