@@ -651,6 +651,15 @@ the following `in.txt` file:
     $ geval -o out.tsv -e expected.tsv -i in.tsv --metric 'Accuracy:f<in[2]:this>'
     0.25
 
+#### `p<P>` — filtering by confidence
+
+When you use `p<P>`, only the top P% entries with the highest
+confidence will be considered. For instance, `p<50>` means half of the
+items with the largest confidence scores will be considered.
+
+So far only MultiLabel-F-measure format is handled. If more than one
+label is given, the geometric mean of all probabilities is used.
+
 ### Presentation
 
 Some flags are used not for modifying the result, but rather changing
