@@ -31,6 +31,7 @@ import GEval.FeatureExtractor
 import GEval.Selector
 import GEval.CreateChallenge
 import GEval.Validation
+import GEval.Confidence
 import Data.Conduit.Bootstrap
 
 import Data.Map.Strict
@@ -373,6 +374,8 @@ main = hspec $ do
       runGEvalTest "multilabel-f1-ie-fuzzy-harden" `shouldReturnAlmost` 0.555555555
     it "information extraction" $ do
       runGEvalTest "multilabel-f1-ie-probs" `shouldReturnAlmost` 0.1111111111
+    it "with top confident" $ do
+      runGEvalTest "top-confidence" `shouldReturnAlmost` 0.857142857142857
   describe "Mean/MultiLabel-F" $ do
     it "simple" $ do
       runGEvalTest "mean-multilabel-f1-simple" `shouldReturnAlmost` 0.5
@@ -801,6 +804,11 @@ main = hspec $ do
       loess (DVU.fromList [0.2, 0.6, 1.0])
             (DVU.fromList [-0.6, 0.2, 1.0])
             0.4 `shouldBeAlmost` (-0.2)
+  describe "Confidence for a line" $ do
+    it "simple case" $ do
+      totalLineConfidence "foo:0.6" `shouldBeAlmost` 0.6
+    it "more than one" $ do
+      totalLineConfidence "foo:1.0 bar:0.6 bar:0.5" `shouldBeAlmost` 0.669432952768766
   describe "Calibration" $ do
     it "empty list" $ do
       calibration [] [] `shouldBeAlmost` 1.0

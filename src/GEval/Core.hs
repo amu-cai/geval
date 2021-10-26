@@ -66,6 +66,7 @@ import GEval.Model (ModelType)
 
 import Data.Conduit
 import Data.Conduit.Combinators as CC
+import Data.Conduit.Utils
 import qualified Data.Conduit.Text as CT
 import Control.Monad.Trans.Resource
 import qualified Data.Conduit.List as CL
@@ -133,6 +134,7 @@ isInputNeeded (EvaluationScheme _ ops) = hasFiltering ops
 hasFiltering :: [PreprocessingOperation] -> Bool
 hasFiltering [] = False
 hasFiltering ((FeatureFilter _):_) = True
+hasFiltering ((TopConfidence _):_) = True
 hasFiltering (_:ops) = hasFiltering ops
 
 -- | Could output be preprocessable
@@ -306,7 +308,7 @@ extensionsHandled = ["tsv", "jsonl"]
 data LineSource m = LineSource (ConduitT () Text m ()) (Text -> ItemTarget) (Text -> Text) SourceSpec Word32
 
 data LineSourcesSpecification m = LineSourcesSpecification {
-  lineSourcesFilter :: Filter,
+  lineSourcesFilter :: GeneralizedFilter,
   lineSourcesInputSource :: LineSource m,
   lineSourcesExpectedSource :: LineSource m,
   lineSourcesOutputSource :: LineSource m }
@@ -359,7 +361,7 @@ addSchemeSpecifics :: EvaluationScheme -> DataSource -> DataSource
 addSchemeSpecifics scheme@(EvaluationScheme metric _) dataSource =
   dataSource {
      dataSourceChallengeData = (dataSourceChallengeData dataSource) {
-         challengeDataSourceFilter = getFilterForScheme (challengeDataSourceInHeader $ dataSourceChallengeData dataSource) scheme,
+         challengeDataSourceFilter = getGeneralizedFilterForScheme (challengeDataSourceInHeader $ dataSourceChallengeData dataSource) scheme,
          challengeDataSourceOutPreprocess = outPreprocess,
          challengeDataSourceInPreprocess = inPreprocess
          }}
@@ -1039,12 +1041,14 @@ defineContinuation aggregator finalStep generateGraph = do
   return $ MetricOutput (SimpleRun $ finalStep v) (generateGraph v)
 
 fromSpecificationToWithoutInput :: LineSourcesSpecification (ResourceT m) -> WithoutInput m e o
-fromSpecificationToWithoutInput lsSpec = case lineSourcesFilter lsSpec of
-     NoFilter -> WithoutInput expectedSource outSource
-     theFilter -> WithoutInputButFiltered theFilter inputSource expectedSource outSource
+fromSpecificationToWithoutInput lsSpec =
+  if hasNoFilter theFilter
+  then WithoutInput expectedSource outSource
+  else WithoutInputButFiltered theFilter  inputSource expectedSource outSource
   where expectedSource = lineSourcesExpectedSource lsSpec
         outSource = lineSourcesOutputSource lsSpec
         inputSource = lineSourcesInputSource lsSpec
+        theFilter = (lineSourcesFilter lsSpec)
 
 fromSpecificationToWithInput :: LineSourcesSpecification (ResourceT m) -> WithInput m i e o
 fromSpecificationToWithInput lsSpec = WithInput theFilter inpSource expectedSource outSource
@@ -1070,7 +1074,7 @@ class EvaluationContext ctxt m where
   checkStepM :: ((Word32, ParsedRecord ctxt) -> (ResourceT m) c) -> (Word32, WrappedParsedRecord ctxt) -> (ResourceT m) (Maybe c)
 
 data WithoutInput m e o = WithoutInput (LineSource (ResourceT m)) (LineSource (ResourceT m))
-                          | WithoutInputButFiltered Filter (LineSource (ResourceT m)) (LineSource (ResourceT m)) (LineSource (ResourceT m))
+                          | WithoutInputButFiltered GeneralizedFilter (LineSource (ResourceT m)) (LineSource (ResourceT m)) (LineSource (ResourceT m))
 
 instance (MonadUnliftIO m, MonadIO m, MonadThrow m) => EvaluationContext (WithoutInput m e o) m where
   data ParserSpec (WithoutInput m e o) = ParserSpecWithoutInput (ItemTarget -> Either String e) (ItemTarget -> Either String o)
@@ -1091,7 +1095,8 @@ instance (MonadUnliftIO m, MonadIO m, MonadThrow m) => EvaluationContext (Withou
          <*> ZipSource (getZipSource $ (,)
                         <$> ZipSource (sourceItems expectedLineSource)
                         <*> ZipSource (sourceItems outLineSource)))
-    .| CC.filter (applyFilter theFilter)
+    .| CC.filter (applyFilter $ generalizedFilterFilter theFilter)
+    .| topperConduit (generalizedFilterTopper theFilter)
     .| CC.map (\(TargetRecord _ y z) -> WrappedParsedRecordWithoutInput (applyParser expParser y) (applyParser outParser z))
 
   checkStep _ step (lineNo, WrappedParsedRecordWithoutInput (Got expectedItem) (Got outItem)) = Just $ step (lineNo, ParsedRecordWithoutInput expectedItem outItem)
@@ -1110,7 +1115,7 @@ instance (MonadUnliftIO m, MonadIO m, MonadThrow m) => EvaluationContext (Withou
 
 
 
-data WithInput m i e o = WithInput Filter (LineSource (ResourceT m)) (LineSource (ResourceT m)) (LineSource (ResourceT m))
+data WithInput m i e o = WithInput GeneralizedFilter (LineSource (ResourceT m)) (LineSource (ResourceT m)) (LineSource (ResourceT m))
 
 getInputFilePath :: WithInput m i e o -> SourceSpec
 getInputFilePath (WithInput _ (LineSource _ _ _ inputFilePath _) _ _) = inputFilePath
@@ -1128,7 +1133,8 @@ instance (MonadUnliftIO m, MonadIO m, MonadThrow m) => EvaluationContext (WithIn
          <*> ZipSource (getZipSource $ (,)
                         <$> ZipSource (sourceItems expectedLineSource)
                         <*> ZipSource (sourceItems outLineSource)))
-    .| CC.filter (applyFilter theFilter)
+    .| CC.filter (applyFilter $ generalizedFilterFilter theFilter)
+    .| topperConduit (generalizedFilterTopper theFilter)
     .| CC.map (\(TargetRecord x y z) -> WrappedParsedRecordWithInput (applyParser inpParser x) (applyParser expParser y) (applyParser outParser z))
   checkStep _ step (lineNo, WrappedParsedRecordWithInput (Got inputItem) (Got expectedItem) (Got outItem)) = Just $ step (lineNo, ParsedRecordWithInput inputItem expectedItem outItem)
   checkStep _ _ (lineNo, WrappedParsedRecordWithInput _ _ (Wrong m)) = throw $ UnexpectedData lineNo m
@@ -1157,7 +1163,7 @@ threeLineSource (WithInput theFilter inputLineSource expectedLineSource outLineS
          <*> (ZipSource $ getZipSource $ (,)
                         <$> ZipSource (linesAsItems expectedLineSource)
                         <*> ZipSource (linesAsItems outLineSource)))
-  .| (CC.filter (applyFilterToSourceItems theFilter))
+  .| (CC.filter (applyFilterToSourceItems $ generalizedFilterFilter theFilter))
   .| (CC.map (\(x, (y,z)) -> WrappedParsedRecordWithInput x y z))
 
 averageC :: MonadResource m => ConduitT Double Void m Double
@@ -1201,3 +1207,15 @@ applyFilterToSourceItems filter (Got x, (Got y, Got z)) = applyFilter filter tar
                                     (Got (RawItemTarget y))
                                     (Got (RawItemTarget z))
 applyFilterToSourceItems _ special = True
+
+topperConduit NoTopper = doNothing
+topperConduit (Topper percentage scorer) = gobbleAndDo (findTop percentage scorer)
+
+findTop :: Double -> (TargetRecord -> Double) -> [TargetRecord] -> [TargetRecord]
+findTop percentage scorer records =
+  Prelude.map fst
+  $ Prelude.take n
+  $ sortBy (\a b -> snd b `compare` snd a)
+  $ Prelude.map (\r -> (r, scorer r)) records
+  where n = ceiling ((percentage * (fromIntegral $ (Prelude.length records) - 1)) / 100.0)
+        -- -1 due to the special entry Done

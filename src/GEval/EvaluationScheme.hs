@@ -36,6 +36,7 @@ data PreprocessingOperation = RegexpMatch Regex
                               | SetPriority Int
                               | RegexpSubstition Regex Text
                               | FeatureFilter Text
+                              | TopConfidence Double
   deriving (Eq)
 
 leftParameterBracket :: Char
@@ -67,6 +68,7 @@ readOps ('N':theRest) = handleParametrizedOp (SetName . pack) theRest
 readOps ('P':theRest) = handleParametrizedOp (SetPriority . read) theRest
 readOps ('s':theRest) = handleParametrizedBinaryOp (\a b -> RegexpSubstition (compile (BSU.fromString a) []) (pack b)) theRest
 readOps ('f':theRest) = handleParametrizedOp (FeatureFilter . pack) theRest
+readOps ('p':theRest) = handleParametrizedOp (TopConfidence . read) theRest
 -- this is not the right way to do this, but try catch at least unknown flags
 readOps t@(c:_) = if isLetter c
                   then throw $ UnknownFlags t
@@ -101,7 +103,7 @@ parseParameter [] = (Nothing, [])
 parseParameter t@(fChar:theRest) =
   if fChar == leftParameterBracket
   then case break (== rightParameterBracket) theRest of
-         (s, []) -> throw $ UnknownFlags t
+         (_, []) -> throw $ UnknownFlags t
          (param, (_:theRest')) -> (Just param, theRest')
   else throw $ UnknownFlags t
 
@@ -145,6 +147,7 @@ instance Show PreprocessingOperation where
   show (SetPriority p) = parametrizedOperation "P" (show p)
   show (RegexpSubstition (Regex _ regexp) s) = "s" ++ (formatParameter $ BSU.toString regexp) ++ (formatParameter $ unpack s)
   show (FeatureFilter featureSpec) = parametrizedOperation "f" (unpack featureSpec)
+  show (TopConfidence percentage) = parametrizedOperation "p" (show percentage)
 
 applySubstitution :: Regex -> Text -> Text -> Text
 applySubstitution r substitution t =
@@ -181,3 +184,4 @@ applyPreprocessingOperation (SetName _) = id
 applyPreprocessingOperation (SetPriority _) = id
 applyPreprocessingOperation (RegexpSubstition regex substition) = applySubstitution regex substition
 applyPreprocessingOperation (FeatureFilter _) = id
+applyPreprocessingOperation (TopConfidence _) = id

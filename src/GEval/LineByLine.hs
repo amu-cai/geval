@@ -33,7 +33,7 @@ import Text.Tokenizer
 
 import System.IO
 
-import Data.Conduit.AutoDecompress (doNothing)
+import Data.Conduit.Utils
 
 import Data.Conduit
 import qualified Data.Conduit.List as CL
@@ -479,11 +479,6 @@ runLineByLineGeneralized ordering spec consum = do
         sortOrder _ _ = flip compareScores
         compareScores (LineRecord _ _ _ _ s1) (LineRecord _ _ _ _ s2) = s1 `compare` s2
         mReferences = Nothing
-
-gobbleAndDo :: Monad m => ([a] -> [b]) -> ConduitT a b m ()
-gobbleAndDo fun = do
-  l <- CC.sinkList
-  CC.yieldMany $ fun l
 
 runDiff :: ResultOrdering -> Maybe String -> FilePath -> GEvalSpecification -> BlackBoxDebuggingOptions -> IO ()
 runDiff ordering featureFilter otherOut spec bbdo = do

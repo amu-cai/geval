@@ -7,6 +7,7 @@ module Data.Conduit.AutoDecompress
 
 import Data.Conduit
 import Data.Conduit.Combinators
+import Data.Conduit.Utils
 import Data.ByteString
 import Data.Conduit.Zlib
 import Data.Word8
@@ -40,6 +41,3 @@ lookAtMagicNumbers (31, 139) = ungzip
 lookAtMagicNumbers (66, 90) = BZ.bunzip2
 lookAtMagicNumbers (253, 55) = XZ.decompress Nothing
 lookAtMagicNumbers _ = doNothing
-
-doNothing :: Monad m => ConduitT a a m ()
-doNothing = Data.Conduit.Combinators.filter (const True)
