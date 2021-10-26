@@ -1163,8 +1163,11 @@ threeLineSource (WithInput theFilter inputLineSource expectedLineSource outLineS
          <*> (ZipSource $ getZipSource $ (,)
                         <$> ZipSource (linesAsItems expectedLineSource)
                         <*> ZipSource (linesAsItems outLineSource)))
-  .| (CC.filter (applyFilterToSourceItems $ generalizedFilterFilter theFilter))
-  .| (CC.map (\(x, (y,z)) -> WrappedParsedRecordWithInput x y z))
+  .| (CC.map (\(x, (y,z)) -> TargetRecord (fmap RawItemTarget x) (fmap RawItemTarget y) (fmap RawItemTarget z)))
+  .| (CC.filter (applyFilter $ generalizedFilterFilter theFilter))
+  .| topperConduit (generalizedFilterTopper theFilter)
+  .| (CC.map (\(TargetRecord x y z) -> WrappedParsedRecordWithInput (unwrap x) (unwrap y) (unwrap z)))
+  where unwrap = fmap (\(RawItemTarget x) -> x)
 
 averageC :: MonadResource m => ConduitT Double Void m Double
 averageC = getZipSink

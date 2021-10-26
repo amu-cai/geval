@@ -7,9 +7,14 @@ import Data.Text.Read as TR
 import Data.Word
 import Control.Exception
 
-import Data.Attoparsec.Text
+import Data.Attoparsec.Text hiding (Done)
 
 data SourceItem a = Got a | Wrong String | Done
+
+instance Functor SourceItem where
+  fmap f (Got a) = Got (f a)
+  fmap _ (Wrong s) = Wrong s
+  fmap _ Done = Done
 
 type MetricValue = Double
 
