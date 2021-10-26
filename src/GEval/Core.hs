@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -fno-warn-type-defaults #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
@@ -1095,8 +1096,7 @@ instance (MonadUnliftIO m, MonadIO m, MonadThrow m) => EvaluationContext (Withou
          <*> ZipSource (getZipSource $ (,)
                         <$> ZipSource (sourceItems expectedLineSource)
                         <*> ZipSource (sourceItems outLineSource)))
-    .| CC.filter (applyFilter $ generalizedFilterFilter theFilter)
-    .| topperConduit (generalizedFilterTopper theFilter)
+    .| filterConduit theFilter
     .| CC.map (\(TargetRecord _ y z) -> WrappedParsedRecordWithoutInput (applyParser expParser y) (applyParser outParser z))
 
   checkStep _ step (lineNo, WrappedParsedRecordWithoutInput (Got expectedItem) (Got outItem)) = Just $ step (lineNo, ParsedRecordWithoutInput expectedItem outItem)
@@ -1133,8 +1133,7 @@ instance (MonadUnliftIO m, MonadIO m, MonadThrow m) => EvaluationContext (WithIn
          <*> ZipSource (getZipSource $ (,)
                         <$> ZipSource (sourceItems expectedLineSource)
                         <*> ZipSource (sourceItems outLineSource)))
-    .| CC.filter (applyFilter $ generalizedFilterFilter theFilter)
-    .| topperConduit (generalizedFilterTopper theFilter)
+    .| filterConduit theFilter
     .| CC.map (\(TargetRecord x y z) -> WrappedParsedRecordWithInput (applyParser inpParser x) (applyParser expParser y) (applyParser outParser z))
   checkStep _ step (lineNo, WrappedParsedRecordWithInput (Got inputItem) (Got expectedItem) (Got outItem)) = Just $ step (lineNo, ParsedRecordWithInput inputItem expectedItem outItem)
   checkStep _ _ (lineNo, WrappedParsedRecordWithInput _ _ (Wrong m)) = throw $ UnexpectedData lineNo m
@@ -1164,14 +1163,13 @@ threeLineSource (WithInput theFilter inputLineSource expectedLineSource outLineS
                         <$> ZipSource (linesAsItems expectedLineSource)
                         <*> ZipSource (linesAsItems outLineSource)))
   .| (CC.map (\(x, (y,z)) -> TargetRecord (fmap RawItemTarget x) (fmap RawItemTarget y) (fmap RawItemTarget z)))
-  .| (CC.filter (applyFilter $ generalizedFilterFilter theFilter))
-  .| topperConduit (generalizedFilterTopper theFilter)
+  .| filterConduit theFilter
   .| (CC.map (\(TargetRecord x y z) -> WrappedParsedRecordWithInput (unwrap x) (unwrap y) (unwrap z)))
   where unwrap = fmap (\(RawItemTarget x) -> x)
 
 averageC :: MonadResource m => ConduitT Double Void m Double
 averageC = getZipSink
-    $ (\total count -> total / fromIntegral count)
+    $ (\total c -> total / fromIntegral c)
   <$> ZipSink CC.sum
   <*> ZipSink CC.length
 
@@ -1204,13 +1202,12 @@ linesAsItems :: MonadResource m => LineSource m -> ConduitT () (SourceItem Text)
 linesAsItems (LineSource lineSource _ _ _ _) =
   (lineSource .| CL.map Got) >> yield Done
 
-applyFilterToSourceItems :: Filter -> (SourceItem Text, (SourceItem Text, SourceItem Text)) -> Bool
-applyFilterToSourceItems filter (Got x, (Got y, Got z)) = applyFilter filter targetRecord
-  where targetRecord = TargetRecord (Got (RawItemTarget x))
-                                    (Got (RawItemTarget y))
-                                    (Got (RawItemTarget z))
-applyFilterToSourceItems _ special = True
+filterConduit :: Monad m => GeneralizedFilter -> ConduitM TargetRecord TargetRecord m ()
+filterConduit theFilter =
+  (CC.filter (applyFilter $ generalizedFilterFilter theFilter))
+  .| topperConduit (generalizedFilterTopper theFilter)
 
+topperConduit :: Monad m => Topper -> ConduitT TargetRecord TargetRecord m ()
 topperConduit NoTopper = doNothing
 topperConduit (Topper percentage scorer) = gobbleAndDo (findTop percentage scorer)
 
