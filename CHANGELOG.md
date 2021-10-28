@@ -1,4 +1,10 @@
 
+## 1.40.6.0 (2021-10-28)
+
+Enhancements:
+
+* Add p<P> flag for selecting the P% subset with the highest confidence scores
+
 ## 1.40.5.1 (2021-10-09)
 
 Bug fixes:
