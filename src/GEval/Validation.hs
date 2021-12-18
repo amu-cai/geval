@@ -15,7 +15,6 @@ import System.FilePath
 import System.Directory
 import Control.Exception
 import Control.Monad.Trans.Resource
-import Control.Monad.IO.Class
 import Control.Conditional (unlessM, whenM, unless, when)
 import Data.Conduit
 import qualified Data.Conduit.List as CL
@@ -154,8 +153,15 @@ testDirFilter :: FindClause Bool
 testDirFilter = (SFF.fileType ==? Directory) &&? (SFF.fileName ~~? "dev-*"
                                                   ||? SFF.fileName ~~? "test-*")
 
+fileTypeFollowed :: FindClause FileType
+fileTypeFollowed = do
+  status <- followStatus
+  case status of
+    Just status' -> return $ statusType status'
+    Nothing -> fileType
+
 fileFilter :: String -> FindClause Bool
-fileFilter fileName = (SFF.fileType ==? RegularFile) &&? (SFF.fileName ~~? fileName ||? SFF.fileName ~~? fileName ++ exts)
+fileFilter fileName = (fileTypeFollowed ==? RegularFile) &&? (SFF.fileName ~~? fileName ||? SFF.fileName ~~? fileName ++ exts)
   where
     exts = Prelude.concat [ "(", intercalate "|" compressedFilesHandled, ")" ]
 
