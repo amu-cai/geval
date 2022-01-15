@@ -780,8 +780,12 @@ Now GEval will work as follows:
 ### Directory structure of a Gonito challenge
 
 A definition of a [Gonito](https://gonito.net) challenge should be put in a separate
-directory. Such a directory should
-have the following structure:
+directory. Such a directory should have the structure as given below.
+
+You don't have to create this structure manually, use `geval --init
+...` option to generate a challenge skeleton (see next section).
+
+Standard GEval/Gonito challenge structure:
 
 * `README.md` — description of a challenge in Markdown, the first header
   will be used as the challenge title, the first paragraph — as its short
@@ -846,7 +850,7 @@ basic facts about Makefiles:
   shell commands
 * `$@` is the (first) target, whereas `$<` — the first dependency
 * the indentation should be done with **TABs, not spaces**! (see the
-  [file with TABs](misc/challenge-preparation-example/Makefile)
+  [file with TABs](misc/challenge-preparation-example/Makefile))
 
 Also don't forget to compress aggressively large files (e.g.
 `train/in.tsv` and `train/expected.tsv`), the xz compressor is a good
