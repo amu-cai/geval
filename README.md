@@ -821,20 +821,36 @@ You can use `geval` to initiate a [Gonito](https://gonito.net) challenge:
 Of course, any other metric can
 be given to generate another type of toy challenge:
 
-    geval --init --expected-directory my-machine-translation-challenge --metric BLEU
+    geval --init --expected-directory my-machine-translation-challenge --metric BLEU --precision 4 -% -B 200
+
+Note that the `--precision 4` and `-%` options give you pretty
+formatting of evaluation scores. Simply you don't want ugly scores
+such as `0.1729801323401`! The `--precision 4` option limits it to 4
+digits after the decimal dot (`0.1730`) and `-%` makes it into a
+percent-like value (`17.30`).
+
+The `-B 200` is yet another interesting option. If it is used, GEval will
+calculate confidence intervals using bootstrap sampling.
 
 ### Preparing a Git repository
 
 [Gonito](https://gonito.net) platform expects a Git repository with a
 challenge to be submitted. The suggested way to do this will be
 presented as a [Makefile](https://en.wikipedia.org/wiki/Makefile), but
-of course you could use any other scripting language and the commands
-should be clear if you know Bash and some basic facts about Makefiles:
+of course you could use any other scripting language (anyway, it's
+always a good idea to start with `geval --init` and then add/overwrite
+the files). The commands should be clear if you know Bash and some
+basic facts about Makefiles:
 
 * a Makefile consists of rules, each rule specifies how to build a _target_ out of _dependencies_ using
   shell commands
 * `$@` is the (first) target, whereas `$<` — the first dependency
-* the indentation should be done with TABs, not spaces!
+* the indentation should be done with **TABs, not spaces**! (see the
+  [file with TABs](misc/challenge-preparation-example/Makefile)
+
+Also don't forget to compress aggressively large files (e.g.
+`train/in.tsv` and `train/expected.tsv`), the xz compressor is a good
+option and is handled by GEval.
 
 ```
 SHELL=/bin/bash
