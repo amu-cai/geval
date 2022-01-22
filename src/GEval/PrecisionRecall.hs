@@ -10,13 +10,10 @@ module GEval.PrecisionRecall(calculateMAPForOneResult,
                              countFragFolder, fMeasureOnSeparatedCounts, f1MeasureOnSeparatedCounts)
        where
 
-import Debug.Trace
-
 import GEval.Common
 import GEval.Probability
 
 import Data.Graph.Inductive
-import Data.Graph.Inductive.Query.MaxFlow
 
 import Data.List (find, foldl', nub)
 
@@ -28,10 +25,10 @@ import qualified Data.HashMap.Strict as M
 calculateMAPForOneResult :: (Eq a) => [a] -> [a] -> Double
 calculateMAPForOneResult expected got = precisionSum / fromIntegral (length expected)
   where (_::Int, _, precisionSum) = calculateMAPForOneResultCore expected (nub got)
-        calculateMAPForOneResultCore expected got = foldl' (oneMAPStep expected) (0, 0, 0.0) got
-        oneMAPStep expected (gotCount, allCount, precisionSum) gotItem
-          | gotItem `elem` expected = (newGotCount, newAllCount, precisionSum + (newGotCount /. newAllCount))
-          | otherwise = (gotCount, newAllCount, precisionSum)
+        calculateMAPForOneResultCore expected' got' = foldl' (oneMAPStep expected') (0, 0, 0.0) got'
+        oneMAPStep expected' (gotCount, allCount, precisionSum') gotItem
+          | gotItem `elem` expected' = (newGotCount, newAllCount, precisionSum' + (newGotCount /. newAllCount))
+          | otherwise = (gotCount, newAllCount, precisionSum')
          where newGotCount = gotCount + 1
                newAllCount = allCount + 1
 
@@ -53,7 +50,7 @@ fMeasure beta matchingFun expected got = weightedHarmonicMean beta p r
 weightedHarmonicMean :: Double -> Double -> Double -> Double
 weightedHarmonicMean beta x y =
   (1 + betaSquared) * x * y `safeDoubleDiv` (betaSquared * x + y)
-  where betaSquared = beta ^ 2
+  where betaSquared = beta ^ (2 :: Int)
 
 f2MeasureOnCounts :: ConvertibleToDouble n => (n, Int, Int) -> Double
 f2MeasureOnCounts = fMeasureOnCounts 2.0
@@ -127,9 +124,9 @@ maxMatchOnOrdered laterThan expected got =
 -- counting maximum match with maximum bipartite matching
 -- (we build an auxiliary graph and do a max-flow on this)
 maxMatch :: (a -> b -> Bool) -> [a] -> [b] -> Int
-maxMatch matchFun expected got = mf
+maxMatch matchFun expected got = mfVal
    where (b, e, g) = buildGraph matchFun expected got
-         mf = maxFlow g (fst b) (fst e)
+         mfVal = maxFlow g (fst b) (fst e)
 
 buildGraph :: (a -> b -> Bool) -> [a] -> [b] -> (LNode Int, LNode Int, Gr Int Int)
 buildGraph matchFun expected got = (b, e, g)
@@ -138,7 +135,7 @@ buildGraph matchFun expected got = (b, e, g)
            run empty $
              do b <- insMapNodeM 0
                 e <- insMapNodeM 1
-                mapM insMapNodeM [2..1+(length expected)+(length got)]
+                _ <- mapM insMapNodeM [2..1+(length expected)+(length got)]
                 insMapEdgesM $ map (\n -> (0, n, 1)) expectedIxs
                 insMapEdgesM $ map (\m -> (m, 1, 1)) gotIxs
                 insMapEdgesM $ map (\(n,m) -> (n, m, 1))
@@ -172,7 +169,7 @@ getProbabilisticCounts (expected, got) = (results, (map getProbabilityAsDouble g
                                               length expected)
   where gotMass = sum $ map (\(i, j) -> (matchScore (expected !! (i - 1)) (got !! (j - 1))) * (getProbabilityAsDouble (got !! (j - 1))))  matching
         results = map findResult [1..(length got)]
-        findResult j = case find (\(i, j') -> j' == j) $ matching of
+        findResult j = case find (\(_, j') -> j' == j) $ matching of
           Just (i, _) -> matchScore (expected !! (i - 1)) (got !! (j - 1))
           Nothing -> 0.0
         (matching, _) = weightedMaxMatching matchScore expected got

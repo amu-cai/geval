@@ -5,13 +5,9 @@ module GEval.Clippings
 
 import Data.Attoparsec.Text
 import Data.Text
-import Control.Applicative
-import Control.Exception
 import Data.Char (isSpace)
 import Data.List (unfoldr)
 import Data.Maybe (catMaybes)
-
-import Debug.Trace
 
 import GEval.Common
 import GEval.PrecisionRecall (maxMatch)
@@ -49,7 +45,7 @@ lineClippingsParser = sepByWhitespaces clippingParser
 clippingParser :: Parser Clipping
 clippingParser = do
   pageNo <- PageNumber <$> decimal
-  char '/'
+  _ <- char '/'
   rectangle <- rectangleParser
   return $ Clipping pageNo rectangle
 
@@ -59,9 +55,9 @@ lineClippingSpecsParser = sepByWhitespaces clippingSpecParser
 clippingSpecParser :: Parser ClippingSpec
 clippingSpecParser = do
   pageNo <- PageNumber <$> decimal
-  char '/'
+  _ <- char '/'
   rectangle <- rectangleParser
-  char '/'
+  _ <- char '/'
   margin <- decimal
   return $ ClippingSpec pageNo (smallerRectangle margin rectangle) (extendedRectangle margin rectangle)
 
@@ -73,7 +69,7 @@ labeledClippingParser =
 clippingWithLabelParser :: Parser LabeledClipping
 clippingWithLabelParser = do
   label <- takeWhile1 (\c -> not (isSpace c) && c /= ':')
-  string ":"
+  _ <- string ":"
   clipping <- clippingParser
   return $ LabeledClipping (Just label) clipping
 
@@ -90,8 +86,7 @@ smallerRectangle margin (Rectangle (Point x0 y0) (Point x1 y1)) =
   Rectangle (Point (x0 + margin) (y0 + margin))
             (Point (x1 `nonNegativeDiff` margin) (y1 `nonNegativeDiff` margin))
 
-
-
+nonNegativeDiff :: (Ord p, Num p) => p -> p -> p
 nonNegativeDiff x y
   | x < y = 0
   | otherwise = x - y
@@ -99,11 +94,11 @@ nonNegativeDiff x y
 rectangleParser :: Parser Rectangle
 rectangleParser = do
   x0 <- decimal
-  char ','
+  _ <- char ','
   y0 <- decimal
-  char ','
+  _ <- char ','
   x1 <- decimal
-  char ','
+  _ <- char ','
   y1 <- decimal
   if x1 < x0 || y1 < y0
   then fail "wrong coordinates"
@@ -128,7 +123,7 @@ coveredBy clippingsA clippingsB = sum
     step ([], _) = Nothing
     step (firstA:restA, b) = Just (result, (newA ++ restA, newB))
        where (result, newA, newB) = step' firstA b
-    step' rectA [] = (Nothing, [], [])
+    step' _ [] = (Nothing, [], [])
     step' a (firstB:restB) = case partitionClippings a firstB of
       Just (commonRect, leftoversA, leftoversB) -> (Just commonRect, leftoversA, leftoversB ++ restB)
       Nothing -> let
@@ -160,8 +155,9 @@ getLeftovers (Rectangle (Point x0 y0) (Point x1 y1))
                          Rectangle (Point x0 (y1 + 1)) (Point x1 y1'),
                          Rectangle (Point x0' y0') (Point (x0 - 1) y1'),
                          Rectangle (Point (x1 + 1) y0') (Point x1' y1')]
-  where validRectangle (Rectangle (Point x0 y0) (Point x1 y1)) = x0 <= x1 && y0 <= y1
+  where validRectangle (Rectangle (Point x0'' y0'') (Point x1'' y1'')) = x0'' <= x1'' && y0'' <= y1''
 
+clippEUMatchStep :: ([ClippingSpec], [Clipping]) -> (Int, Int, Int)
 clippEUMatchStep (clippingSpecs, clippings) = (maxMatch matchClippingToSpec clippingSpecs clippings,
                                                Prelude.length clippingSpecs,
                                                Prelude.length clippings)
