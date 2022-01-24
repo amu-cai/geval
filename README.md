@@ -1301,6 +1301,74 @@ $ echo -e '2021.99999\t20211231\tGEval is awesome!' | docker run -v $(pwd)/model
 positive
 ```
 
+## Running external evaluators
+
+GEval can invoke external evaluators provided that they are dockerised
+in a consistent manner. (This option in itself is not probably very
+useful, it makes more sense when GEval is used as a part of [Gonito](https://gitlab/filipg/gonito).)
+
+Docker containers are required for external evaluators to ensure
+reproducibility of evaluation results (assuming there is no randomness
+within the evaluator itself). In order to run an external evaluator
+use a metric of the form `GROUP/IMAGE@sha256:SHA256`, e.g.
+`amu-csi/comet@sha256:499fe5e5073102dbb0ee3dbb65f049dab44fa9fc251f6835c9990f8fb196a72b`,
+e.g.:
+
+```
+geval --metric amu-csi/comet@sha256:499fe5e5073102dbb0ee3dbb65f049dab44fa9fc251f6835c9990f8fb196a72b:N<Comet>
+```
+
+(Usually it is recommended to use the `N<...>` flag to give the metric a pretty name.)
+
+It is required that a container be made in such a way that:
+
+* it should read items from the standard input and write to the standard output,
+* input line is composed of TAB-separated fields, first the actual output from
+  the system evaluated should be given and then the expected (gold-standard) output,
+* it should calculate the result for each items, as immediately as possibly — preferably
+  immediately for each line (though there might be exceptions, for instance when it
+  is better to use batching for efficiency reasons),
+* when it encounters the end of the standard input, it should print the total score
+  in a separate line,
+* in other words, for _N_ input lines (items) read from the standard
+  input, it should print out _N+1_ lines to the standard output.
+
+### Requirements explained
+
+Q. Why not just print the total score?<br>
+A. We'd like to be able to use
+the GEval `--line-by-line` or `--worst-features` options also for
+external metrics.
+
+Q. So why we need the total score now, couldn't GEval just calculate the mean score?<br>
+A. Score aggregation is not always just mean, sometimes is quite complicated (e.g. for BLUE),
+   it is a crucial part of the evaluation metric itself.
+
+Q. Why this crude standard input-output streaming and not just REST
+   server or something like this?</br>
+A. Because streaming like this is a
+   powerful, but simple idea, with some parallelisation obtained for
+   free. You can combine it with shell pipelines both externally
+   (GEval could be combined with other scripts) and internally (the
+   main evaluation script could be implemented as a shell pipeline
+   itself).
+
+### What if an external evaluator needs the input as well?
+
+Some evaluators, e.g. BERTScore, need not just the expected and actual
+output, but also the input that was fed to the system being evaluated.
+In such a case, `--with-input` should be used:
+
+```
+geval --with-input --metric amu-csi/bertscore@sha256:100fe5e5073102dbb0ee3dbb65f049dab44fa9fc251f6835c9990f8fb196a72b:N<BertScore>
+```
+
+When `--with-input` is used, each line is composed of the following fields:
+
+* actual output,
+* expected (gold-standard/ground-truth) output,
+* input fed to the system being evaluated.
+
 ## `geval` options
 
 ```
