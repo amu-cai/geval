@@ -1,4 +1,10 @@
 
+## 1.40.7.0 (2022-02-03)
+
+Enhancements:
+
+* Add Improvement@Threshold metric
+
 ## 1.40.6.0 (2021-10-28)
 
 Enhancements:
