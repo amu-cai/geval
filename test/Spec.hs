@@ -140,6 +140,9 @@ main = hspec $ do
   describe "Haversine" $ do
     it "simple example" $
       runGEvalTest "haversine" `shouldReturnAlmost` 1951.9351057250876
+  describe "Improvement" $ do
+    it "simple improvement" $ do
+      runGEvalTest "improvement-simple" `shouldReturnAlmost` 1.12
   describe "Accuracy" $ do
     it "simple example" $
       runGEvalTest "accuracy-simple" `shouldReturnAlmost` 0.6

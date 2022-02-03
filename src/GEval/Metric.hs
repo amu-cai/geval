@@ -37,6 +37,7 @@ data Metric = RMSE | MSE | Pearson | Spearman | BLEU | GLEU | WER | CER | Accura
               | ProbabilisticSoftFMeasure Double | Soft2DFMeasure Double
               | FLCFMeasure Double
               | Haversine
+              | Improvement Double
               -- it would be better to avoid infinite recursion here
               -- `Mean (Mean BLEU)` is not useful, but as it would mean
               -- a larger refactor, we will postpone this
@@ -109,6 +110,7 @@ instance Show Metric where
   show MultiLabelLogLoss = "MultiLabel-Logloss"
   show MultiLabelLikelihood = "MultiLabel-Likelihood"
   show Haversine = "Haversine"
+  show (Improvement threshold) = "Improvement@" ++ (show threshold)
   show (Mean metric) = "Mean/" ++ (show metric)
 
 applyMatchingSpecification :: (MatchingSpecification -> MatchingSpecification)
@@ -203,6 +205,9 @@ instance Read Metric where
   readsPrec _ ('M':'u':'l':'t':'i':'L':'a':'b':'e':'l':'-':'L':'o':'g':'L':'o':'s':'s':theRest) = [(MultiLabelLogLoss, theRest)]
   readsPrec _ ('M':'u':'l':'t':'i':'L':'a':'b':'e':'l':'-':'L':'i':'k':'e':'l':'i':'h':'o':'o':'d':theRest) = [(MultiLabelLikelihood, theRest)]
   readsPrec _ ('H':'a':'v':'e':'r':'s':'i':'n':'e':theRest) = [(Haversine, theRest)]
+  readsPrec p ('I':'m':'p':'r':'o':'v':'e':'m':'e':'n':'t':'@':theRest) = case readsPrec p theRest of
+    [(threshold, theRest')] -> [(Improvement threshold, theRest')]
+    _ -> []
   readsPrec _ t = throw $ UnknownMetric t
 
 
@@ -246,6 +251,7 @@ getMetricOrdering (MultiLabelFMeasure _ _) = TheHigherTheBetter
 getMetricOrdering MultiLabelLogLoss = TheLowerTheBetter
 getMetricOrdering MultiLabelLikelihood = TheHigherTheBetter
 getMetricOrdering Haversine = TheLowerTheBetter
+getMetricOrdering (Improvement _) = TheHigherTheBetter
 getMetricOrdering (Mean metric) = getMetricOrdering metric
 
 metricCompare :: Metric -> MetricValue -> MetricValue -> Ordering
@@ -253,11 +259,12 @@ metricCompare metric a b = metricCompare' (getMetricOrdering metric) a b
   where metricCompare' TheHigherTheBetter a' b' = a' `compare` b'
         metricCompare' TheLowerTheBetter a' b' = b' `compare` a'
 
-bestPossibleValue :: Metric -> MetricValue
-bestPossibleValue (PerplexityHashed _) = 1.0
+bestPossibleValue :: Metric -> Maybe MetricValue
+bestPossibleValue (Improvement _) = Nothing
+bestPossibleValue (PerplexityHashed _) = Just 1.0
 bestPossibleValue metric = case getMetricOrdering metric of
-  TheLowerTheBetter -> 0.0
-  TheHigherTheBetter -> 1.0
+  TheLowerTheBetter -> Just 0.0
+  TheHigherTheBetter -> Just 1.0
 
 fixedNumberOfColumnsInExpected :: Metric -> Bool
 fixedNumberOfColumnsInExpected (Mean metric) = fixedNumberOfColumnsInExpected metric

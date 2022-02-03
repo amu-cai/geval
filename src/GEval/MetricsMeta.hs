@@ -78,7 +78,8 @@ listOfAvailableMetrics = [RMSE,
                           Soft2DFMeasure 2.0,
                           Soft2DFMeasure 0.25,
                           Haversine,
-                          CharMatch]
+                          CharMatch,
+                          Improvement 0.5]
 
 extraInfo :: EvaluationScheme -> Maybe String
 extraInfo (EvaluationScheme CER []) = Just "Character-Error Rate"
@@ -107,6 +108,7 @@ isMetricDescribed CER = True
 isMetricDescribed SegmentAccuracy = True
 isMetricDescribed Haversine = True
 isMetricDescribed BIOWeightedF1 = True
+isMetricDescribed (Improvement _) = True
 isMetricDescribed _ = False
 
 getEvaluationSchemeDescription :: EvaluationScheme -> String
@@ -181,6 +183,12 @@ two points on a sphere given their longitudes and latitudes (in degrees).
 getMetricDescription BIOWeightedF1 =
   [i|Weighted-average F1-score calculated on output expressed in the BIO format.
 |]
+getMetricDescription (Improvement _) =
+  [i|Improvement at a given threshold, i.e. a system outputs a number (which can
+be interpreted as a quality score) for each item. The metric is the difference
+between the mean for the subset of expected values for which the quality score exceeds
+the threshold and the mean for all the items.
+|]
 
 outContents :: Metric -> String
 outContents (MultiLabelFMeasure _ _) = [hereLit|person/1,3 first-name/1:0.8 first-name/3:0.75
@@ -215,6 +223,12 @@ outContents BIOWeightedF1 = [hereLit|B-firstname/ALAN B-surname/TURING
 O O O
 B-surname/TARSKI O B-surname/NOT O
 |]
+outContents (Improvement _) = [hereLit|0.8
+0.6
+0.01
+1.3
+0.02
+|]
 
 expectedScore :: EvaluationScheme -> MetricValue
 expectedScore (EvaluationScheme (MultiLabelFMeasure 1.0 ExactMatch) []) = 0.6666
@@ -242,6 +256,13 @@ expectedScore (EvaluationScheme Haversine [])
   = 1044.2633358563135
 expectedScore (EvaluationScheme BIOWeightedF1 [])
   = 0.86666666
+expectedScore (EvaluationScheme (Improvement threshold) [])
+  | threshold < 0.01 = 0.0
+  | threshold >= 0.01 && threshold < 0.02 = 0.035
+  | threshold >= 0.02 && threshold < 0.6 = 0.5266
+  | threshold >= 0.6 && threshold < 0.8 = 1.16
+  | threshold >= 0.8 && threshold < 1.3 = 3.26
+  | otherwise = error "Wrong threshold"
 
 helpMetricParameterMetricsList :: String
 helpMetricParameterMetricsList = intercalate ", " $ map (\s -> (show s) ++ (case extraInfo s of
@@ -312,6 +333,8 @@ formatDescription CER = [hereLit|Any text, whitespace and punctuation marks are 
 formatDescription Haversine = [hereLit|Each line is a latitude and longitude of sphere separated by tabulation,
 e.g. "41.558153 -73.051497".
 |]
+formatDescription (Improvement _) = [hereLit|A number that will be compared against the threshold.
+|]
 formatDescription BIOWeightedF1 = [hereLit|Each line is a sequence of tags encoded in the BIO format, i.e. O, B-tag, I-tag;
 B-tags and I-tags can accompanied by an extra label after a slash.
 |]
@@ -357,6 +380,7 @@ scoreExplanation (EvaluationScheme BIOWeightedF1 [])
   = Just [hereLit|There are two labels (firstname and surname, O is not considered). Firstname was
 predicted in the perfect way, hence F1=1, whereas for surname recall is 1, precision - 2/3 and F1 - 4/5.
 The weighted average is (1 * 1 + 2 * 4/5) / 3 = 13/15 = 0.8667.|]
+scoreExplanation (EvaluationScheme (Improvement _) []) = Nothing
 
 pasteLines :: String -> String -> String
 pasteLines a b = printf "%-35s %s\n" a b

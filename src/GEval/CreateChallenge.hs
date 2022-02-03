@@ -125,6 +125,19 @@ Compute distance between two points on a sphere given their longitudes and latit
 This is a sample fake challenge for Gonito framework. Replace it with
 the description of your challenge.|] ++ (commonReadmeMDContents testName)
 
+readmeMDContents (Improvement _) testName = [i|
+GEval simple Improvement challenge
+==================================
+
+This is a sample fake challenge for the special Improvement@Threshold metric.
+
+Your need to give a number (which can be interpreted as a quality score) for each item.
+
+Your task is to maximize the difference between the mean for the subset of expected values for which
+the quality score exceeds the threshold and the mean for all the items.
+
+|] ++ (commonReadmeMDContents testName)
+
 readmeMDContents (Accuracy _) testName = [i|
 GEval sample classification challenge
 =====================================
@@ -510,6 +523,12 @@ errare humanum est	train3.pdf
 trainContents Haversine = [hereLit|30.47547	-90.100911	some text
 33.399478	-110.87095	Another text
 |]
+trainContents (Improvement _) = [hereLit|2.5	baq
+1.8	bar
+-0.1	foo
+3.0	baz
+0.5	foo
+|]
 
 trainContents (Accuracy _) = [hereLit|Y	10	none	yes
 N	-2	strong	no
@@ -677,6 +696,14 @@ file2.djvu
 |]
 devInContents Haversine = [hereLit|Some dev text
 |]
+devInContents (Improvement _) = [hereLit|foo
+baz
+bar
+foo
+|]
+
+
+
 devInContents _ = [hereLit|0.72	0	0.007
 9.54	62	0.054
 |]
@@ -754,6 +781,11 @@ devExpectedContents ClippEU = [hereLit|
 10/10,20,30,100/5 3/0,50,500,500/5
 |]
 devExpectedContents Haversine = [hereLit|32.812883	-109.625582
+|]
+devExpectedContents (Improvement _) = [hereLit|0.1
+2.0
+1.5
+-1.0
 |]
 devExpectedContents _ = [hereLit|0.82
 95.2
@@ -835,6 +867,12 @@ file4.djvu
 |]
 testInContents Haversine = [hereLit|Some test text
 Another test text
+|]
+testInContents (Improvement _) = [hereLit|foo
+foo
+bar
+baz
+foo
 |]
 testInContents _ = [hereLit|0.72	0	0.007
 9.54	62	0.054
@@ -919,6 +957,12 @@ testExpectedContents GLEU = [hereLit|Alice has a black cat
 testExpectedContents Haversine = [hereLit|39.575264	-76.995928
 29.949932	-90.070116
 |]
+testExpectedContents (Improvement _) = [hereLit|0.3
+0.5
+1.1
+4.5
+-0.2
+|]
 testExpectedContents _ = [hereLit|0.11
 17.2
 |]
@@ -972,6 +1016,7 @@ inHeaderContents MultiLabelLogLoss = Just ["Utterance"]
 inHeaderContents (Soft2DFMeasure _) = inHeaderContents ClippEU
 inHeaderContents ClippEU = Just ["DjvuFilePath"]
 inHeaderContents Haversine = Just ["Text"]
+inHeaderContents (Improvement _) = Just ["SomeText"]
 inHeaderContents _ = Just ["OrbitalPeriod", "OrbitalEccentricity", "NumberOfMoons"]
 
 outHeaderContents :: Metric -> Maybe [String]
@@ -1005,6 +1050,7 @@ outHeaderContents MultiLabelLogLoss = Just ["Emotion"]
 outHeaderContents (Soft2DFMeasure _) = Just ["Rectangle"]
 outHeaderContents ClippEU = Just ["Rectangle"]
 outHeaderContents Haversine = Just ["Longitude", "Latitude"]
+outHeaderContents (Improvement _) = Just ["SomeNumber"]
 outHeaderContents _ = Just ["Mass"]
 
 gitignoreContents :: String

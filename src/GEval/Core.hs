@@ -177,6 +177,7 @@ isPreprocessable MultiLabelLogLoss = False
 isPreprocessable MultiLabelLikelihood = False
 isPreprocessable (Mean metric) = isPreprocessable metric
 isPreprocessable Haversine = False
+isPreprocessable (Improvement _) = False
 
 isInputModifiable :: Metric -> Bool
 isInputModifiable CharMatch = True
@@ -574,6 +575,7 @@ handleBootstrap (LikelihoodHashed _ ) = False
 handleBootstrap (PerplexityHashed _ ) = False
 handleBootstrap Pearson = False
 handleBootstrap Spearman = False
+handleBootstrap (Improvement _) = False
 handleBootstrap (ProbabilisticMultiLabelFMeasure _) = False
 handleBootstrap (ProbabilisticSoftFMeasure _) = False
 handleBootstrap _ = True
@@ -813,6 +815,14 @@ separatedCountAgg :: Monad m => ConduitM (M.HashMap Text (Int, Int, Int)) o m (M
 separatedCountAgg = CC.foldl separatedCountFolder M.empty
   where separatedCountFolder = M.unionWith countFolder
 
+diffAverageWithThreshold threshold = CC.foldl diffAverageWithThresholdFolder ((0.0, 0), (0.0, 0))
+  where diffAverageWithThresholdFolder ((fSSum, qC), (tSSum, tC)) (targetScore, qualityScore) =
+          (if qualityScore >= threshold
+           then
+              (fSSum + targetScore, qC + 1)
+           else
+              (fSSum, qC), (tSSum + targetScore, tC + 1))
+
 
 countFragAgg :: (Num n, Num v, Monad m) => ConduitM (n, n, v, v) o m (n, n, v, v)
 countFragAgg = CC.foldl countFragFolder (fromInteger 0, fromInteger 0, fromInteger 0, fromInteger 0)
@@ -1031,6 +1041,10 @@ continueGEvalCalculations SAMultiLabelLogLoss MultiLabelLogLoss = defineContinua
                                                                    noGraph
 
 continueGEvalCalculations SAHaversine Haversine = defineContinuation averageC id noGraph
+
+continueGEvalCalculations SAImprovement (Improvement threshold) =
+  defineContinuation (diffAverageWithThreshold threshold) final noGraph
+  where final ((qSSum, qC), (tSSum, tC)) = (qSSum / qC) - (tSSum / tC)
 
 defineContinuation ::  (ConduitT c Void (ResourceT m) d)  -- ^ a Conduit which aggregates all the combined values into
                                                          -- a "total" value
