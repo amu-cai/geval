@@ -196,9 +196,10 @@ hits (when two rectangles overlaps) taken into account.
 Format
 ------
 
-Each clipping found in a corresponding PDF/DjVu file. Each clipping should be given as P/X0,Y0,X1,Y1, where:
+Each clipping found in a corresponding PDF/DjVu file. Each clipping should be given as L:P/X0,Y0,X1,Y1, where:
 
-    P — DjVu page number (starting from 1)
+    L — (optional) label
+    P — DjVu page number (starting from 1, optional if one-page documents are assumed)
     X0, Y0, X1, Y1 — clipping coordinates (in pixels)
 
 |] ++ (commonReadmeMDContents testName)
@@ -612,8 +613,8 @@ Love and hate	LOVE HATE
 I am sad	SADNESS
 I am so sad and hateful	SADNESS HATE
 |]
-trainContents (Soft2DFMeasure _) = [hereLit|2/0,0,10,150	foo.djvu
-1/30,40,100,1000	bar.djvu
+trainContents (Soft2DFMeasure _) = [hereLit|foo:2/0,0,10,150	foo.djvu
+bar:1/30,40,100,1000	bar.djvu
 |]
 trainContents ClippEU = [hereLit|1/30,40,100,1000/10	bar.djvu
 2/30,40,500,600/10	foo.djvu
@@ -775,7 +776,7 @@ devExpectedContents MultiLabelLogLoss = [hereLit|LOVE
 SADNESS LOVE
 |]
 devExpectedContents (Soft2DFMeasure _) = [hereLit|
-10/10,20,30,100 3/0,50,500,500
+foo:10/10,20,30,100 3/0,50,500,500
 |]
 devExpectedContents ClippEU = [hereLit|
 10/10,20,30,100/5 3/0,50,500,500/5
