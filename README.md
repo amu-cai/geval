@@ -1301,6 +1301,57 @@ $ echo -e '2021.99999\t20211231\tGEval is awesome!' | docker run -v $(pwd)/model
 positive
 ```
 
+## Object detection challenges
+
+We assume that in an object detection task the ground truth is a list
+of labelled bounding boxes. The bounding boxes are rectangles (no
+polygons for the time being!) parallel to x/y-axis. Segmentation is
+not assumed to be a part of an object detection task.
+
+There are two variants of object detection challenges - multi-page
+challenges and single-page challenges.
+
+### Multi-page challenges
+
+In a multi-page challenge, the input file is a DjVu or PDF file. An
+object is described as `LABEL:PAGE-NUMBER/X0,Y0,X1,Y1` where _X0_ <=
+_X1_, _Y0_ <= _Y1_ (e.g. `graph:3/113,23,150,270`). Note that a **pair
+of points** is given, **not** a single point with the width and height!
+
+### Single-page challenges
+
+In a single-page challenge, the input file is a PNG or JPEG file. An object is described
+as `LABEL:X0,Y0,X1,Y1` (note that page number is not given, it's **not** 1).
+
+### Evaluation metrics
+
+So far, the only metric implemented is Soft2D-F-score, for the description see
+`geval --list-metrics`:
+
+```
+"Soft" F-measure on rectangles, i.e. precision and recall is calculated for areas. For instance,
+if a label `foo` is expected for the rectangle (0, 0)-(100, 200) and this label is returned but with
+the span (50, 100)-(150, 150), it is treated as recall=1/8 and precision=1/2. For each item (line) F-score
+is evaluated separately and finally averaged.
+
+Each line is a sequence of entities separated by spaces, each entity is of
+the form LABEL:PAGE/X0,Y0,X1,Y1 where LABEL is any label, page is the page number (starting from 1) and
+(X0, Y0) and (X1, Y1) are clipping corners.
+
+Example
+Expected output                     Sample output
+foo:3/0,0,100,100                   foo:3/250,130,340,217
+bar:1/50,50,1000,1000               bar:1/0,0,100,200 foo:1/40,50,1000,1000 bar:1/400,600,1000,1000
+
+Metric value: 0.1196
+(The F-score for the first item is 0 (the entity was found in the completely wrong place).
+As far as the second item is concerned, the total area that covered by the output is 50*150+600*400=247500.
+Hence, recall is 247500/902500=0.274 and precision - 247500/(20000+912000+240000)=0.211. Therefore, the F-score
+for the second item is 0.238 and the F-score for the whole set is (0 + 0.238)/2 = 0.119.)
+```
+
+There is another metric, ClippEU, but it is deprecated.
+
 ## `geval` options
 
 ```
