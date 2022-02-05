@@ -1360,14 +1360,23 @@ geval - stand-alone evaluation tool for tests in Gonito platform
 Usage: geval ([--init] | [-v|--version] | [-l|--line-by-line] |
              [-w|--worst-features] | [-d|--diff OTHER-OUT] |
              [-m|--most-worsening-features ARG] | [-j|--just-tokenize] |
-             [-S|--submit]) ([-s|--sort] | [-r|--reverse-sort])
-             [--out-directory OUT-DIRECTORY]
+             [-S|--submit] | [--validate] | [--list-metrics] |
+             [--oracle-item-based] | [--train MODEL-TYPE] |
+             [--infer MODEL-PATH]) ([-s|--sort] | [-r|--reverse-sort])
+             [--filter FEATURE] [--out-directory OUT-DIRECTORY]
              [--expected-directory EXPECTED-DIRECTORY] [-t|--test-name NAME]
-             [-o|--out-file OUT] [-e|--expected-file EXPECTED]
-             [-i|--input-file INPUT] [-a|--alt-metric METRIC]
+             [--selector JSON_PATH] [-o|--out-file OUT] [--alt-out-file OUT]
+             [-e|--expected-file EXPECTED] [-i|--input-file INPUT]
+             [--select-metric METRIC-NAME] [-a|--alt-metric METRIC]
              [-m|--metric METRIC] [-p|--precision NUMBER-OF-FRACTIONAL-DIGITS]
-             [-T|--tokenizer TOKENIZER] [--gonito-host GONITO_HOST]
-             [--token TOKEN]
+             [-%|--show-as-percentage] [-T|--tokenizer TOKENIZER]
+             [--gonito-host GONITO_HOST] [--token TOKEN]
+             [--gonito-git-annex-remote GIT-ANNEX-REMOTE] [--references FILE]
+             [-B|--bootstrap NUMBER-OF-SAMPLES] [--in-header FILE]
+             [--out-header FILE] [--show-preprocessed] [--min-frequency N]
+             [--word-shapes] [--bigrams] [--cartesian]
+             [--min-cartesian-frequency N] [--numerical-features]
+             [--plot-graph FILE-PATH] [--mark-worst-features]
   Run evaluation for tests in Gonito platform
 
 Available options:
@@ -1379,10 +1388,10 @@ Available options:
                            set
   -w,--worst-features      Print a ranking of worst features, i.e. features that
                            worsen the score significantly. Features are sorted
-                           using p-value for the Mann-Whitney U test comparing the
-                           items with a given feature and without it. For each
-                           feature the number of occurrences, average score and
-                           p-value is given.
+                           using p-value for the Mann-Whitney U test comparing
+                           the items with a given feature and without it. For
+                           each feature the number of occurrences, average score
+                           and p-value is given.
   -d,--diff OTHER-OUT      Compare results of evaluations (line by line) for two
                            outputs.
   -m,--most-worsening-features ARG
@@ -1396,10 +1405,21 @@ Available options:
   -S,--submit              Submit current solution for evaluation to an external
                            Gonito instance specified with --gonito-host option.
                            Optionally, specify --token.
+  --validate               Validate challenge, it searches for potential errors
+                           in the given challenge path, like missing columns,
+                           files or format data.
+  --list-metrics           List all metrics with their descriptions
+  --oracle-item-based      Generate the best possible output considering outputs
+                           given by --out-file and --alt-out-file options (and
+                           peeking into the expected file).
+  --train MODEL-TYPE       Train a model
+  --infer MODEL-PATH       Infer from a model
   -s,--sort                When in line-by-line or diff mode, sort the results
                            from the worst to the best
   -r,--reverse-sort        When in line-by-line or diff mode, sort the results
                            from the best to the worst
+  --filter FEATURE         When in line-by-line or diff mode, show only items
+                           with a given feature
   --out-directory OUT-DIRECTORY
                            Directory with test results to be
                            evaluated (default: ".")
@@ -1408,33 +1428,80 @@ Available options:
                            OUT-DIRECTORY, if not given)
   -t,--test-name NAME      Test name (i.e. subdirectory with results or expected
                            results) (default: "test-A")
+  --selector JSON_PATH     Selector to an item to be considered
   -o,--out-file OUT        The name of the file to be
                            evaluated (default: "out.tsv")
+  --alt-out-file OUT       Alternative output file, makes sense only for some
+                           options, e.g. --oracle-item-based
   -e,--expected-file EXPECTED
                            The name of the file with expected
                            results (default: "expected.tsv")
   -i,--input-file INPUT    The name of the file with the input (applicable only
                            for some metrics) (default: "in.tsv")
+  --select-metric METRIC-NAME
+                           Select metric(s) by name
   -a,--alt-metric METRIC   Alternative metric (overrides --metric option)
-  -m,--metric METRIC       Metric to be used - RMSE, MSE, Accuracy, LogLoss,
-                           Likelihood, F-measure (specify as F1, F2, F0.25,
-                           etc.), multi-label F-measure (specify as
-                           MultiLabel-F1, MultiLabel-F2, MultiLabel-F0.25,
-                           etc.), MAP, BLEU, NMI, ClippEU, LogLossHashed,
-                           LikelihoodHashed, BIO-F1, BIO-F1-Labels or CharMatch
+  -m,--metric METRIC       Metric to be used, e.g.:RMSE, MSE, MAE, SMAPE,
+                           Pearson, Spearman, Accuracy, LogLoss, Likelihood,
+                           F1.0, F2.0, F0.25, Macro-F1.0, Macro-F2.0,
+                           Macro-F0.25, MultiLabel-F1.0, MultiLabel-F2.0,
+                           MultiLabel-F0.25, Mean/MultiLabel-F1.0,
+                           Probabilistic-MultiLabel-F1.0,
+                           Probabilistic-MultiLabel-F2.0,
+                           Probabilistic-MultiLabel-F0.25,
+                           MultiLabel-Likelihood, MAP, BLEU, GLEU ("Google GLEU"
+                           not the grammar correction metric), WER, CER
+                           (Character-Error Rate), NMI, ClippEU, LogLossHashed,
+                           LikelihoodHashed, PerplexityHashed, BIO-F1,
+                           BIO-Weighted-F1, BIO-F1-Labels, TokenAccuracy,
+                           SegmentAccuracy, Soft-F1.0, Soft-F2.0, Soft-F0.25,
+                           Probabilistic-Soft-F1.0, Probabilistic-Soft-F2.0,
+                           Probabilistic-Soft-F0.25, Soft2D-F1.0, Soft2D-F2.0,
+                           Soft2D-F0.25, Haversine, CharMatch, Improvement@0.5,
+                           BLEU:lm<\s+|[a-z0-9]+> (BLEU on lowercased strings,
+                           only Latin characters and digits considered)
   -p,--precision NUMBER-OF-FRACTIONAL-DIGITS
                            Arithmetic precision, i.e. the number of fractional
                            digits to be shown
+  -%,--show-as-percentage  Returns the result as a percentage (i.e. maximum
+                           value of 100 instead of 1)
   -T,--tokenizer TOKENIZER Tokenizer on expected and actual output before
                            running evaluation (makes sense mostly for metrics
-                           such BLEU), minimalistic, 13a and v14 tokenizers are
-                           implemented so far. Will be also used for tokenizing
-                           text into features when in --worst-features and
+                           such BLEU), minimalistic, 13a, v14 and
+                           character-by-character tokenizers are implemented so
+                           far. Will be also used for tokenizing text into
+                           features when in --worst-features and
                            --most-worsening-features modes.
   --gonito-host GONITO_HOST
                            Submit ONLY: Gonito instance location.
   --token TOKEN            Submit ONLY: Token for authorization with Gonito
                            instance.
+  --gonito-git-annex-remote GIT-ANNEX-REMOTE
+                           Submit ONLY: Specification of a git-annex remote.
+  --references FILE        External text file referenced
+  -B,--bootstrap NUMBER-OF-SAMPLES
+                           Tests on NUMBER-OF-SAMPLES bootstrap samples rather
+                           than just on the whole test set
+  --in-header FILE         One-line TSV file specifying a list of field names
+                           for input files
+  --out-header FILE        One-line TSV file specifying a list of field names
+                           for output and expected files
+  --show-preprocessed      When in --line-by-line or similar modes, not just
+                           work preprocessed data, but show them as such
+  --min-frequency N        Minimum frequency for the worst features (default: 1)
+  --word-shapes            Consider word shapes
+  --bigrams                Consider feature bigrams
+  --cartesian              Consider Cartesian combination of all features
+                           (computationally expensive!)
+  --min-cartesian-frequency N
+                           When combining features into Cartesian features,
+                           consider only features whose frequency exceeds the
+                           threshold given
+  --numerical-features     Consider numerical features or field lengths
+  --plot-graph FILE-PATH   Plot an extra graph, applicable only for
+                           Probabilistic-MultiLabel/Soft-F-score (LOESS function
+                           for calibration)
+  --mark-worst-features    Mark worst features when in the line-by-line mode
 ```
 
 If you need another metric, let me know, or do it yourself!
@@ -1454,7 +1521,7 @@ Apache License 2.0
 
 ## Copyright
 
-2015-2019 Filip Graliński
+2015-2022 Filip Graliński
 2019 Applica.ai
 
 ## References
