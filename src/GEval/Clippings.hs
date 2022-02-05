@@ -13,22 +13,40 @@ import GEval.Common
 import GEval.PrecisionRecall (maxMatch)
 
 newtype PageNumber = PageNumber Int
-        deriving (Eq, Show)
+        deriving (Eq)
+
+instance Show PageNumber where
+  show (PageNumber p) = show p
 
 data Point = Point Int Int
-             deriving (Show, Eq)
+             deriving (Eq)
+
+instance Show Point where
+  show (Point x y) = (show x) ++ "," ++ (show y)
 
 data Rectangle = Rectangle Point Point
-                 deriving (Show, Eq)
+                 deriving (Eq)
 
-data Clipping = Clipping PageNumber Rectangle
-                deriving (Show, Eq)
+instance Show Rectangle where
+  show (Rectangle a b) = (show a) ++ "," ++ (show b)
 
-data ClippingSpec = ClippingSpec PageNumber Rectangle Rectangle
-                    deriving (Show, Eq)
+-- page number is optional (Nothing if one-page documents are assumed)
+data Clipping = Clipping (Maybe PageNumber) Rectangle
+                deriving (Eq)
+
+instance Show Clipping where
+  show (Clipping Nothing rect) = show rect
+  show (Clipping (Just pageNumber) rect) = (show pageNumber) ++ "/" ++ (show rect)
+
+data ClippingSpec = ClippingSpec (Maybe PageNumber) Rectangle Rectangle
+                    deriving (Eq, Show)
 
 data LabeledClipping = LabeledClipping (Maybe Text) Clipping
-                       deriving (Show, Eq)
+                       deriving (Eq)
+
+instance Show LabeledClipping where
+  show (LabeledClipping Nothing clipping) = show clipping
+  show (LabeledClipping (Just label) clipping) = (unpack label) ++ ":" ++ (show clipping)
 
 matchClippingToSpec :: ClippingSpec -> Clipping -> Bool
 matchClippingToSpec (ClippingSpec pageNo (Rectangle (Point x0' y0') (Point x1' y1'))
@@ -44,22 +62,46 @@ lineClippingsParser = sepByWhitespaces clippingParser
 
 clippingParser :: Parser Clipping
 clippingParser = do
+  choice [clippingParserWithPage,
+          clippingParserWithoutPage]
+
+clippingParserWithPage :: Parser Clipping
+clippingParserWithPage = do
   pageNo <- PageNumber <$> decimal
   _ <- char '/'
   rectangle <- rectangleParser
-  return $ Clipping pageNo rectangle
+  return $ Clipping (Just pageNo) rectangle
+
+clippingParserWithoutPage :: Parser Clipping
+clippingParserWithoutPage = do
+  rectangle <- rectangleParser
+  return $ Clipping Nothing rectangle
+
 
 lineClippingSpecsParser :: Parser [ClippingSpec]
 lineClippingSpecsParser = sepByWhitespaces clippingSpecParser
 
 clippingSpecParser :: Parser ClippingSpec
 clippingSpecParser = do
+  choice [clippingSpecParserWithPage,
+          clippingSpecParserWithoutPage]
+
+clippingSpecParserWithPage :: Parser ClippingSpec
+clippingSpecParserWithPage = do
   pageNo <- PageNumber <$> decimal
   _ <- char '/'
   rectangle <- rectangleParser
   _ <- char '/'
   margin <- decimal
-  return $ ClippingSpec pageNo (smallerRectangle margin rectangle) (extendedRectangle margin rectangle)
+  return $ ClippingSpec (Just pageNo) (smallerRectangle margin rectangle) (extendedRectangle margin rectangle)
+
+clippingSpecParserWithoutPage :: Parser ClippingSpec
+clippingSpecParserWithoutPage = do
+  rectangle <- rectangleParser
+  _ <- char '/'
+  margin <- decimal
+  return $ ClippingSpec Nothing (smallerRectangle margin rectangle) (extendedRectangle margin rectangle)
+
 
 labeledClippingParser :: Parser LabeledClipping
 labeledClippingParser =

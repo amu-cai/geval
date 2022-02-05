@@ -307,8 +307,8 @@ cleanMarginFromClippEU :: Text -> Text
 cleanMarginFromClippEU t = Data.Text.unwords outs
   where outs = map toOut specs
         (Right specs) = parseOnly lineClippingSpecsParser t
-        toOut (ClippingSpec (PageNumber pageNumber) (Rectangle (Point x0 y0) (Point x1 y1)) _) =
-          pack ((show pageNumber) ++ "/" ++ (show x0) ++ "," ++ (show y0) ++ "," ++ (show x1) ++ "," ++ (show y1))
+        toOut (ClippingSpec page rect _) =
+          pack $ show (Clipping page rect)
 
 defaultLogLossHashedSize :: Word32
 defaultLogLossHashedSize = 10

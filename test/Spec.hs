@@ -258,23 +258,23 @@ main = hspec $ do
   describe "ClippEU" $ do
     it "parsing rectangles" $ do
       let (Right r) = parseOnly (lineClippingsParser <* endOfInput) "2/0,0,2,3 10/20,30,40,50 18/0,1,500,3 "
-      r `shouldBe` [Clipping (PageNumber 2) (Rectangle (Point 0 0) (Point 2 3)),
-                    Clipping (PageNumber 10) (Rectangle (Point 20 30) (Point 40 50)),
-                    Clipping (PageNumber 18) (Rectangle (Point 0 1) (Point 500 3))]
+      r `shouldBe` [Clipping (Just (PageNumber 2)) (Rectangle (Point 0 0) (Point 2 3)),
+                    Clipping (Just (PageNumber 10)) (Rectangle (Point 20 30) (Point 40 50)),
+                    Clipping (Just (PageNumber 18)) (Rectangle (Point 0 1) (Point 500 3))]
     it "parsing labeled rectangles" $ do
       let (Right r) = parseOnly (lineLabeledClippingsParser <* endOfInput) "2/0,0,2,3 foo:5/10,10,20,20 "
-      r `shouldBe` [LabeledClipping Nothing $ Clipping (PageNumber 2) (Rectangle (Point 0 0) (Point 2 3)),
-                    LabeledClipping (Just "foo") $ Clipping (PageNumber 5) (Rectangle (Point 10 10) (Point 20 20))]
+      r `shouldBe` [LabeledClipping Nothing $ Clipping (Just (PageNumber 2)) (Rectangle (Point 0 0) (Point 2 3)),
+                    LabeledClipping (Just "foo") $ Clipping (Just (PageNumber 5)) (Rectangle (Point 10 10) (Point 20 20))]
     it "check partition" $ do
-      partitionClippings (LabeledClipping Nothing (Clipping (PageNumber 5) $ Rectangle (Point 0 0) (Point 100 50)))
-                         (LabeledClipping Nothing (Clipping (PageNumber 5) $ Rectangle (Point 10 20) (Point 200 300)))
+      partitionClippings (LabeledClipping Nothing (Clipping (Just (PageNumber 5)) $ Rectangle (Point 0 0) (Point 100 50)))
+                         (LabeledClipping Nothing (Clipping (Just (PageNumber 5)) $ Rectangle (Point 10 20) (Point 200 300)))
         `shouldBe` Just (Rectangle (Point 10 20) (Point 100 50),
-                         [LabeledClipping Nothing (Clipping (PageNumber 5) $ Rectangle (Point 10 0) (Point 100 19)),
-                          LabeledClipping Nothing (Clipping (PageNumber 5) $ Rectangle (Point 0 0) (Point 9 50))],
-                         [LabeledClipping Nothing (Clipping (PageNumber 5) $ Rectangle (Point 10 51) (Point 100 300)),
-                          LabeledClipping Nothing (Clipping (PageNumber 5) $ Rectangle (Point 101 20) (Point 200 300))])
-      partitionClippings (LabeledClipping (Just "bar") (Clipping (PageNumber 10) (Rectangle (Point 100 100) (Point 200 149))))
-                         (LabeledClipping (Just "bar") (Clipping (PageNumber 10) (Rectangle (Point 100 201) (Point 200 300))))
+                         [LabeledClipping Nothing (Clipping (Just (PageNumber 5)) $ Rectangle (Point 10 0) (Point 100 19)),
+                          LabeledClipping Nothing (Clipping (Just (PageNumber 5)) $ Rectangle (Point 0 0) (Point 9 50))],
+                         [LabeledClipping Nothing (Clipping (Just (PageNumber 5)) $ Rectangle (Point 10 51) (Point 100 300)),
+                          LabeledClipping Nothing (Clipping (Just (PageNumber 5)) $ Rectangle (Point 101 20) (Point 200 300))])
+      partitionClippings (LabeledClipping (Just "bar") (Clipping (Just (PageNumber 10)) (Rectangle (Point 100 100) (Point 200 149))))
+                         (LabeledClipping (Just "bar") (Clipping (Just (PageNumber 10)) (Rectangle (Point 100 201) (Point 200 300))))
         `shouldBe` Nothing
     it "no rectangles" $ do
       let (Right r) = parseOnly (lineClippingsParser <* endOfInput) ""
@@ -284,10 +284,10 @@ main = hspec $ do
       r `shouldBe` []
     it "parsing specs" $ do
       let (Right r) = parseOnly lineClippingSpecsParser  " 2/0,0,2,3/5  10/20,30,40,50/10"
-      r `shouldBe` [ClippingSpec (PageNumber 2) (Rectangle (Point 5 5) (Point 0 0))
-                                                (Rectangle (Point 0 0) (Point 7 8)),
-                    ClippingSpec (PageNumber 10) (Rectangle (Point 30 40) (Point 30 40))
-                                                 (Rectangle (Point 10 20) (Point 50 60))]
+      r `shouldBe` [ClippingSpec (Just (PageNumber 2)) (Rectangle (Point 5 5) (Point 0 0))
+                                                       (Rectangle (Point 0 0) (Point 7 8)),
+                    ClippingSpec (Just (PageNumber 10)) (Rectangle (Point 30 40) (Point 30 40))
+                                                        (Rectangle (Point 10 20) (Point 50 60))]
     it "full test" $ do
       runGEvalTest "clippeu-simple" `shouldReturnAlmost` 0.399999999999
   describe "evaluation metric specification is parsed" $ do
