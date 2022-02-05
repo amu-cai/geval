@@ -1318,10 +1318,39 @@ object is described as `LABEL:PAGE-NUMBER/X0,Y0,X1,Y1` where _X0_ <=
 _X1_, _Y0_ <= _Y1_ (e.g. `graph:3/113,23,150,270`). Note that a **pair
 of points** is given, **not** a single point with the width and height!
 
+The document files (for all subsets) should be put into the
+`documents/` directory.
+
 ### Single-page challenges
 
 In a single-page challenge, the input file is a PNG or JPEG file. An object is described
 as `LABEL:X0,Y0,X1,Y1` (note that page number is not given, it's **not** 1).
+
+The images files (for all subsets) should be put into the
+`images/` directory.
+
+### Storing the files
+
+The names of the document/image files (just the names without the
+path) should be specified in the first (and possibly the only) column
+of the input. As the files can be very large, they should not be kept
+directly in git, but [git-annex](https://git-annex.branchable.com)
+should be used instead.
+
+### Coordinates
+
+The origin is assumed to be located in the upper left corner as it
+customary when handling graphical files. The same applies for DjVu and
+PDF files for which the origin is usually located in the lower left corner
+(but still the djvutoxml command returns the coordinates of bounding boxes
+assuming the origin in the upper left corner…)
+
+### Labels
+
+Labels are optional (i.e. `PAGE-NUMBER/X0,Y0,X1,Y1` or `X0,Y0,X1,Y1`
+would work), but in practise it is recommended to always specify them,
+even though for data sets with just one label (in order to make it
+easier to mix challenges).
 
 ### Evaluation metrics
 
