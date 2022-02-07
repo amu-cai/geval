@@ -19,7 +19,8 @@ import GEval.Metric
 import GEval.Common
 import GEval.BLEU (bleuStep, gleuStep)
 import GEval.WER (werStep)
-import GEval.Clippings (totalArea, coveredBy, clippEUMatchStep)
+import GEval.Clippings (totalArea, coveredBy, clippEUMatchStep,
+                        ObtainedLabeledClipping(..), lineObtainedLabeledClippingsParser)
 import GEval.BIO (gatherCountsForBIO, gatherSeparatedCountsForBIO)
 
 import GEval.Probability
@@ -27,7 +28,7 @@ import GEval.PrecisionRecall (weightedMaxMatch, calculateMAPForOneResult, getPro
 
 import Control.Exception
 
-import Data.Text hiding (map, maximum, zip)
+import Data.Text hiding (map, maximum, zip, filter)
 import Data.Text.Read as TR
 import qualified Data.List.Split as DLS
 import Data.Attoparsec.Text (parseOnly)
@@ -197,6 +198,7 @@ type family ParsedOutputType (t :: AMetric) :: * where
   ParsedOutputType AMultiLabelLogLoss = ProbList
   ParsedOutputType AHaversine = (Double, Double)
   ParsedOutputType AImprovement = Double
+  ParsedOutputType ASoft2DFMeasure = [ObtainedLabeledClipping]
   ParsedOutputType t = ParsedExpectedType t
 
 outputParser :: SAMetric t -> Text -> Either String (ParsedOutputType t)
@@ -216,7 +218,7 @@ outputParser SASoftFMeasure = parseObtainedAnnotations
 outputParser SAFLCFMeasure = parseObtainedAnnotations
 outputParser SAProbabilisticMultiLabelFMeasure = (Right . (\(ProbList es) -> es) . parseIntoProbList)
 outputParser SAProbabilisticSoftFMeasure = parseObtainedAnnotations
-outputParser SASoft2DFMeasure = expectedParser SASoft2DFMeasure
+outputParser SASoft2DFMeasure = controlledParse lineObtainedLabeledClippingsParser
 outputParser SANMI = expectedParser SANMI
 outputParser SALogLossHashed = onlyStrip
 outputParser SALikelihoodHashed = onlyStrip
@@ -427,11 +429,14 @@ getWeightedCounts matchFun (expected, got) = (weightedMaxMatch matchFun expected
 getSoftCounts :: EntityWithProbability e => ([BareEntity e], [e]) -> (Double, Int, Int)
 getSoftCounts args = getWeightedCounts matchScore args
 
-getSoft2DCounts :: ([LabeledClipping], [LabeledClipping]) -> (Integer, Integer, Integer)
-getSoft2DCounts (expected, got) = (tpArea, expArea, gotArea)
+getSoft2DCounts :: ([LabeledClipping], [ObtainedLabeledClipping]) -> (Integer, Integer, Integer)
+getSoft2DCounts (expected, gotWithProbs) = (tpArea, expArea, gotArea)
   where tpArea = coveredBy expected got
         expArea = totalArea expected
         gotArea = totalArea got
+        got = map (\(ObtainedLabeledClipping clip _) -> clip)
+              $ filter (\(ObtainedLabeledClipping _ prob) -> getP prob >= detectionThreshold) gotWithProbs
+        detectionThreshold = 0.5
 
 getFragCounts :: CoverableEntityWithProbability e => ([BareEntity e], [e]) -> (Double, Double, Int, Int)
 getFragCounts (expected, got)

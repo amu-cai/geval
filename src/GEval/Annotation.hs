@@ -12,15 +12,11 @@ import qualified Data.Text as T
 import Data.Set (intersection, fromList)
 
 import Data.Attoparsec.Text
-import Data.Attoparsec.Combinator
 import Control.Applicative
 import GEval.Common (sepByWhitespaces, (/.))
 import GEval.Probability
 import Data.Char
-import Data.Maybe (fromMaybe)
 import Data.Either (partitionEithers)
-
-import GEval.PrecisionRecall(weightedMaxMatching)
 
 data Annotation = Annotation T.Text IS.IntSet
                   deriving (Eq, Show, Ord)
@@ -100,7 +96,7 @@ annotationsParser = sepByWhitespaces annotationParser
 annotationParser :: Parser Annotation
 annotationParser = do
   label <- takeWhile1 (\c -> not (isSpace c) && c /= ':')
-  string ":"
+  _ <- string ":"
   intSet <- intSetParser
   return $ Annotation label intSet
 

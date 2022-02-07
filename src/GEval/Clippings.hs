@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module GEval.Clippings
        where
@@ -11,6 +12,7 @@ import Data.Maybe (catMaybes)
 
 import GEval.Common
 import GEval.PrecisionRecall (maxMatch)
+import GEval.Probability
 
 newtype PageNumber = PageNumber Int
         deriving (Eq)
@@ -47,6 +49,15 @@ data LabeledClipping = LabeledClipping (Maybe Text) Clipping
 instance Show LabeledClipping where
   show (LabeledClipping Nothing clipping) = show clipping
   show (LabeledClipping (Just label) clipping) = (unpack label) ++ ":" ++ (show clipping)
+
+getRectangle :: LabeledClipping -> Rectangle
+getRectangle (LabeledClipping _ (Clipping _ rect)) = rect
+
+getLabel :: LabeledClipping -> Maybe Text
+getLabel (LabeledClipping label _) = label
+
+data ObtainedLabeledClipping = ObtainedLabeledClipping LabeledClipping Probability
+                               deriving (Eq, Show)
 
 matchClippingToSpec :: ClippingSpec -> Clipping -> Bool
 matchClippingToSpec (ClippingSpec pageNo (Rectangle (Point x0' y0') (Point x1' y1'))
@@ -115,8 +126,17 @@ clippingWithLabelParser = do
   clipping <- clippingParser
   return $ LabeledClipping (Just label) clipping
 
+obtainedLabeledClippingParser :: Parser ObtainedLabeledClipping
+obtainedLabeledClippingParser = do
+  labeledClipping <- labeledClippingParser
+  prob <- option probabilityOne ((string ":") *> (mkProbability <$> double))
+  return $ ObtainedLabeledClipping labeledClipping prob
+
 lineLabeledClippingsParser :: Parser [LabeledClipping]
 lineLabeledClippingsParser = sepByWhitespaces labeledClippingParser
+
+lineObtainedLabeledClippingsParser :: Parser [ObtainedLabeledClipping]
+lineObtainedLabeledClippingsParser = sepByWhitespaces obtainedLabeledClippingParser
 
 extendedRectangle :: Int -> Rectangle -> Rectangle
 extendedRectangle margin (Rectangle (Point x0 y0) (Point x1 y1)) =
@@ -203,3 +223,22 @@ clippEUMatchStep :: ([ClippingSpec], [Clipping]) -> (Int, Int, Int)
 clippEUMatchStep (clippingSpecs, clippings) = (maxMatch matchClippingToSpec clippingSpecs clippings,
                                                Prelude.length clippingSpecs,
                                                Prelude.length clippings)
+
+instance Coverable LabeledClipping where
+  coveredScore clipA clipB = intersectionArea /. areaOfA
+    where areaOfA = clippingArea clipA
+          intersectionArea = coveredBy [clipA] [clipB]
+  disjoint clipA clipB = areDisjoint (getRectangle clipA) (getRectangle clipB)
+
+instance EntityWithProbability ObtainedLabeledClipping where
+  type BareEntity ObtainedLabeledClipping = LabeledClipping
+  getBareEntity (ObtainedLabeledClipping clipping _) = clipping
+  getProbabilityAsDouble (ObtainedLabeledClipping _ prob) = getP prob
+  matchScore clipA oclipB
+    | labelA == labelB = intersectionArea /. unionArea
+    | otherwise = 0.0
+    where clipB = getBareEntity oclipB
+          labelA = getLabel clipA
+          labelB = getLabel clipB
+          intersectionArea = coveredBy [clipA] [clipB]
+          unionArea = (clippingArea clipA) + (clippingArea clipB) - intersectionArea

@@ -136,7 +136,7 @@ getMetricDescription (Soft2DFMeasure _) =
   [i|"Soft" F-measure on rectangles, i.e. precision and recall is calculated for areas. For instance,
 if a label `foo` is expected for the rectangle (0, 0)-(100, 200) and this label is returned but with
 the span (50, 100)-(150, 150), it is treated as recall=1/8 and precision=1/2. For each item (line) F-score
-is evaluated separately and finally averaged.
+is evaluated separately and finally averaged. Only labels with probability >= 0.5 are considered.
 |]
 getMetricDescription (ProbabilisticMultiLabelFMeasure _) =
   [i|F-measure generalised so that labels could annotated with probabilities and the quality
@@ -198,8 +198,8 @@ first-name/3:0.52
 outContents (SoftFMeasure _) = [hereLit|inwords:1-4
 inwords:1-3 indigits:5
 |]
-outContents (Soft2DFMeasure _) = [hereLit|foo:3/250,130,340,217
-bar:1/0,0,100,200 foo:1/40,50,1000,1000 bar:1/400,600,1000,1000
+outContents (Soft2DFMeasure _) = [hereLit|foo:3/250,130,340,217:0.8 foo:3/50,20,120,130:0.1
+bar:1/0,0,100,200 foo:1/40,50,1000,1000 bar:1/400,600,1000,1000:0.6
 |]
 outContents (ProbabilisticMultiLabelFMeasure _) = [hereLit|first-name/1:0.8 surname/3:1.0
 surname/1:0.4
@@ -312,8 +312,8 @@ the form LABEL:SPAN, where LABEL is any label and SPAN is defined using single i
 units separated with commas.
 |]
 formatDescription (Soft2DFMeasure _) = [hereLit|Each line is a sequence of entities separated by spaces, each entity is of
-the form LABEL:PAGE/X0,Y0,X1,Y1 where LABEL is any label, page is the page number (starting from 1) and
-(X0, Y0) and (X1, Y1) are clipping corners.
+the form LABEL:PAGE/X0,Y0,X1,Y1:PROB where LABEL is any label, PAGE is the page number (starting from 1) and
+(X0, Y0) and (X1, Y1) are clipping corners. The PROB is optional, 1.0 is assumed if :PROB is skipped.
 |]
 formatDescription (ProbabilisticMultiLabelFMeasure _) = [hereLit|In each line a number of labels (entities) can be given. A label probability
 can be provided with a colon (e.g. "foo:0.7"). By default, 1.0 is assumed.
@@ -351,10 +351,11 @@ scoreExplanation (EvaluationScheme (SoftFMeasure _) [])
   = Just [hereLit|We have a partial (0.75) success for the entity `inwords:1-4`, hence Recall = 0.75/1 = 0.75,
 Precision = (0 + 0.75 + 0) / 3 = 0.25, so F-score = 0.375|]
 scoreExplanation (EvaluationScheme (Soft2DFMeasure _) [])
-  = Just [hereLit|The F-score for the first item is 0 (the entity was found in the completely wrong place).
-As far as the second item is concerned, the total area that covered by the output is 50*150+600*400=247500.
-Hence, recall is 247500/902500=0.274 and precision - 247500/(20000+912000+240000)=0.211. Therefore, the F-score
-for the second item is 0.238 and the F-score for the whole set is (0 + 0.238)/2 = 0.119.|]
+  = Just [hereLit|The F-score for the first item is 0 (the first entity was found in the completely wrong place
+and the second was skipped as probability < 0.5). As far as the second item is concerned, the total area that
+covered by the output is 50*150+600*400=247500. Hence, recall is 247500/902500=0.274 and precision -
+247500/(20000+912000+240000)=0.211. Therefore, the F-score for the second item is 0.238 and the F-score for the
+whole set is (0 + 0.238)/2 = 0.119.|]
 scoreExplanation (EvaluationScheme (ProbabilisticMultiLabelFMeasure _) []) = Nothing
 scoreExplanation (EvaluationScheme GLEU [])
   = Just [hereLit|To find out GLEU score we first count number of tp (true positives) fp(false positives) and fn(false negatives).
