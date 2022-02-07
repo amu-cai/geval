@@ -1,4 +1,12 @@
 
+## 1.40.8.0 (2022-02-07)
+
+Enhancements
+
+* Add Probabilistic-Soft2D-F-measure metric
+* Add (optional) probabilities to clippings
+* Page number is optional in clippings
+
 ## 1.40.7.0 (2022-02-03)
 
 Enhancements:
