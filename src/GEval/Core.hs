@@ -155,6 +155,7 @@ isPreprocessable (MacroFMeasure _) = False
 isPreprocessable (SoftFMeasure _) = False
 isPreprocessable (ProbabilisticMultiLabelFMeasure _) = True
 isPreprocessable (ProbabilisticSoftFMeasure _) = True
+isPreprocessable (ProbabilisticSoft2DFMeasure _) = True
 isPreprocessable (Soft2DFMeasure _) = False
 isPreprocessable (FLCFMeasure _) = False
 isPreprocessable NMI = False
@@ -578,6 +579,7 @@ handleBootstrap Spearman = False
 handleBootstrap (Improvement _) = False
 handleBootstrap (ProbabilisticMultiLabelFMeasure _) = False
 handleBootstrap (ProbabilisticSoftFMeasure _) = False
+handleBootstrap (ProbabilisticSoft2DFMeasure _) = False
 handleBootstrap _ = True
 
 -- | Runs evaluation for a given metric using the sources specified
@@ -750,6 +752,10 @@ gevalCoreOnSources (ProbabilisticMultiLabelFMeasure beta) = generalizedProbabili
 
 gevalCoreOnSources (ProbabilisticSoftFMeasure beta) = generalizedProbabilisticFMeasure beta
                                                                                        SAProbabilisticSoftFMeasure
+
+gevalCoreOnSources (ProbabilisticSoft2DFMeasure beta) = generalizedProbabilisticFMeasure beta
+                                                                                         SAProbabilisticSoft2DFMeasure
+
 
 -- and now more typical metrics, which:
 -- 1) parse the expected output

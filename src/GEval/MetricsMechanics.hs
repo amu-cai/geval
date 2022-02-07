@@ -58,7 +58,11 @@ singletons [d|data AMetric = ARMSE | AMSE | APearson | ASpearman | ABLEU | AGLEU
                              | ABIOF1 | ABIOWeightedF1 | ABIOF1Labels | ATokenAccuracy | ASegmentAccuracy | ALikelihoodHashed | APerplexityHashed
                              | AMAE | ASMAPE | AMultiLabelFMeasure MatchingSpecification
                              | AMultiLabelLogLoss | AMultiLabelLikelihood
-                             | ASoftFMeasure | AProbabilisticMultiLabelFMeasure | AProbabilisticSoftFMeasure | ASoft2DFMeasure
+                             | ASoftFMeasure
+                             | AProbabilisticMultiLabelFMeasure
+                             | AProbabilisticSoftFMeasure
+                             | AProbabilisticSoft2DFMeasure
+                             | ASoft2DFMeasure
                              | AFLCFMeasure | AHaversine | AImprovement
                              deriving (Eq)
              |]
@@ -99,6 +103,7 @@ toHelper (SoftFMeasure _) = ASoftFMeasure
 toHelper (FLCFMeasure _) = AFLCFMeasure
 toHelper (ProbabilisticMultiLabelFMeasure _) = AProbabilisticMultiLabelFMeasure
 toHelper (ProbabilisticSoftFMeasure _) = AProbabilisticSoftFMeasure
+toHelper (ProbabilisticSoft2DFMeasure _) = AProbabilisticSoft2DFMeasure
 toHelper (Soft2DFMeasure _) = ASoft2DFMeasure
 toHelper Haversine = AHaversine
 toHelper (Improvement _) = AImprovement
@@ -124,6 +129,7 @@ type family ParsedExpectedType (t :: AMetric) :: * where
   ParsedExpectedType AFLCFMeasure = [Annotation]
   ParsedExpectedType AProbabilisticMultiLabelFMeasure = [Text]
   ParsedExpectedType AProbabilisticSoftFMeasure = [Annotation]
+  ParsedExpectedType AProbabilisticSoft2DFMeasure = [LabeledClipping]
   ParsedExpectedType ASoft2DFMeasure = [LabeledClipping]
   ParsedExpectedType ANMI = Text
   ParsedExpectedType ALogLossHashed = Text
@@ -163,6 +169,7 @@ expectedParser SASoftFMeasure = parseAnnotations
 expectedParser SAFLCFMeasure = parseAnnotations
 expectedParser SAProbabilisticMultiLabelFMeasure = intoWords
 expectedParser SAProbabilisticSoftFMeasure = parseAnnotations
+expectedParser SAProbabilisticSoft2DFMeasure = controlledParse lineLabeledClippingsParser
 expectedParser SASoft2DFMeasure = controlledParse lineLabeledClippingsParser
 expectedParser SANMI = Right . id
 expectedParser SALogLossHashed = onlyStrip
@@ -192,8 +199,9 @@ type family ParsedOutputType (t :: AMetric) :: * where
   ParsedOutputType AMacroFMeasure = Maybe Text
   ParsedOutputType ASoftFMeasure = [ObtainedAnnotation]
   ParsedOutputType AFLCFMeasure = [ObtainedAnnotation]
-  ParsedOutputType AProbabilisticSoftFMeasure = [ObtainedAnnotation]
   ParsedOutputType AProbabilisticMultiLabelFMeasure = [WordWithProb]
+  ParsedOutputType AProbabilisticSoftFMeasure = [ObtainedAnnotation]
+  ParsedOutputType AProbabilisticSoft2DFMeasure = [ObtainedLabeledClipping]
   ParsedOutputType AMultiLabelLikelihood = ProbList
   ParsedOutputType AMultiLabelLogLoss = ProbList
   ParsedOutputType AHaversine = (Double, Double)
@@ -218,6 +226,7 @@ outputParser SASoftFMeasure = parseObtainedAnnotations
 outputParser SAFLCFMeasure = parseObtainedAnnotations
 outputParser SAProbabilisticMultiLabelFMeasure = (Right . (\(ProbList es) -> es) . parseIntoProbList)
 outputParser SAProbabilisticSoftFMeasure = parseObtainedAnnotations
+outputParser SAProbabilisticSoft2DFMeasure = controlledParse lineObtainedLabeledClippingsParser
 outputParser SASoft2DFMeasure = controlledParse lineObtainedLabeledClippingsParser
 outputParser SANMI = expectedParser SANMI
 outputParser SALogLossHashed = onlyStrip
@@ -256,6 +265,7 @@ type family ItemIntermediateRepresentationType (t :: AMetric) :: * where
   ItemIntermediateRepresentationType ATokenAccuracy = (Int, Int)
   ItemIntermediateRepresentationType AProbabilisticMultiLabelFMeasure = ([Double], [Double], Double, Int)
   ItemIntermediateRepresentationType AProbabilisticSoftFMeasure = ([Double], [Double], Double, Int)
+  ItemIntermediateRepresentationType AProbabilisticSoft2DFMeasure = ([Double], [Double], Double, Int)
   ItemIntermediateRepresentationType APearson = (Double, Double)
   ItemIntermediateRepresentationType ASpearman = (Double, Double)
   -- FIXME
@@ -298,6 +308,7 @@ itemStep SASoftFMeasure = getSoftCounts
 itemStep SAFLCFMeasure = getFragCounts
 itemStep SAProbabilisticMultiLabelFMeasure = getProbabilisticCounts
 itemStep SAProbabilisticSoftFMeasure = getProbabilisticCounts
+itemStep SAProbabilisticSoft2DFMeasure = getProbabilisticCounts
 itemStep SASoft2DFMeasure = getSoft2DCounts
 itemStep SANMI = id
 itemStep SALogLossHashed = id

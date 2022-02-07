@@ -385,6 +385,11 @@ main = hspec $ do
   describe "MultiLabel-Likelihood" $ do
     it "simple" $ do
       runGEvalTest "multilabel-likelihood-simple" `shouldReturnAlmost` 0.115829218528827
+  describe "Probabilistic-Soft2D-F" $ do
+    it "simple" $ do
+      runGEvalTest "probabilistic-soft2d-f1-simple" `shouldReturnAlmost` 0.3369517442617539
+    it "recall" $ do
+      runGEvalTest "probabilistic-soft2d-recall-simple" `shouldReturnAlmost` 0.30717411254418137
   describe "Preprocessing operations" $ do
     it "F1 with preprocessing" $ do
       runGEvalTest "f1-with-preprocessing" `shouldReturnAlmost` 0.57142857142857

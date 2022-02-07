@@ -186,21 +186,24 @@ GEval sample challenge — mark numbers
 This is a sample/toy classification challenge for Gonito framework with Probabilistic-Soft-F-measure as the metric.
 |] ++ (commonReadmeMDContents testName)
 
+readmeMDContents (ProbabilisticSoft2DFMeasure b) testName = readmeMDContents (Soft2DFMeasure b) testName
 readmeMDContents (Soft2DFMeasure _) testName = [i|
 Sample challenge for clippings
 ==============================
 
-The metric is Soft2D-F-score, i.e. F-score for clipping with partial
-hits (when two rectangles overlaps) taken into account.
+Try to give clippings coordinates as close to the ground-truth
+clippings as possible.
 
 Format
 ------
 
-Each clipping found in a corresponding PDF/DjVu file. Each clipping should be given as L:P/X0,Y0,X1,Y1, where:
+Each clipping found in a corresponding PDF/DjVu file. Each clipping should be given as L:P/X0,Y0,X1,Y1:PROB,
+where:
 
     L — (optional) label
     P — DjVu page number (starting from 1, optional if one-page documents are assumed)
     X0, Y0, X1, Y1 — clipping coordinates (in pixels)
+    PROB — (optional) probability
 
 |] ++ (commonReadmeMDContents testName)
 
@@ -613,6 +616,7 @@ Love and hate	LOVE HATE
 I am sad	SADNESS
 I am so sad and hateful	SADNESS HATE
 |]
+trainContents (ProbabilisticSoft2DFMeasure b) = trainContents (Soft2DFMeasure b)
 trainContents (Soft2DFMeasure _) = [hereLit|foo:2/0,0,10,150	foo.djvu
 bar:1/30,40,100,1000	bar.djvu
 |]
@@ -691,6 +695,7 @@ devInContents MultiLabelLikelihood = devInContents MultiLabelLogLoss
 devInContents MultiLabelLogLoss = [hereLit|I am in love
 I am a sad hater
 |]
+devInContents (ProbabilisticSoft2DFMeasure _) = devInContents ClippEU
 devInContents (Soft2DFMeasure _) = devInContents ClippEU
 devInContents ClippEU = [hereLit|file1.djvu
 file2.djvu
@@ -775,6 +780,7 @@ devExpectedContents MultiLabelLikelihood = devExpectedContents MultiLabelLogLoss
 devExpectedContents MultiLabelLogLoss = [hereLit|LOVE
 SADNESS LOVE
 |]
+devExpectedContents (ProbabilisticSoft2DFMeasure b) = devExpectedContents (Soft2DFMeasure b)
 devExpectedContents (Soft2DFMeasure _) = [hereLit|
 foo:10/10,20,30,100 3/0,50,500,500
 |]
@@ -862,6 +868,7 @@ testInContents MultiLabelLikelihood = testInContents MultiLabelLogLoss
 testInContents MultiLabelLogLoss = [hereLit|I am very sad
 I hate
 |]
+testInContents (ProbabilisticSoft2DFMeasure _) = testInContents ClippEU
 testInContents (Soft2DFMeasure _) = testInContents ClippEU
 testInContents ClippEU = [hereLit|file3.djvu
 file4.djvu
@@ -947,6 +954,7 @@ testExpectedContents MultiLabelLikelihood = testExpectedContents MultiLabelLogLo
 testExpectedContents MultiLabelLogLoss = [hereLit|SADNESS
 HATE
 |]
+testExpectedContents (ProbabilisticSoft2DFMeasure b) = testExpectedContents (Soft2DFMeasure b)
 testExpectedContents (Soft2DFMeasure _) = [hereLit|foo:3/0,0,100,100
 bar:1/50,50,1000,1000
 |]
@@ -1014,6 +1022,7 @@ inHeaderContents (ProbabilisticMultiLabelFMeasure beta) = inHeaderContents (Mult
 inHeaderContents (MultiLabelFMeasure _ _) = Just ["Text"]
 inHeaderContents MultiLabelLikelihood = inHeaderContents MultiLabelLogLoss
 inHeaderContents MultiLabelLogLoss = Just ["Utterance"]
+inHeaderContents (ProbabilisticSoft2DFMeasure _) = inHeaderContents ClippEU
 inHeaderContents (Soft2DFMeasure _) = inHeaderContents ClippEU
 inHeaderContents ClippEU = Just ["DjvuFilePath"]
 inHeaderContents Haversine = Just ["Text"]
@@ -1048,6 +1057,7 @@ outHeaderContents (ProbabilisticMultiLabelFMeasure beta) = outHeaderContents (Mu
 outHeaderContents (MultiLabelFMeasure _ _) = Just ["Entities"]
 outHeaderContents MultiLabelLikelihood = outHeaderContents MultiLabelLogLoss
 outHeaderContents MultiLabelLogLoss = Just ["Emotion"]
+outHeaderContents (ProbabilisticSoft2DFMeasure b) = outHeaderContents (Soft2DFMeasure b)
 outHeaderContents (Soft2DFMeasure _) = Just ["Rectangle"]
 outHeaderContents ClippEU = Just ["Rectangle"]
 outHeaderContents Haversine = Just ["Longitude", "Latitude"]
