@@ -70,7 +70,7 @@ instance Show Metric where
   show (SoftFMeasure beta) = "Soft-F" ++ (show beta)
   show (ProbabilisticMultiLabelFMeasure beta) = "Probabilistic-MultiLabel-F" ++ (show beta)
   show (ProbabilisticSoftFMeasure beta) = "Probabilistic-Soft-F" ++ (show beta)
-  show (ProbabilisticSoft2DFMeasure beta) = "Probabilistic-Soft-2D-F" ++ (show beta)
+  show (ProbabilisticSoft2DFMeasure beta) = "Probabilistic-Soft2D-F" ++ (show beta)
   show (Soft2DFMeasure beta) = "Soft2D-F" ++ (show beta)
   show (FLCFMeasure beta) = "FLC-F" ++ (show beta)
   show NMI = "NMI"
