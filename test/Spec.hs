@@ -390,6 +390,9 @@ main = hspec $ do
       runGEvalTest "probabilistic-soft2d-f1-simple" `shouldReturnAlmost` 0.3369517442617539
     it "recall" $ do
       runGEvalTest "probabilistic-soft2d-recall-simple" `shouldReturnAlmost` 0.30717411254418137
+  describe "MacroAvg" $ do
+    it "with Likelihood" $ do
+      runGEvalTest "macroavg-likelihood" `shouldReturnAlmost` 0.500506559087994
   describe "Preprocessing operations" $ do
     it "F1 with preprocessing" $ do
       runGEvalTest "f1-with-preprocessing" `shouldReturnAlmost` 0.57142857142857

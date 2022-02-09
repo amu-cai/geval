@@ -64,6 +64,7 @@ singletons [d|data AMetric = ARMSE | AMSE | APearson | ASpearman | ABLEU | AGLEU
                              | AProbabilisticSoft2DFMeasure
                              | ASoft2DFMeasure
                              | AFLCFMeasure | AHaversine | AImprovement
+                             | AMacroAvg AMetric
                              deriving (Eq)
              |]
 
@@ -107,6 +108,7 @@ toHelper (ProbabilisticSoft2DFMeasure _) = AProbabilisticSoft2DFMeasure
 toHelper (Soft2DFMeasure _) = ASoft2DFMeasure
 toHelper Haversine = AHaversine
 toHelper (Improvement _) = AImprovement
+toHelper (MacroAvg m) = AMacroAvg (toHelper m)
 
 type family ParsedInputType (t :: AMetric) :: * where
   ParsedInputType ACharMatch = Text
@@ -151,6 +153,7 @@ type family ParsedExpectedType (t :: AMetric) :: * where
   ParsedExpectedType AMultiLabelLikelihood = [Text]
   ParsedExpectedType AHaversine = (Double, Double)
   ParsedExpectedType AImprovement = Double
+  ParsedExpectedType (AMacroAvg m) = ParsedExpectedType m
 
 expectedParser :: SAMetric t -> Text -> Either String (ParsedExpectedType t)
 expectedParser SARMSE = doubleParser
@@ -191,6 +194,7 @@ expectedParser SAMultiLabelLogLoss = intoWords
 expectedParser SAMultiLabelLikelihood = intoWords
 expectedParser SAHaversine =  parseSpherePoints
 expectedParser SAImprovement = doubleParser
+expectedParser (SAMacroAvg m) = expectedParser m
 
 type family ParsedOutputType (t :: AMetric) :: * where
   ParsedOutputType ABLEU = [String]
@@ -207,6 +211,7 @@ type family ParsedOutputType (t :: AMetric) :: * where
   ParsedOutputType AHaversine = (Double, Double)
   ParsedOutputType AImprovement = Double
   ParsedOutputType ASoft2DFMeasure = [ObtainedLabeledClipping]
+  ParsedOutputType (AMacroAvg m) = ParsedOutputType m
   ParsedOutputType t = ParsedExpectedType t
 
 outputParser :: SAMetric t -> Text -> Either String (ParsedOutputType t)
@@ -248,6 +253,7 @@ outputParser SAMultiLabelLogLoss = Right . parseIntoProbList
 outputParser SAMultiLabelLikelihood = Right . parseIntoProbList
 outputParser SAHaversine = parseSpherePoints
 outputParser SAImprovement = doubleParser
+outputParser (SAMacroAvg m) = outputParser m
 
 type family ItemIntermediateRepresentationType (t :: AMetric) :: * where
   ItemIntermediateRepresentationType ABLEU = (Int, Int, Int, Int, Int, Int, Int, Int, Int)
@@ -280,6 +286,7 @@ type family ItemIntermediateRepresentationType (t :: AMetric) :: * where
   ItemIntermediateRepresentationType ACER = (Int, Int)
   ItemIntermediateRepresentationType AHaversine = Double
   ItemIntermediateRepresentationType AImprovement = (Double, Double)
+  ItemIntermediateRepresentationType (AMacroAvg m) = (ParsedExpectedType m, ItemIntermediateRepresentationType m)
   ItemIntermediateRepresentationType t = Double
 
 findBest :: (Text -> Text -> Double) -> (Text -> Text -> Double)
@@ -330,7 +337,10 @@ itemStep SAMultiLabelLogLoss = uncurry countLogLossOnProbList
 itemStep SAMultiLabelLikelihood = uncurry countLogLossOnProbList
 itemStep SAHaversine = haversine
 itemStep SAImprovement = id
+itemStep (SAMacroAvg m) = repack m
 
+repack m (expected, out) = (expected, out')
+   where  out' = itemStep m (expected, out)
 
 doubleParser :: Text -> Either String Double
 doubleParser = getValue . TR.double

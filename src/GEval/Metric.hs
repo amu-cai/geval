@@ -45,6 +45,7 @@ data Metric = RMSE | MSE | Pearson | Spearman | BLEU | GLEU | WER | CER | Accura
               -- `Mean (Mean BLEU)` is not useful, but as it would mean
               -- a larger refactor, we will postpone this
               | Mean Metric
+              | MacroAvg Metric
               deriving (Eq)
 
 instance Show Metric where
@@ -116,6 +117,7 @@ instance Show Metric where
   show Haversine = "Haversine"
   show (Improvement threshold) = "Improvement@" ++ (show threshold)
   show (Mean metric) = "Mean/" ++ (show metric)
+  show (MacroAvg metric) = "MacroAvg/" ++ (show metric)
 
 applyMatchingSpecification :: (MatchingSpecification -> MatchingSpecification)
                            -> Metric
@@ -129,6 +131,9 @@ applyMatchingSpecification _ metric = error $ "Matching specification cannot be 
 instance Read Metric where
   readsPrec p ('M':'e':'a':'n':'/':theRest) = case readsPrec p theRest of
     [(metric, theRest')] -> [(Mean metric, theRest')]
+    _ -> []
+  readsPrec p ('M':'a':'c':'r':'o':'A':'v':'g':'/':theRest) = case readsPrec p theRest of
+    [(metric, theRest')] -> [(MacroAvg metric, theRest')]
     _ -> []
   readsPrec p ('F':'u':'z':'z':'y':'/':theRest) = case readsPrec p theRest of
     [(metric, theRest')] -> [(applyMatchingSpecification (const FuzzyMatch) metric, theRest')]
@@ -261,6 +266,7 @@ getMetricOrdering MultiLabelLikelihood = TheHigherTheBetter
 getMetricOrdering Haversine = TheLowerTheBetter
 getMetricOrdering (Improvement _) = TheHigherTheBetter
 getMetricOrdering (Mean metric) = getMetricOrdering metric
+getMetricOrdering (MacroAvg metric) = getMetricOrdering metric
 
 metricCompare :: Metric -> MetricValue -> MetricValue -> Ordering
 metricCompare metric a b = metricCompare' (getMetricOrdering metric) a b
@@ -268,6 +274,8 @@ metricCompare metric a b = metricCompare' (getMetricOrdering metric) a b
         metricCompare' TheLowerTheBetter a' b' = b' `compare` a'
 
 bestPossibleValue :: Metric -> Maybe MetricValue
+bestPossibleValue (Mean metric) = bestPossibleValue metric
+bestPossibleValue (MacroAvg metric) = bestPossibleValue metric
 bestPossibleValue (Improvement _) = Nothing
 bestPossibleValue (PerplexityHashed _) = Just 1.0
 bestPossibleValue metric = case getMetricOrdering metric of
@@ -276,6 +284,7 @@ bestPossibleValue metric = case getMetricOrdering metric of
 
 fixedNumberOfColumnsInExpected :: Metric -> Bool
 fixedNumberOfColumnsInExpected (Mean metric) = fixedNumberOfColumnsInExpected metric
+fixedNumberOfColumnsInExpected (MacroAvg metric) = fixedNumberOfColumnsInExpected metric
 fixedNumberOfColumnsInExpected MAP = False
 fixedNumberOfColumnsInExpected BLEU = False
 fixedNumberOfColumnsInExpected GLEU = False
@@ -285,6 +294,7 @@ fixedNumberOfColumnsInExpected _ = True
 
 fixedNumberOfColumnsInInput :: Metric -> Bool
 fixedNumberOfColumnsInInput (Mean metric) = fixedNumberOfColumnsInInput metric
+fixedNumberOfColumnsInInput (MacroAvg metric) = fixedNumberOfColumnsInInput metric
 fixedNumberOfColumnsInInput (SoftFMeasure _) = False
 fixedNumberOfColumnsInInput (ProbabilisticSoftFMeasure _) = False
 fixedNumberOfColumnsInInput (Soft2DFMeasure _) = False
@@ -293,6 +303,7 @@ fixedNumberOfColumnsInInput _ = True
 
 perfectOutLineFromExpectedLine :: Metric -> Text -> Text
 perfectOutLineFromExpectedLine (Mean metric) t = perfectOutLineFromExpectedLine metric t
+perfectOutLineFromExpectedLine (MacroAvg metric) t = perfectOutLineFromExpectedLine metric t
 perfectOutLineFromExpectedLine (LogLossHashed _) t = addProbOne t
 perfectOutLineFromExpectedLine (LikelihoodHashed _) t = addProbOne t
 perfectOutLineFromExpectedLine (PerplexityHashed _) t = addProbOne t

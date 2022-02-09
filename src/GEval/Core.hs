@@ -79,7 +79,7 @@ import System.Posix
 import System.FilePath
 import Data.Maybe
 import Data.Either (rights)
-import Data.List (sortBy, isSuffixOf, minimum, maximum)
+import Data.List (sortBy, isSuffixOf, minimum, maximum, groupBy)
 import Text.NaturalComp
 
 import Control.Monad.IO.Class
@@ -104,6 +104,7 @@ import GEval.DataSource
 import GEval.MatchingSpecification
 
 import qualified Data.HashMap.Strict as M
+import qualified Data.Map as DM
 import qualified Data.Vector as V
 
 import qualified Data.Vector.Unboxed as DVU
@@ -938,10 +939,9 @@ gevalRunPipeline' parserSpec itemStep finalPipeline context = do
 
 
 
-continueGEvalCalculations :: forall m t . (MonadIO m) =>
-                            SAMetric t
+continueGEvalCalculations :: Monad m => SAMetric t
                             -> Metric
-                            -> ConduitT (ItemIntermediateRepresentationType t) Void (ResourceT m) MetricOutput
+                            -> ConduitT (ItemIntermediateRepresentationType t) Void m MetricOutput
 
 continueGEvalCalculations (SAMultiLabelFMeasure matchingSpec) (MultiLabelFMeasure beta matchingSpec')
   = defineContinuation countAgg (fMeasureOnCounts beta) noGraph
@@ -1052,11 +1052,33 @@ continueGEvalCalculations SAImprovement (Improvement threshold) =
   defineContinuation (diffAverageWithThreshold threshold) final noGraph
   where final ((qSSum, qC), (tSSum, tC)) = (qSSum / qC) - (tSSum / tC)
 
-defineContinuation ::  (ConduitT c Void (ResourceT m) d)  -- ^ a Conduit which aggregates all the combined values into
+continueGEvalCalculations (SAMacroAvg sametric@(SALikelihood)) (MacroAvg metric@(Likelihood)) =
+  defineContinuation gatherC (macroAvg sametric metric) noGraph
+
+gatherC :: (Ord a, Monad m) => ConduitT (a,b) Void m ([[b]])
+gatherC = do
+  l <- sinkList
+  return $ Prelude.map snd $ DM.toList $ DM.fromListWith (++) [ (k, [v]) | (k, v) <- l ]
+
+
+macroAvg :: SAMetric t -> Metric -> [[ItemIntermediateRepresentationType t]] -> MetricValue
+macroAvg sametric metric mp = avg $ Prelude.map (intraRun sametric metric) mp
+
+intraRun :: SAMetric t -> Metric -> [ItemIntermediateRepresentationType t] -> MetricValue
+intraRun sametric metric items =
+  let
+    (SimpleRun metricOutput) = getMetricValue $ runConduitPure $ (CL.sourceList items .| continueGEvalCalculations sametric metric)
+  in metricOutput
+
+avg :: (Num a, Fractional a) => [a] -> a
+avg l = mass / (fromIntegral $ Prelude.length l)
+  where mass = Prelude.sum $ l
+
+defineContinuation ::  (ConduitT c Void m d)  -- ^ a Conduit which aggregates all the combined values into
                                                          -- a "total" value
                       -> (d -> Double)             -- ^ function to transform the "total" value into the final score
                       -> (d -> Maybe GraphSeries)
-                      -> ConduitT c Void (ResourceT m) MetricOutput
+                      -> ConduitT c Void m MetricOutput
 defineContinuation aggregator finalStep generateGraph = do
   v <- aggregator
   return $ MetricOutput (SimpleRun $ finalStep v) (generateGraph v)
@@ -1187,7 +1209,7 @@ threeLineSource (WithInput theFilter inputLineSource expectedLineSource outLineS
   .| (CC.map (\(TargetRecord x y z) -> WrappedParsedRecordWithInput (unwrap x) (unwrap y) (unwrap z)))
   where unwrap = fmap (\(RawItemTarget x) -> x)
 
-averageC :: MonadResource m => ConduitT Double Void m Double
+averageC :: Monad m => ConduitT Double Void m Double
 averageC = getZipSink
     $ (\total c -> total / fromIntegral c)
   <$> ZipSink CC.sum
