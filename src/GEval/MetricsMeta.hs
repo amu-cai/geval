@@ -82,7 +82,8 @@ listOfAvailableMetrics = [RMSE,
                           Soft2DFMeasure 0.25,
                           Haversine,
                           CharMatch,
-                          Improvement 0.5]
+                          Improvement 0.5,
+                          MacroAvg Likelihood]
 
 extraInfo :: EvaluationScheme -> Maybe String
 extraInfo (EvaluationScheme CER []) = Just "Character-Error Rate"
@@ -112,6 +113,8 @@ isMetricDescribed SegmentAccuracy = True
 isMetricDescribed Haversine = True
 isMetricDescribed BIOWeightedF1 = True
 isMetricDescribed (Improvement _) = True
+isMetricDescribed Likelihood = True
+isMetricDescribed (MacroAvg Likelihood) = True
 isMetricDescribed _ = False
 
 getEvaluationSchemeDescription :: EvaluationScheme -> String
@@ -192,8 +195,18 @@ be interpreted as a quality score) for each item. The metric is the difference
 between the mean for the subset of expected values for which the quality score exceeds
 the threshold and the mean for all the items.
 |]
+getMetricDescription Likelihood =
+  [i|Likelihood for binary classification, i.e. geometric mean of probabilities assigned to the right
+class. It is closely related to LogLoss (Likelihood=exp(-LogLoss)), but a little bit easier
+to interpret for humans.
+|]
+getMetricDescription (MacroAvg Likelihood) =
+  [i|Likelihood is calculated separately for the classes and then averaged.
+|]
 
 outContents :: Metric -> String
+outContents (Mean metric) = outContents metric
+outContents (MacroAvg metric) = outContents metric
 outContents (MultiLabelFMeasure _ _) = [hereLit|person/1,3 first-name/1:0.8 first-name/3:0.75
 surname/2 county/1:0.33
 first-name/3:0.52
@@ -232,6 +245,10 @@ outContents (Improvement _) = [hereLit|0.8
 1.3
 0.02
 |]
+outContents Likelihood = [hereLit|0.9
+0.5
+0.8
+|]
 
 expectedScore :: EvaluationScheme -> MetricValue
 expectedScore (EvaluationScheme (MultiLabelFMeasure 1.0 ExactMatch) []) = 0.6666
@@ -266,6 +283,9 @@ expectedScore (EvaluationScheme (Improvement threshold) [])
   | threshold >= 0.6 && threshold < 0.8 = 1.16
   | threshold >= 0.8 && threshold < 1.3 = 3.26
   | otherwise = error "Wrong threshold"
+expectedScore (EvaluationScheme Likelihood []) = 0.44814047825270
+expectedScore (EvaluationScheme (MacroAvg Likelihood) []) = 0.4354101962495
+
 
 helpMetricParameterMetricsList :: String
 helpMetricParameterMetricsList = intercalate ", " $ map (\s -> (show s) ++ (case extraInfo s of
@@ -341,7 +361,9 @@ formatDescription (Improvement _) = [hereLit|A number that will be compared agai
 formatDescription BIOWeightedF1 = [hereLit|Each line is a sequence of tags encoded in the BIO format, i.e. O, B-tag, I-tag;
 B-tags and I-tags can accompanied by an extra label after a slash.
 |]
-
+formatDescription Likelihood = [hereLit|A probability for the positive class
+|]
+formatDescription (MacroAvg metric) = formatDescription metric
 
 scoreExplanation :: EvaluationScheme -> Maybe String
 scoreExplanation (EvaluationScheme (MultiLabelFMeasure _ ExactMatch) [])
@@ -385,6 +407,14 @@ scoreExplanation (EvaluationScheme BIOWeightedF1 [])
 predicted in the perfect way, hence F1=1, whereas for surname recall is 1, precision - 2/3 and F1 - 4/5.
 The weighted average is (1 * 1 + 2 * 4/5) / 3 = 13/15 = 0.8667.|]
 scoreExplanation (EvaluationScheme (Improvement _) []) = Nothing
+scoreExplanation (EvaluationScheme Likelihood []) =
+  Just [hereLit|The probabilities assigned to the right class are: 0.9, 0.5, 1-0.8=0.2. Their geometric mean
+is (0.9 * 0.5 * 0.2)^(1/3) = 0.448140.|]
+scoreExplanation (EvaluationScheme (MacroAvg Likelihood) []) =
+  Just [hereLit|The probabilities assigned to the right class are: 0.9, 0.5, 1-0.8=0.2. Their geometric mean
+for the positive class is sqrt(0.9 * 0.5)=0.670820, whereas for the negative class is simply 0.2 (as there
+is only one example for this). The artithmetic mean of 0.670820 and 0.2 is 0.435410.|]
+
 
 pasteLines :: String -> String -> String
 pasteLines a b = printf "%-35s %s\n" a b

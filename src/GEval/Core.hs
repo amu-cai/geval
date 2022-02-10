@@ -1052,8 +1052,25 @@ continueGEvalCalculations SAImprovement (Improvement threshold) =
   defineContinuation (diffAverageWithThreshold threshold) final noGraph
   where final ((qSSum, qC), (tSSum, tC)) = (qSSum / qC) - (tSSum / tC)
 
+-- arggh welcome to Haskell hell, it seems that it isn't possible to
+-- specify that ItemIntermediateRepresentationType t satisfies the Ord constraint
 continueGEvalCalculations (SAMacroAvg sametric@(SALikelihood)) (MacroAvg metric@(Likelihood)) =
   defineContinuation gatherC (macroAvg sametric metric) noGraph
+continueGEvalCalculations (SAMacroAvg sametric@(SAAccuracy _)) (MacroAvg metric@(Accuracy _)) =
+  defineContinuation gatherC (macroAvg sametric metric) noGraph
+continueGEvalCalculations (SAMacroAvg sametric@(SAFMeasure)) (MacroAvg metric@(FMeasure _)) =
+  defineContinuation gatherC (macroAvg sametric metric) noGraph
+continueGEvalCalculations (SAMacroAvg sametric@(SARMSE)) (MacroAvg metric@(RMSE)) =
+  defineContinuation gatherC (macroAvg sametric metric) noGraph
+continueGEvalCalculations (SAMacroAvg sametric@(SAMSE)) (MacroAvg metric@(MSE)) =
+  defineContinuation gatherC (macroAvg sametric metric) noGraph
+continueGEvalCalculations (SAMacroAvg sametric@(SAMAE)) (MacroAvg metric@(MAE)) =
+  defineContinuation gatherC (macroAvg sametric metric) noGraph
+continueGEvalCalculations (SAMacroAvg sametric@(SASMAPE)) (MacroAvg metric@(SMAPE)) =
+  defineContinuation gatherC (macroAvg sametric metric) noGraph
+continueGEvalCalculations (SAMacroAvg _) _ =
+  error $ "MacroAvg/ meta-metric defined only for Likelihood, Accuracy, FMeasure, RMSE, MSE, MAE, SMAPE"
+
 
 gatherC :: (Ord a, Monad m) => ConduitT (a,b) Void m ([[b]])
 gatherC = do

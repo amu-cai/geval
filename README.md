@@ -480,6 +480,18 @@ So now you can see that the accuracy is over 78% and the likelihood
     in<1>:Brytania	2	0.53333333	0.01357876718525224600
     in<1>:rewolucja	2	0.53333333	0.01357876718525224600
 
+## Metric modifiers
+
+There are a number of flags available to modify the meaning of a
+metric:
+
+* `Mean/` — metric value is calculated separately for each line and
+   then the average is returned, it can be used for metrics such as
+   `BLEU` or `WER` (`Mean/BLEU`, `Mean/WER`), which normally are
+   calculated on the whole set;
+* `MacroAvg/` — items grouped according to the expected value (class),
+   the metric is calculated separately for each group and then averaged.
+
 ## Metric flags
 
 GEval offers a number of *flags* to modify the way an evaluation
