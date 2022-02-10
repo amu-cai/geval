@@ -174,6 +174,9 @@ isPreprocessable TokenAccuracy = True
 isPreprocessable SegmentAccuracy = True
 isPreprocessable MAE = False
 isPreprocessable SMAPE = False
+isPreprocessable MSEAgainstInterval = False
+isPreprocessable RMSEAgainstInterval = False
+isPreprocessable MAEAgainstInterval = False
 isPreprocessable (MultiLabelFMeasure _ _) = True
 isPreprocessable MultiLabelLogLoss = False
 isPreprocessable MultiLabelLikelihood = False
@@ -1051,6 +1054,10 @@ continueGEvalCalculations SAHaversine Haversine = defineContinuation averageC id
 continueGEvalCalculations SAImprovement (Improvement threshold) =
   defineContinuation (diffAverageWithThreshold threshold) final noGraph
   where final ((qSSum, qC), (tSSum, tC)) = (qSSum / qC) - (tSSum / tC)
+
+continueGEvalCalculations SAMSEAgainstInterval MSEAgainstInterval = defineContinuation averageC id noGraph
+continueGEvalCalculations SARMSEAgainstInterval RMSEAgainstInterval = defineContinuation averageC (**0.5) noGraph
+continueGEvalCalculations SAMAEAgainstInterval MAEAgainstInterval = defineContinuation averageC id noGraph
 
 -- arggh welcome to Haskell hell, it seems that it isn't possible to
 -- specify that ItemIntermediateRepresentationType t satisfies the Ord constraint

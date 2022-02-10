@@ -65,6 +65,7 @@ singletons [d|data AMetric = ARMSE | AMSE | APearson | ASpearman | ABLEU | AGLEU
                              | ASoft2DFMeasure
                              | AFLCFMeasure | AHaversine | AImprovement
                              | AMacroAvg AMetric
+                             | AMSEAgainstInterval | ARMSEAgainstInterval | AMAEAgainstInterval
                              deriving (Eq)
              |]
 
@@ -107,6 +108,9 @@ toHelper (ProbabilisticSoftFMeasure _) = AProbabilisticSoftFMeasure
 toHelper (ProbabilisticSoft2DFMeasure _) = AProbabilisticSoft2DFMeasure
 toHelper (Soft2DFMeasure _) = ASoft2DFMeasure
 toHelper Haversine = AHaversine
+toHelper MSEAgainstInterval = AMSEAgainstInterval
+toHelper RMSEAgainstInterval = ARMSEAgainstInterval
+toHelper MAEAgainstInterval = AMAEAgainstInterval
 toHelper (Improvement _) = AImprovement
 toHelper (MacroAvg m) = AMacroAvg (toHelper m)
 
@@ -152,6 +156,9 @@ type family ParsedExpectedType (t :: AMetric) :: * where
   ParsedExpectedType AMultiLabelLogLoss = [Text]
   ParsedExpectedType AMultiLabelLikelihood = [Text]
   ParsedExpectedType AHaversine = (Double, Double)
+  ParsedExpectedType AMSEAgainstInterval = (Double, Double)
+  ParsedExpectedType ARMSEAgainstInterval = (Double, Double)
+  ParsedExpectedType AMAEAgainstInterval = (Double, Double)
   ParsedExpectedType AImprovement = Double
   ParsedExpectedType (AMacroAvg m) = ParsedExpectedType m
 
@@ -192,7 +199,10 @@ expectedParser SASMAPE = doubleParser
 expectedParser (SAMultiLabelFMeasure _) = intoWords
 expectedParser SAMultiLabelLogLoss = intoWords
 expectedParser SAMultiLabelLikelihood = intoWords
-expectedParser SAHaversine =  parseSpherePoints
+expectedParser SAHaversine = parseSpherePoints
+expectedParser SAMSEAgainstInterval = parseInterval
+expectedParser SARMSEAgainstInterval = parseInterval
+expectedParser SAMAEAgainstInterval = parseInterval
 expectedParser SAImprovement = doubleParser
 expectedParser (SAMacroAvg m) = expectedParser m
 
@@ -212,6 +222,9 @@ type family ParsedOutputType (t :: AMetric) :: * where
   ParsedOutputType AImprovement = Double
   ParsedOutputType ASoft2DFMeasure = [ObtainedLabeledClipping]
   ParsedOutputType (AMacroAvg m) = ParsedOutputType m
+  ParsedOutputType AMSEAgainstInterval = Double
+  ParsedOutputType ARMSEAgainstInterval = Double
+  ParsedOutputType AMAEAgainstInterval = Double
   ParsedOutputType t = ParsedExpectedType t
 
 outputParser :: SAMetric t -> Text -> Either String (ParsedOutputType t)
@@ -252,6 +265,9 @@ outputParser (SAMultiLabelFMeasure _) = Right . selectByStandardThreshold . pars
 outputParser SAMultiLabelLogLoss = Right . parseIntoProbList
 outputParser SAMultiLabelLikelihood = Right . parseIntoProbList
 outputParser SAHaversine = parseSpherePoints
+outputParser SAMSEAgainstInterval = doubleParser
+outputParser SARMSEAgainstInterval = doubleParser
+outputParser SAMAEAgainstInterval = doubleParser
 outputParser SAImprovement = doubleParser
 outputParser (SAMacroAvg m) = outputParser m
 
@@ -337,6 +353,9 @@ itemStep SAMultiLabelLogLoss = uncurry countLogLossOnProbList
 itemStep SAMultiLabelLikelihood = uncurry countLogLossOnProbList
 itemStep SAHaversine = haversine
 itemStep SAImprovement = id
+itemStep SAMSEAgainstInterval = squaredErrorAgainstInterval
+itemStep SARMSEAgainstInterval = squaredErrorAgainstInterval
+itemStep SAMAEAgainstInterval = absoluteErrorAgainstInterval
 itemStep (SAMacroAvg m) = repack m
 
 repack m (expected, out) = (expected, out')
@@ -489,3 +508,13 @@ parseSpherePoints t = case DLS.splitOn "\t" (unpack t) of
        Left _ -> Left "cannot parse line with latitude of sphere"
      Left _ -> Left "cannot parse line with longitude of sphere"
    _ -> Left "cannot parse line with longitude and latitude of sphere"
+
+parseInterval :: Text -> Either String (Double, Double)
+parseInterval t = case DLS.splitOn "\t" (unpack t) of
+   [longitudeStr, latitudeStr] -> case doubleParser (pack longitudeStr) of
+     Right longitude -> case doubleParser (pack latitudeStr) of
+       Right latitude -> Right (longitude, latitude)
+       Left _ -> Left errorMsg
+     Left _ -> Left errorMsg
+   _ -> Left errorMsg
+   where errorMsg = "cannot parse interval"

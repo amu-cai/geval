@@ -393,6 +393,9 @@ main = hspec $ do
   describe "MacroAvg" $ do
     it "with Likelihood" $ do
       runGEvalTest "macroavg-likelihood" `shouldReturnAlmost` 0.500506559087994
+  describe "MAE-Against-Interval" $ do
+    it "simple" $ do
+      runGEvalTest "mae-against-interval-simple" `shouldReturnAlmost` 1.0
   describe "Preprocessing operations" $ do
     it "F1 with preprocessing" $ do
       runGEvalTest "f1-with-preprocessing" `shouldReturnAlmost` 0.57142857142857

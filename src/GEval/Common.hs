@@ -112,6 +112,18 @@ itemAbsoluteError (exp, out) = abs (exp-out)
 itemSquaredError :: (Double, Double) -> Double
 itemSquaredError (exp, out) = (exp-out)**2
 
+absoluteErrorAgainstInterval :: ((Double, Double), Double) -> Double
+absoluteErrorAgainstInterval = errorAgainstInverval itemAbsoluteError
+
+squaredErrorAgainstInterval :: ((Double, Double), Double) -> Double
+squaredErrorAgainstInterval = errorAgainstInverval itemSquaredError
+
+errorAgainstInverval :: ((Double, Double) -> Double) -> ((Double, Double), Double) -> Double
+errorAgainstInverval errorFun ((exp_lower, exp_upper), out)
+  | out < exp_lower = errorFun (exp_lower, out)
+  | out > exp_upper = errorFun (exp_upper, out)
+  | otherwise = 0.0
+
 itemLogLossError :: (Double, Double) -> Double
 itemLogLossError (exp, out)
   | exp' > 0.5 = - (log out')

@@ -46,6 +46,7 @@ data Metric = RMSE | MSE | Pearson | Spearman | BLEU | GLEU | WER | CER | Accura
               -- a larger refactor, we will postpone this
               | Mean Metric
               | MacroAvg Metric
+              | MAEAgainstInterval | MSEAgainstInterval | RMSEAgainstInterval
               deriving (Eq)
 
 instance Show Metric where
@@ -118,6 +119,9 @@ instance Show Metric where
   show (Improvement threshold) = "Improvement@" ++ (show threshold)
   show (Mean metric) = "Mean/" ++ (show metric)
   show (MacroAvg metric) = "MacroAvg/" ++ (show metric)
+  show MAEAgainstInterval = "MAE-Against-Interval"
+  show MSEAgainstInterval = "MSE-Against-Interval"
+  show RMSEAgainstInterval = "RMSE-Against-Interval"
 
 applyMatchingSpecification :: (MatchingSpecification -> MatchingSpecification)
                            -> Metric
@@ -156,7 +160,9 @@ instance Read Metric where
   readsPrec p ('E':'x':'t':'r':'a':'c':'t':'N':'u':'m':'b':'e':'r':'/':theRest) = case readsPrec p theRest of
     [(metric, theRest')] -> [(applyMatchingSpecification ExtractNumber metric, theRest')]
     _ -> []
+  readsPrec _ ('R':'M':'S':'E':'-':'A':'g':'a':'i':'n':'s':'t':'-':'I':'n':'t':'e':'r':'v':'a':'l':theRest) = [(RMSEAgainstInterval, theRest)]
   readsPrec _ ('R':'M':'S':'E':theRest) = [(RMSE, theRest)]
+  readsPrec _ ('M':'S':'E':'-':'A':'g':'a':'i':'n':'s':'t':'-':'I':'n':'t':'e':'r':'v':'a':'l':theRest) = [(MSEAgainstInterval, theRest)]
   readsPrec _ ('M':'S':'E':theRest) = [(MSE, theRest)]
   readsPrec _ ('P':'e':'a':'r':'s':'o':'n':theRest) = [(Pearson, theRest)]
   readsPrec _ ('S':'p':'e':'a':'r':'m':'a':'n':theRest) = [(Spearman, theRest)]
@@ -212,6 +218,7 @@ instance Read Metric where
   readsPrec _ ('B':'I':'O':'-':'F':'1':theRest) = [(BIOF1, theRest)]
   readsPrec _ ('T':'o':'k':'e':'n':'A':'c':'c':'u':'r':'a':'c':'y':theRest) = [(TokenAccuracy, theRest)]
   readsPrec _ ('S':'e':'g':'m':'e':'n':'t':'A':'c':'c':'u':'r':'a':'c':'y':theRest) = [(SegmentAccuracy, theRest)]
+  readsPrec _ ('M':'A':'E':'-':'A':'g':'a':'i':'n':'s':'t':'-':'I':'n':'t':'e':'r':'v':'a':'l':theRest) = [(MAEAgainstInterval, theRest)]
   readsPrec _ ('M':'A':'E':theRest) = [(MAE, theRest)]
   readsPrec _ ('S':'M':'A':'P':'E':theRest) = [(SMAPE, theRest)]
   readsPrec _ ('M':'u':'l':'t':'i':'L':'a':'b':'e':'l':'-':'L':'o':'g':'L':'o':'s':'s':theRest) = [(MultiLabelLogLoss, theRest)]
@@ -265,6 +272,9 @@ getMetricOrdering MultiLabelLogLoss = TheLowerTheBetter
 getMetricOrdering MultiLabelLikelihood = TheHigherTheBetter
 getMetricOrdering Haversine = TheLowerTheBetter
 getMetricOrdering (Improvement _) = TheHigherTheBetter
+getMetricOrdering MSEAgainstInterval = TheLowerTheBetter
+getMetricOrdering RMSEAgainstInterval = TheLowerTheBetter
+getMetricOrdering MAEAgainstInterval = TheLowerTheBetter
 getMetricOrdering (Mean metric) = getMetricOrdering metric
 getMetricOrdering (MacroAvg metric) = getMetricOrdering metric
 
