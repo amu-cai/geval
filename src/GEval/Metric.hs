@@ -321,11 +321,19 @@ perfectOutLineFromExpectedLine BLEU t = getFirstColumn t
 perfectOutLineFromExpectedLine GLEU t = getFirstColumn t
 perfectOutLineFromExpectedLine ClippEU t = cleanMarginFromClippEU t
 perfectOutLineFromExpectedLine (Accuracy ExactMatch) t = t
+perfectOutLineFromExpectedLine RMSEAgainstInterval t = perfectOutLineFromExpectedLine MSEAgainstInterval t
+perfectOutLineFromExpectedLine MAEAgainstInterval t = perfectOutLineFromExpectedLine MSEAgainstInterval t
+perfectOutLineFromExpectedLine MSEAgainstInterval t = getLowerBound t
 perfectOutLineFromExpectedLine (Accuracy _) t = getFirstColumn t
 perfectOutLineFromExpectedLine _ t = t
 
 addProbOne :: Text -> Text
 addProbOne = (<> ":1.0")
+
+getLowerBound :: Text -> Text
+getLowerBound t = case splitOn "," t of
+  [] -> t
+  (h:_) -> h
 
 getFirstColumn :: Text -> Text
 getFirstColumn t = case splitOn "\t" t of

@@ -83,7 +83,10 @@ listOfAvailableMetrics = [RMSE,
                           Haversine,
                           CharMatch,
                           Improvement 0.5,
-                          MacroAvg Likelihood]
+                          MacroAvg Likelihood,
+                          MSEAgainstInterval,
+                          RMSEAgainstInterval,
+                          MAEAgainstInterval]
 
 extraInfo :: EvaluationScheme -> Maybe String
 extraInfo (EvaluationScheme CER []) = Just "Character-Error Rate"
@@ -115,6 +118,9 @@ isMetricDescribed BIOWeightedF1 = True
 isMetricDescribed (Improvement _) = True
 isMetricDescribed Likelihood = True
 isMetricDescribed (MacroAvg Likelihood) = True
+isMetricDescribed MSEAgainstInterval = True
+isMetricDescribed RMSEAgainstInterval = True
+isMetricDescribed MAEAgainstInterval = True
 isMetricDescribed _ = False
 
 getEvaluationSchemeDescription :: EvaluationScheme -> String
@@ -200,6 +206,12 @@ getMetricDescription Likelihood =
 class. It is closely related to LogLoss (Likelihood=exp(-LogLoss)), but a little bit easier
 to interpret for humans.
 |]
+getMetricDescription RMSEAgainstInterval = getMetricDescription MSEAgainstInterval
+getMetricDescription MAEAgainstInterval = getMetricDescription MSEAgainstInterval
+getMetricDescription MSEAgainstInterval =
+  [i|Error measured against an interval (given as a pair of numbers separated by a comma). The error is zero
+if the predicted value is within the interval, otherwise it is measured against the nearer bound.
+|]
 getMetricDescription (MacroAvg Likelihood) =
   [i|Likelihood is calculated separately for the classes and then averaged.
 |]
@@ -249,6 +261,11 @@ outContents Likelihood = [hereLit|0.9
 0.5
 0.8
 |]
+outContents RMSEAgainstInterval = outContents MSEAgainstInterval
+outContents MAEAgainstInterval = outContents MSEAgainstInterval
+outContents MSEAgainstInterval = [hereLit|1600.7
+1601.6
+|]
 
 expectedScore :: EvaluationScheme -> MetricValue
 expectedScore (EvaluationScheme (MultiLabelFMeasure 1.0 ExactMatch) []) = 0.6666
@@ -283,6 +300,9 @@ expectedScore (EvaluationScheme (Improvement threshold) [])
   | threshold >= 0.6 && threshold < 0.8 = 1.16
   | threshold >= 0.8 && threshold < 1.3 = 3.26
   | otherwise = error "Wrong threshold"
+expectedScore (EvaluationScheme MSEAgainstInterval []) = 2.42
+expectedScore (EvaluationScheme RMSEAgainstInterval []) = 1.5556349
+expectedScore (EvaluationScheme MAEAgainstInterval []) = 1.1
 expectedScore (EvaluationScheme Likelihood []) = 0.44814047825270
 expectedScore (EvaluationScheme (MacroAvg Likelihood) []) = 0.4354101962495
 
@@ -363,6 +383,10 @@ B-tags and I-tags can accompanied by an extra label after a slash.
 |]
 formatDescription Likelihood = [hereLit|A probability for the positive class
 |]
+formatDescription RMSEAgainstInterval = formatDescription MSEAgainstInterval
+formatDescription MAEAgainstInterval = formatDescription MSEAgainstInterval
+formatDescription MSEAgainstInterval = [hereLit|A single number to be compared against an interval.
+|]
 formatDescription (MacroAvg metric) = formatDescription metric
 
 scoreExplanation :: EvaluationScheme -> Maybe String
@@ -410,6 +434,15 @@ scoreExplanation (EvaluationScheme (Improvement _) []) = Nothing
 scoreExplanation (EvaluationScheme Likelihood []) =
   Just [hereLit|The probabilities assigned to the right class are: 0.9, 0.5, 1-0.8=0.2. Their geometric mean
 is (0.9 * 0.5 * 0.2)^(1/3) = 0.448140.|]
+scoreExplanation (EvaluationScheme MSEAgainstInterval []) =
+  Just [hereLit|The first date is within the interval, hence the error is zero. The error for second date is
+(1601.6-1599.4)^2=2.2^2=4.84. Hence the mean error is (0+4.84)/2=2.4200.|]
+scoreExplanation (EvaluationScheme RMSEAgainstInterval []) =
+  Just [hereLit|The first date is within the interval, hence the error is zero. The error for second date is
+(1601.6-1599.4)^2=2.2^2=4.84. Hence the mean error is sqrt((0+4.84)/2)=sqrt(2.4200)=1.555634.|]
+scoreExplanation (EvaluationScheme MAEAgainstInterval []) =
+  Just [hereLit|The first date is within the interval, hence the error is zero. The error for second date is
+(1601.6-1599.4)=2.2. Hence the mean error is ((0+2.2)/2)=1.1.|]
 scoreExplanation (EvaluationScheme (MacroAvg Likelihood) []) =
   Just [hereLit|The probabilities assigned to the right class are: 0.9, 0.5, 1-0.8=0.2. Their geometric mean
 for the positive class is sqrt(0.9 * 0.5)=0.670820, whereas for the negative class is simply 0.2 (as there

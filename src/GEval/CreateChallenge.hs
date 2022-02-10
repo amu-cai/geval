@@ -438,6 +438,17 @@ Similar to the reference format, each line describes clippings found in a corres
 
 |] ++ (commonReadmeMDContents testName)
 
+readmeMDContents RMSEAgainstInterval testName = readmeMDContents MSEAgainstInterval testName
+readmeMDContents MAEAgainstInterval testName = readmeMDContents MSEAgainstInterval testName
+readmeMDContents MSEAgainstInterval testName = [i|
+Guessing a text year sample challenge
+=====================================
+
+Guess the year of a text
+
+Your task is to guess a year of a text. The expected time is given as an interval.
+|] ++ (commonReadmeMDContents testName)
+
 readmeMDContents _ testName = [i|
 GEval sample challenge
 ======================
@@ -625,6 +636,12 @@ bar:1/30,40,100,1000	bar.djvu
 trainContents ClippEU = [hereLit|1/30,40,100,1000/10	bar.djvu
 2/30,40,500,600/10	foo.djvu
 |]
+trainContents RMSEAgainstInterval = trainContents MSEAgainstInterval
+trainContents MAEAgainstInterval = trainContents MSEAgainstInterval
+trainContents MSEAgainstInterval = [hereLit|1592,1593.9999	Now is the winter of our discontent
+1596,1597.9999	All that glisters is not gold.
+1600,1601.9999	What a piece of work is a man!
+|]
 trainContents _ = [hereLit|0.06	0.39	0	0.206
 1.00	1.00	1	0.017
 317.8	5.20	67	0.048
@@ -710,9 +727,11 @@ baz
 bar
 foo
 |]
-
-
-
+devInContents RMSEAgainstInterval = devInContents MSEAgainstInterval
+devInContents MAEAgainstInterval = devInContents MSEAgainstInterval
+devInContents MSEAgainstInterval = [hereLit|Misery acquaints a man with strange bedfellows.
+Nothing can come of nothing.
+|]
 devInContents _ = [hereLit|0.72	0	0.007
 9.54	62	0.054
 |]
@@ -797,6 +816,11 @@ devExpectedContents (Improvement _) = [hereLit|0.1
 2.0
 1.5
 -1.0
+|]
+devExpectedContents RMSEAgainstInterval = devExpectedContents MSEAgainstInterval
+devExpectedContents MAEAgainstInterval = devExpectedContents MSEAgainstInterval
+devExpectedContents MSEAgainstInterval = [hereLit|1611.0,1611.5
+1605,1606.9999
 |]
 devExpectedContents _ = [hereLit|0.82
 95.2
@@ -886,6 +910,11 @@ foo
 bar
 baz
 foo
+|]
+testInContents RMSEAgainstInterval = testInContents MSEAgainstInterval
+testInContents MAEAgainstInterval = testInContents MSEAgainstInterval
+testInContents MSEAgainstInterval = [hereLit|What a piece of work is a man!
+Beware the ides of March.
 |]
 testInContents _ = [hereLit|0.72	0	0.007
 9.54	62	0.054
@@ -978,6 +1007,11 @@ testExpectedContents (Improvement _) = [hereLit|0.3
 4.5
 -0.2
 |]
+testExpectedContents RMSEAgainstInterval = testExpectedContents MSEAgainstInterval
+testExpectedContents MAEAgainstInterval = testExpectedContents MSEAgainstInterval
+testExpectedContents MSEAgainstInterval = [hereLit|1600,1601.9999
+1599.2,1599.4
+|]
 testExpectedContents _ = [hereLit|0.11
 17.2
 |]
@@ -1034,6 +1068,9 @@ inHeaderContents (Soft2DFMeasure _) = inHeaderContents ClippEU
 inHeaderContents ClippEU = Just ["DjvuFilePath"]
 inHeaderContents Haversine = Just ["Text"]
 inHeaderContents (Improvement _) = Just ["SomeText"]
+inHeaderContents RMSEAgainstInterval = inHeaderContents MSEAgainstInterval
+inHeaderContents MAEAgainstInterval = inHeaderContents MSEAgainstInterval
+inHeaderContents MSEAgainstInterval = Just ["SomeText"]
 inHeaderContents _ = Just ["OrbitalPeriod", "OrbitalEccentricity", "NumberOfMoons"]
 
 outHeaderContents :: Metric -> Maybe [String]
@@ -1070,6 +1107,9 @@ outHeaderContents (Soft2DFMeasure _) = Just ["Rectangle"]
 outHeaderContents ClippEU = Just ["Rectangle"]
 outHeaderContents Haversine = Just ["Longitude", "Latitude"]
 outHeaderContents (Improvement _) = Just ["SomeNumber"]
+outHeaderContents RMSEAgainstInterval = outHeaderContents MSEAgainstInterval
+outHeaderContents MAEAgainstInterval = outHeaderContents MSEAgainstInterval
+outHeaderContents MSEAgainstInterval = Just ["FractionalYear"]
 outHeaderContents _ = Just ["Mass"]
 
 gitignoreContents :: String

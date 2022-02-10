@@ -510,7 +510,7 @@ parseSpherePoints t = case DLS.splitOn "\t" (unpack t) of
    _ -> Left "cannot parse line with longitude and latitude of sphere"
 
 parseInterval :: Text -> Either String (Double, Double)
-parseInterval t = case DLS.splitOn "\t" (unpack t) of
+parseInterval t = case DLS.splitOn "," (unpack t) of
    [longitudeStr, latitudeStr] -> case doubleParser (pack longitudeStr) of
      Right longitude -> case doubleParser (pack latitudeStr) of
        Right latitude -> Right (longitude, latitude)
