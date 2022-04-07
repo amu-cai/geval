@@ -183,6 +183,7 @@ isPreprocessable MultiLabelLikelihood = False
 isPreprocessable (Mean metric) = isPreprocessable metric
 isPreprocessable Haversine = False
 isPreprocessable (Improvement _) = False
+isPreprocessable (MacroAvg metric) = isPreprocessable metric
 
 isInputModifiable :: Metric -> Bool
 isInputModifiable CharMatch = True
