@@ -1,14 +1,20 @@
 
+## 1.40.9.1 (2022-04-07)
+
+Bug fix:
+
+* Fix a helper function broken for MacroAvg/* metrics
+
 ## 1.40.9.0 (2022-02-10)
 
-Enhancements
+Enhancements:
 
 * Add {RMSE,MSE,MAE}-Against-Interval metrics
 * Add MacroAvg/* metrics
 
 ## 1.40.8.0 (2022-02-07)
 
-Enhancements
+Enhancements:
 
 * Add Probabilistic-Soft2D-F-measure metric
 * Add (optional) probabilities to clippings
