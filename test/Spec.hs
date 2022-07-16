@@ -37,6 +37,8 @@ import Data.Conduit.Bootstrap
 import Data.Map.Strict
 import Data.Conduit.List (consume)
 
+import Data.NDCG (ndcgAt)
+
 import System.FilePath
 
 import System.Directory
@@ -813,6 +815,11 @@ main = hspec $ do
       kendallZ (V.fromList $ Prelude.zip [12, 2, 1, 12, 2] [1, 4, 7, 1, 0]) `shouldBeAlmost` (-1.0742)
     it "p-value" $ do
       (2 * (cumulative (normalDistr 0.0 1.0) $ kendallZ (V.fromList $ Prelude.zip [12, 2, 1, 12, 2] [1, 4, 7, 1, 0]))) `shouldBeAlmost` 0.2827
+  describe "NDCG" $ do
+    it "simple" $ do
+      ndcgAt 6
+             (fromList [("d1", 3.0), ("d2", 2.0), ("d3", 3.0), ("d5", 1.0), ("d6", 2.0), ("d7", 3.0), ("d8", 2.0)])
+             ["d1", "d2", "d3", "d4", "d5", "d6"] `shouldBeAlmost` 0.785
   describe "Loess" $ do
     it "simple" $ do
       loess (DVU.fromList [0.2, 0.6, 1.0])

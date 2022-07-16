@@ -61,6 +61,7 @@ library
                      , GEval.MatchingSpecification
                      , GEval.Confidence
                      , Data.Conduit.Utils
+                     , Data.NDCG
                      , Paths_geval
   build-depends:       base >= 4.7 && < 5
                      , cond
