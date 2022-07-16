@@ -37,7 +37,7 @@ import Data.Conduit.Bootstrap
 import Data.Map.Strict
 import Data.Conduit.List (consume)
 
-import Data.NDCG (ndcgAt)
+import Data.NDCG (ndcgAt, binaryNdcgAt)
 
 import System.FilePath
 
@@ -816,10 +816,19 @@ main = hspec $ do
     it "p-value" $ do
       (2 * (cumulative (normalDistr 0.0 1.0) $ kendallZ (V.fromList $ Prelude.zip [12, 2, 1, 12, 2] [1, 4, 7, 1, 0]))) `shouldBeAlmost` 0.2827
   describe "NDCG" $ do
+    let sampleRelevanceScores = fromList [("d1", 3.0), ("d2", 2.0), ("d3", 3.0), ("d5", 1.0), ("d6", 2.0), ("d7", 3.0), ("d8", 2.0)]
     it "simple" $ do
-      ndcgAt 6
-             (fromList [("d1", 3.0), ("d2", 2.0), ("d3", 3.0), ("d5", 1.0), ("d6", 2.0), ("d7", 3.0), ("d8", 2.0)])
-             ["d1", "d2", "d3", "d4", "d5", "d6"] `shouldBeAlmost` 0.785
+      ndcgAt 6 sampleRelevanceScores ["d1", "d2", "d3", "d4", "d5", "d6"] `shouldBeAlmost` 0.785
+    it "handle duplicates" $ do
+      ndcgAt 6 sampleRelevanceScores ["d1", "d2", "d1", "d3", "d4", "d5", "d6"] `shouldBeAlmost` 0.785
+    it "only binary scores" $ do
+      binaryNdcgAt 3 ["foo", "bar", "baz", "baq"] ["aaa", "baz", "bbb", "baq"] `shouldBeAlmost` 0.29608
+    it "perfect" $ do
+      ndcgAt 6 sampleRelevanceScores ["d1", "d7", "d3", "d2", "d8", "d6"] `shouldBeAlmost` 1.0
+    it "worst" $ do
+      ndcgAt 6 sampleRelevanceScores ["d4", "aaa", "bbb", "ccc", "ddd", "eee"] `shouldBeAlmost` 0.0
+    it "no results" $ do
+      ndcgAt 6 sampleRelevanceScores [] `shouldBeAlmost` 0.0
   describe "Loess" $ do
     it "simple" $ do
       loess (DVU.fromList [0.2, 0.6, 1.0])

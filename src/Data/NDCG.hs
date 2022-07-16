@@ -1,16 +1,20 @@
 
 module Data.NDCG
-  (ndcgAt)
+  (ndcgAt, binaryNdcgAt)
 where
 
 import Data.Map as M hiding (map, take)
 import Data.List
 
+binaryNdcgAt :: Ord a => Int -> [a] -> [a] -> Double
+binaryNdcgAt n relevantItems ranking =
+  ndcgAt n (fromList $ map (\k -> (k, 1.0)) relevantItems) ranking
+
 ndcgAt :: Ord a => Int -> M.Map a Double -> [a] -> Double
 ndcgAt n relevanceScores ranking = dcgAt n relevanceScores ranking / idcgAt n relevanceScores
 
 dcgAt :: Ord a => Int -> M.Map a Double -> [a] -> Double
-dcgAt n relevanceScores ranking = dcg relevanceScores (take n ranking)
+dcgAt n relevanceScores ranking = dcg relevanceScores (take n $ nub ranking)
 
 dcg :: Ord a => M.Map a Double -> [a] -> Double
 dcg relevanceScores ranking =
