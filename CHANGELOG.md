@@ -1,4 +1,10 @@
 
+## 1.41.0.0 (2022-07-16)
+
+Enhancements:
+
+* Add NDCG metric
+
 ## 1.40.9.1 (2022-04-07)
 
 Bug fix:
