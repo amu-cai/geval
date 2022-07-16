@@ -350,6 +350,9 @@ main = hspec $ do
       runGEvalTest "map-simple" `shouldReturnAlmost` 0.444444444
     it "dos-end-of-lines" $
       runGEvalTest "dos-end-of-line" `shouldReturnAlmost` 0.75
+  describe "NDCG" $ do
+    it "simple test" $ do
+      runGEvalTest "ndcg-simple" `shouldReturnAlmost` 0.71193675
   describe "LogLoss" $ do
     it "simple" $ do
       runGEvalTest "logloss-simple" `shouldReturnAlmost` 0.31824

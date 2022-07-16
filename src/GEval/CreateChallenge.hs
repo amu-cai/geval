@@ -298,14 +298,12 @@ Directory structure
 * `${testName}/expected.tsv` — American reference text for the test set
 |]
 
+readmeMDContents (NDCG _) testName = readmeMDContents MAP testName
 readmeMDContents MAP testName = [i|
 English word for a Polish word
 ================================================
 
 Give a (British or American) English equivalent of a Polish word.
-
-This is a sample challenge for MAP evaluation metric. MAP (Mean Average Precision)
-is used, mostly in information retrieval, for evaluation of ranked retrieval results.
 
 The relevant items are separated by TABs (could be just one item) and returned items
 should be separated by TABs.
@@ -596,6 +594,7 @@ Camptown race-track five miles long, Oh, doo-dah day!
 I come down dah wid my hat caved in, Doo-dah! doo-dah!
 I go back home wid a pocket full of tin, Oh, doo-dah day!
 |]
+trainContents (NDCG _) = trainContents MAP
 trainContents MAP = [hereLit|honor	US	honor
 honour	GB	honor
 titbit	GB	smakołyk
@@ -686,6 +685,7 @@ devInContents CharMatch = [hereLit|honour to organise
 nothing to change
 time traveller
 |]
+devInContents (NDCG _) = devInContents MAP
 devInContents MAP = [hereLit|US	noc
 GB	wózek dziecięcy
 GB	wizualizować
@@ -774,6 +774,7 @@ devExpectedContents CharMatch = [hereLit|honor to organize
 nothing to change
 time traveler
 |]
+devExpectedContents (NDCG _) = devExpectedContents MAP
 devExpectedContents MAP = [hereLit|night	nite
 pram
 visualise
@@ -867,7 +868,8 @@ testInContents CharMatch = [hereLit|paralysed by practise
 recognise
 nothing
 |]
-testInContents MAP = [hereLit|US	wózek dziecięcy
+testInContents (NDCG _) = testInContents MAP
+testInContents MAP = [hereLit|US	lekki
 GB	słoń
 US	słoń
 |]
@@ -959,7 +961,8 @@ testExpectedContents CharMatch = [hereLit|paralyzed by practice
 recognize
 nothing
 |]
-testExpectedContents MAP = [hereLit|trolley
+testExpectedContents (NDCG _) = testExpectedContents MAP
+testExpectedContents MAP = [hereLit|light	lite
 elephant
 elephant
 |]
@@ -1051,6 +1054,7 @@ inHeaderContents (LikelihoodHashed b) = inHeaderContents (LogLossHashed b)
 inHeaderContents (PerplexityHashed b) = inHeaderContents (LogLossHashed b)
 inHeaderContents (LogLossHashed _) = Just ["LeftContext", "RightContext"]
 inHeaderContents CharMatch = Just ["Text"]
+inHeaderContents (NDCG _) = inHeaderContents MAP
 inHeaderContents MAP = Just ["Dialect", "PolishPhrase"]
 inHeaderContents Likelihood = inHeaderContents LogLoss
 inHeaderContents LogLoss = Just ["Text"]
@@ -1090,6 +1094,7 @@ outHeaderContents (LikelihoodHashed b) = outHeaderContents (LogLossHashed b)
 outHeaderContents (PerplexityHashed b) = outHeaderContents (LogLossHashed b)
 outHeaderContents (LogLossHashed _) = Just ["GuessedWord"]
 outHeaderContents CharMatch = Just ["NormalizedText"]
+outHeaderContents (NDCG _) = Nothing
 outHeaderContents MAP = Nothing
 outHeaderContents Likelihood = outHeaderContents LogLoss
 outHeaderContents LogLoss = Just ["Probability"]

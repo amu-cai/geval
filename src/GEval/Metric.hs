@@ -28,7 +28,7 @@ import Data.Attoparsec.Text (parseOnly)
 -- | evaluation metric
 data Metric = RMSE | MSE | Pearson | Spearman | BLEU | GLEU | WER | CER | Accuracy MatchingSpecification | ClippEU
               | FMeasure Double | MacroFMeasure Double | NMI
-              | LogLossHashed Word32 | CharMatch | MAP | LogLoss | Likelihood
+              | LogLossHashed Word32 | CharMatch | MAP | NDCG Int | LogLoss | Likelihood
               | BIOF1 | BIOWeightedF1 | BIOF1Labels | TokenAccuracy | SegmentAccuracy | LikelihoodHashed Word32 | PerplexityHashed Word32
               | MAE | SMAPE
               | MultiLabelFMeasure Double MatchingSpecification
@@ -96,6 +96,7 @@ instance Show Metric where
                                                               (show nbOfBits))
   show CharMatch = "CharMatch"
   show MAP = "MAP"
+  show (NDCG n) = "NDCG@" ++ (show n)
   show LogLoss = "LogLoss"
   show Likelihood = "Likelihood"
   show BIOF1 = "BIO-F1"
@@ -213,6 +214,9 @@ instance Read Metric where
   readsPrec _ ('L':'i':'k':'e':'l':'i':'h':'o':'o':'d':theRest) = [(Likelihood, theRest)]
   readsPrec _ ('C':'h':'a':'r':'M':'a':'t':'c':'h':theRest) = [(CharMatch, theRest)]
   readsPrec _ ('M':'A':'P':theRest) = [(MAP, theRest)]
+  readsPrec p ('N':'D':'C':'G':'@':theRest) = case readsPrec p theRest of
+    [(n, theRest')] -> [(NDCG n, theRest')]
+    _ -> []
   readsPrec _ ('B':'I':'O':'-':'F':'1':'-':'L':'a':'b':'e':'l':'s':theRest) = [(BIOF1Labels, theRest)]
   readsPrec _ ('B':'I':'O':'-':'W':'e':'i':'g':'h':'t':'e':'d':'-':'F':'1': theRest) = [(BIOWeightedF1, theRest)]
   readsPrec _ ('B':'I':'O':'-':'F':'1':theRest) = [(BIOF1, theRest)]
@@ -258,6 +262,7 @@ getMetricOrdering (LikelihoodHashed _) = TheHigherTheBetter
 getMetricOrdering (PerplexityHashed _) = TheLowerTheBetter
 getMetricOrdering CharMatch = TheHigherTheBetter
 getMetricOrdering MAP = TheHigherTheBetter
+getMetricOrdering (NDCG _) = TheHigherTheBetter
 getMetricOrdering LogLoss = TheLowerTheBetter
 getMetricOrdering Likelihood = TheHigherTheBetter
 getMetricOrdering BIOF1 = TheHigherTheBetter
@@ -296,6 +301,7 @@ fixedNumberOfColumnsInExpected :: Metric -> Bool
 fixedNumberOfColumnsInExpected (Mean metric) = fixedNumberOfColumnsInExpected metric
 fixedNumberOfColumnsInExpected (MacroAvg metric) = fixedNumberOfColumnsInExpected metric
 fixedNumberOfColumnsInExpected MAP = False
+fixedNumberOfColumnsInExpected (NDCG _) = False
 fixedNumberOfColumnsInExpected BLEU = False
 fixedNumberOfColumnsInExpected GLEU = False
 fixedNumberOfColumnsInExpected (Accuracy ExactMatch) = True

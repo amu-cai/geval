@@ -54,6 +54,7 @@ listOfAvailableMetrics = [RMSE,
                           ProbabilisticMultiLabelFMeasure 0.25,
                           MultiLabelLikelihood,
                           MAP,
+                          NDCG 3,
                           BLEU,
                           GLEU,
                           WER,
@@ -121,6 +122,7 @@ isMetricDescribed (MacroAvg Likelihood) = True
 isMetricDescribed MSEAgainstInterval = True
 isMetricDescribed RMSEAgainstInterval = True
 isMetricDescribed MAEAgainstInterval = True
+isMetricDescribed (NDCG 3) = True
 isMetricDescribed _ = False
 
 getEvaluationSchemeDescription :: EvaluationScheme -> String
@@ -215,6 +217,9 @@ if the predicted value is within the interval, otherwise it is measured against 
 getMetricDescription (MacroAvg Likelihood) =
   [i|Likelihood is calculated separately for the classes and then averaged.
 |]
+getMetricDescription (NDCG _) =
+  [i|Normalized discounted cumulative gain, metric used in information retrieval.
+|]
 
 outContents :: Metric -> String
 outContents (Mean metric) = outContents metric
@@ -266,6 +271,10 @@ outContents MAEAgainstInterval = outContents MSEAgainstInterval
 outContents MSEAgainstInterval = [hereLit|1600.7
 1601.6
 |]
+outContents (NDCG _) = [hereLit|unheavy	non-heavy	lite	light
+elephant
+elefant
+|]
 
 expectedScore :: EvaluationScheme -> MetricValue
 expectedScore (EvaluationScheme (MultiLabelFMeasure 1.0 ExactMatch) []) = 0.6666
@@ -305,7 +314,7 @@ expectedScore (EvaluationScheme RMSEAgainstInterval []) = 1.5556349
 expectedScore (EvaluationScheme MAEAgainstInterval []) = 1.1
 expectedScore (EvaluationScheme Likelihood []) = 0.44814047825270
 expectedScore (EvaluationScheme (MacroAvg Likelihood) []) = 0.4354101962495
-
+expectedScore (EvaluationScheme (NDCG 3) []) = 0.4355
 
 helpMetricParameterMetricsList :: String
 helpMetricParameterMetricsList = intercalate ", " $ map (\s -> (show s) ++ (case extraInfo s of
@@ -388,6 +397,8 @@ formatDescription MAEAgainstInterval = formatDescription MSEAgainstInterval
 formatDescription MSEAgainstInterval = [hereLit|A single number to be compared against an interval.
 |]
 formatDescription (MacroAvg metric) = formatDescription metric
+formatDescription (NDCG _) = [hereLit|A ranking of IDs/words separated by TABs.
+|]
 
 scoreExplanation :: EvaluationScheme -> Maybe String
 scoreExplanation (EvaluationScheme (MultiLabelFMeasure _ ExactMatch) [])
@@ -447,7 +458,13 @@ scoreExplanation (EvaluationScheme (MacroAvg Likelihood) []) =
   Just [hereLit|The probabilities assigned to the right class are: 0.9, 0.5, 1-0.8=0.2. Their geometric mean
 for the positive class is sqrt(0.9 * 0.5)=0.670820, whereas for the negative class is simply 0.2 (as there
 is only one example for this). The artithmetic mean of 0.670820 and 0.2 is 0.435410.|]
-
+scoreExplanation (EvaluationScheme (NDCG 3) []) =
+  Just [hereLit|For the first item, the ranking contains 4 items, but it's NDCG@3, so we consider only the first three
+items ("unheavy", "non-heavy", "lite"). Out of these 3 items, only the third one is correct ("lite"), so
+DCG is 1 / (log_2(3 + 1)) = 0.5. The ideal DCG would be 1/log_2(1+1) + 1/log_2(1+2) = 1.6309. Hence the
+NDCG@3 for the first item is 0.5 / 1.6309 = 0.3066. The answer for the second item is perfect, so the
+score would be 1.0, whereas for the third one - wrong, hence 0.0. In total, the average value
+for the whole test set is (0.3066 + 1.0 + 0.0)/3 = 0.4355.|]
 
 pasteLines :: String -> String -> String
 pasteLines a b = printf "%-35s %s\n" a b

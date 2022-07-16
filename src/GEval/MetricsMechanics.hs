@@ -54,7 +54,7 @@ import qualified Data.HashMap.Strict as M
 -- | Word32 and this is not handled by the singleton libary.)
 singletons [d|data AMetric = ARMSE | AMSE | APearson | ASpearman | ABLEU | AGLEU | AWER | ACER | AAccuracy MatchingSpecification | AClippEU
                              | AFMeasure | AMacroFMeasure | ANMI
-                             | ALogLossHashed | ACharMatch | AMAP | ALogLoss | ALikelihood
+                             | ALogLossHashed | ACharMatch | AMAP | ANDCG | ALogLoss | ALikelihood
                              | ABIOF1 | ABIOWeightedF1 | ABIOF1Labels | ATokenAccuracy | ASegmentAccuracy | ALikelihoodHashed | APerplexityHashed
                              | AMAE | ASMAPE | AMultiLabelFMeasure MatchingSpecification
                              | AMultiLabelLogLoss | AMultiLabelLikelihood
@@ -87,6 +87,7 @@ toHelper NMI = ANMI
 toHelper (LogLossHashed _) = ALogLossHashed
 toHelper CharMatch = ACharMatch
 toHelper MAP = AMAP
+toHelper (NDCG _) = ANDCG
 toHelper LogLoss = ALogLoss
 toHelper Likelihood = ALikelihood
 toHelper BIOF1 = ABIOF1
@@ -143,6 +144,7 @@ type family ParsedExpectedType (t :: AMetric) :: * where
   ParsedExpectedType APerplexityHashed = Text
   ParsedExpectedType ACharMatch = Text
   ParsedExpectedType AMAP = [String]
+  ParsedExpectedType ANDCG = [String]
   ParsedExpectedType ALogLoss = Double
   ParsedExpectedType ALikelihood = Double
   ParsedExpectedType ABIOF1 = [TaggedEntity]
@@ -187,6 +189,7 @@ expectedParser SALikelihoodHashed = onlyStrip
 expectedParser SAPerplexityHashed = onlyStrip
 expectedParser SACharMatch = Right
 expectedParser SAMAP = splitByTabs
+expectedParser SANDCG = splitByTabs
 expectedParser SALogLoss = doubleParser
 expectedParser SALikelihood = doubleParser
 expectedParser SABIOF1 = parseBioSequenceIntoEntities
@@ -252,6 +255,7 @@ outputParser SALikelihoodHashed = onlyStrip
 outputParser SAPerplexityHashed = onlyStrip
 outputParser SACharMatch = Right
 outputParser SAMAP = splitByTabs
+outputParser SANDCG = splitByTabs
 outputParser SALogLoss = doubleParser
 outputParser SALikelihood = doubleParser
 outputParser SABIOF1 = parseBioSequenceIntoEntities
@@ -391,7 +395,9 @@ predictedParser got =
     Left _ -> Just got
 
 splitByTabs :: Text -> Either a [[Char]]
-splitByTabs = Right . DLS.splitOn "\t" . unpack
+splitByTabs t
+  | Data.Text.null t = Right []
+  | otherwise = Right $ DLS.splitOn "\t" $ unpack t
 
 zeroOneParser :: Text -> Either String Bool
 zeroOneParser = expected <=< (getValue . TR.decimal)

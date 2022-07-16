@@ -102,6 +102,7 @@ import GEval.BlackBoxDebugging
 import Data.Conduit.Bootstrap
 import GEval.DataSource
 import GEval.MatchingSpecification
+import Data.NDCG
 
 import qualified Data.HashMap.Strict as M
 import qualified Data.Map as DM
@@ -165,6 +166,7 @@ isPreprocessable (LikelihoodHashed _) = False
 isPreprocessable (PerplexityHashed _) = False
 isPreprocessable CharMatch = True
 isPreprocessable MAP = False
+isPreprocessable (NDCG _) = False
 isPreprocessable LogLoss = False
 isPreprocessable Likelihood = False
 isPreprocessable BIOF1 = True
@@ -732,6 +734,15 @@ gevalCoreOnSources (Mean CER)
       -- repeated as below, as it will be refactored into dependent types soon anyway
       getString (RawItemTarget t) = expectedParser SACER t
       getString (PartiallyParsedItemTarget ts) = Right $ Prelude.unwords $ Prelude.map unpack ts
+
+
+gevalCoreOnSources (NDCG n)
+  = gevalCoreWithoutInputOnItemTargets (liftOp splitByTabs)
+                                       (liftOp splitByTabs)
+                          (uncurry (binaryNdcgAt n))
+                          averageC
+                          id
+                          noGraph
 
 gevalCoreOnSources (Mean _) = error $ "Mean/ meta-metric defined only for MultiLabel-F1, WER and CER for the time being"
 
