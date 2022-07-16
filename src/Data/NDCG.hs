@@ -11,7 +11,7 @@ binaryNdcgAt n relevantItems ranking =
   ndcgAt n (fromList $ map (\k -> (k, 1.0)) relevantItems) ranking
 
 ndcgAt :: Ord a => Int -> M.Map a Double -> [a] -> Double
-ndcgAt n relevanceScores ranking = dcgAt n relevanceScores ranking / idcgAt n relevanceScores
+ndcgAt n relevanceScores ranking = dcgAt n relevanceScores ranking `generalizedDiv` idcgAt n relevanceScores
 
 dcgAt :: Ord a => Int -> M.Map a Double -> [a] -> Double
 dcgAt n relevanceScores ranking = dcg relevanceScores (take n $ nub ranking)
@@ -19,6 +19,10 @@ dcgAt n relevanceScores ranking = dcg relevanceScores (take n $ nub ranking)
 dcg :: Ord a => M.Map a Double -> [a] -> Double
 dcg relevanceScores ranking =
   dcgForRanks $ map (\k -> findWithDefault 0.0 k relevanceScores) ranking
+
+generalizedDiv :: Double -> Double -> Double
+generalizedDiv _ 0.0 = 1.0
+generalizedDiv x y = x / y
 
 dcgForRanks :: [Double] -> Double
 dcgForRanks scores =

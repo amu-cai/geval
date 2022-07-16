@@ -829,6 +829,10 @@ main = hspec $ do
       ndcgAt 6 sampleRelevanceScores ["d4", "aaa", "bbb", "ccc", "ddd", "eee"] `shouldBeAlmost` 0.0
     it "no results" $ do
       ndcgAt 6 sampleRelevanceScores [] `shouldBeAlmost` 0.0
+    it "none relevant" $ do
+      ndcgAt 6 (fromList []) ([] :: [Text]) `shouldBeAlmost` 1.0
+    it "none relevant, some given" $ do
+      ndcgAt 6 (fromList []) ["foo", "bar"] `shouldBeAlmost` 1.0
   describe "Loess" $ do
     it "simple" $ do
       loess (DVU.fromList [0.2, 0.6, 1.0])
