@@ -1,4 +1,10 @@
 
+## 1.41.1.0 (2022-08-17)
+
+Enhancements:
+
+* Add CustomMetric1 metric (for one of PolEval competitions)
+
 ## 1.41.0.0 (2022-07-16)
 
 Enhancements:
