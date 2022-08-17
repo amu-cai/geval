@@ -66,6 +66,7 @@ singletons [d|data AMetric = ARMSE | AMSE | APearson | ASpearman | ABLEU | AGLEU
                              | AFLCFMeasure | AHaversine | AImprovement
                              | AMacroAvg AMetric
                              | AMSEAgainstInterval | ARMSEAgainstInterval | AMAEAgainstInterval
+                             | ACustomMetric1
                              deriving (Eq)
              |]
 
@@ -112,6 +113,7 @@ toHelper Haversine = AHaversine
 toHelper MSEAgainstInterval = AMSEAgainstInterval
 toHelper RMSEAgainstInterval = ARMSEAgainstInterval
 toHelper MAEAgainstInterval = AMAEAgainstInterval
+toHelper CustomMetric1 = ACustomMetric1
 toHelper (Improvement _) = AImprovement
 toHelper (MacroAvg m) = AMacroAvg (toHelper m)
 
@@ -162,6 +164,7 @@ type family ParsedExpectedType (t :: AMetric) :: * where
   ParsedExpectedType ARMSEAgainstInterval = (Double, Double)
   ParsedExpectedType AMAEAgainstInterval = (Double, Double)
   ParsedExpectedType AImprovement = Double
+  ParsedExpectedType ACustomMetric1 = (Text, Text)
   ParsedExpectedType (AMacroAvg m) = ParsedExpectedType m
 
 expectedParser :: SAMetric t -> Text -> Either String (ParsedExpectedType t)
@@ -207,7 +210,15 @@ expectedParser SAMSEAgainstInterval = parseInterval
 expectedParser SARMSEAgainstInterval = parseInterval
 expectedParser SAMAEAgainstInterval = parseInterval
 expectedParser SAImprovement = doubleParser
+expectedParser SACustomMetric1 = pairParser
 expectedParser (SAMacroAvg m) = expectedParser m
+
+pairParser :: Text -> Either String (Text, Text)
+pairParser t = case splitOn "\t" t of
+  [f,s] -> Right (f, s)
+  [] -> Left "empty text"
+  [_] -> Left "two fields expected"
+  _ -> Left "too many fields, only two expected"
 
 type family ParsedOutputType (t :: AMetric) :: * where
   ParsedOutputType ABLEU = [String]
@@ -273,6 +284,7 @@ outputParser SAMSEAgainstInterval = doubleParser
 outputParser SARMSEAgainstInterval = doubleParser
 outputParser SAMAEAgainstInterval = doubleParser
 outputParser SAImprovement = doubleParser
+outputParser SACustomMetric1 = pairParser
 outputParser (SAMacroAvg m) = outputParser m
 
 type family ItemIntermediateRepresentationType (t :: AMetric) :: * where
@@ -360,7 +372,11 @@ itemStep SAImprovement = id
 itemStep SAMSEAgainstInterval = squaredErrorAgainstInterval
 itemStep SARMSEAgainstInterval = squaredErrorAgainstInterval
 itemStep SAMAEAgainstInterval = absoluteErrorAgainstInterval
+itemStep SACustomMetric1 = customMetric1
 itemStep (SAMacroAvg m) = repack m
+
+customMetric1 :: ((Text, Text), (Text, Text)) -> Double
+customMetric1 ((f1, s1), (f2, s2)) = (if f1 == f2 then 0.25 else 0.0) + (if s1 == s2 then 0.75 else 0.0)
 
 repack m (expected, out) = (expected, out')
    where  out' = itemStep m (expected, out)

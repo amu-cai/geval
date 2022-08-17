@@ -185,6 +185,7 @@ isPreprocessable MultiLabelLikelihood = False
 isPreprocessable (Mean metric) = isPreprocessable metric
 isPreprocessable Haversine = False
 isPreprocessable (Improvement _) = False
+isPreprocessable CustomMetric1 = True
 isPreprocessable (MacroAvg metric) = isPreprocessable metric
 
 isInputModifiable :: Metric -> Bool
@@ -1002,6 +1003,8 @@ continueGEvalCalculations SACER CER = defineContinuation cerAgg cerFinal noGraph
         cerFinal (errors, ref) = errors /. ref
 
 continueGEvalCalculations (SAAccuracy _) (Accuracy _) = defineContinuation averageC id noGraph
+
+continueGEvalCalculations SACustomMetric1 CustomMetric1 = defineContinuation averageC id noGraph
 
 continueGEvalCalculations SAFMeasure (FMeasure beta) = defineContinuation countAgg (fMeasureOnCounts beta) noGraph
 

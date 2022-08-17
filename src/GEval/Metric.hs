@@ -47,6 +47,9 @@ data Metric = RMSE | MSE | Pearson | Spearman | BLEU | GLEU | WER | CER | Accura
               | Mean Metric
               | MacroAvg Metric
               | MAEAgainstInterval | MSEAgainstInterval | RMSEAgainstInterval
+              -- custom metric for PolEval 2022 Abbreviation Ambiguation
+              -- to be replaced by a proper metric - weighted average
+              | CustomMetric1
               deriving (Eq)
 
 instance Show Metric where
@@ -123,6 +126,7 @@ instance Show Metric where
   show MAEAgainstInterval = "MAE-Against-Interval"
   show MSEAgainstInterval = "MSE-Against-Interval"
   show RMSEAgainstInterval = "RMSE-Against-Interval"
+  show CustomMetric1 = "CustomMetric1"
 
 applyMatchingSpecification :: (MatchingSpecification -> MatchingSpecification)
                            -> Metric
@@ -231,6 +235,7 @@ instance Read Metric where
   readsPrec p ('I':'m':'p':'r':'o':'v':'e':'m':'e':'n':'t':'@':theRest) = case readsPrec p theRest of
     [(threshold, theRest')] -> [(Improvement threshold, theRest')]
     _ -> []
+  readsPrec _ ('C':'u':'s':'t':'o':'m':'M':'e':'t':'r':'i':'c':'1':theRest) = [(CustomMetric1, theRest)]
   readsPrec _ t = throw $ UnknownMetric t
 
 
@@ -280,6 +285,7 @@ getMetricOrdering (Improvement _) = TheHigherTheBetter
 getMetricOrdering MSEAgainstInterval = TheLowerTheBetter
 getMetricOrdering RMSEAgainstInterval = TheLowerTheBetter
 getMetricOrdering MAEAgainstInterval = TheLowerTheBetter
+getMetricOrdering CustomMetric1 = TheHigherTheBetter
 getMetricOrdering (Mean metric) = getMetricOrdering metric
 getMetricOrdering (MacroAvg metric) = getMetricOrdering metric
 

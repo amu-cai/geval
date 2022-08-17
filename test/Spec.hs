@@ -236,6 +236,9 @@ main = hspec $ do
       runGEvalTest "unexpected-data" `shouldThrow` (== UnexpectedData 3 "input does not start with a digit")
     it "unwanted data is handled" $
       runGEvalTest "unwanted-data" `shouldThrow` (== UnexpectedData 2 "number expected")
+  describe "custom metric" $ do
+    it "weighted accuracy" $ do
+      runGEvalTest "weighted-accuracy" `shouldReturnAlmost` 0.65
   describe "precision and recall" $ do
     it "null test" $ do
       precision neverMatch ['a', 'b', 'c'] [0, 1, 2, 3, 4, 5] `shouldBeAlmost` 0.0
