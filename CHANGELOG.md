@@ -1,4 +1,14 @@
 
+## 1.42.0.0 (2022-09-08)
+
+Enhancements:
+
+* Add WAR, CAR, Mean/WAR, Mean/CAR metrics
+
+Bug fixes:
+
+* Improve handling empty texts in WER and CER
+
 ## 1.41.1.0 (2022-08-17)
 
 Enhancements:
