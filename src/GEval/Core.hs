@@ -713,7 +713,7 @@ gevalCoreOnSources (Mean (MultiLabelFMeasure beta matchingSpec))
 gevalCoreOnSources (Mean WER)
   = gevalCoreWithoutInputOnItemTargets intoWords
                                        getWords
-                                       ((uncurry (/.)) . (uncurry werStep))
+                                       ((uncurry errorRate) . (uncurry werStep))
                                        averageC
                                        id
                                        noGraph
@@ -727,7 +727,7 @@ gevalCoreOnSources (Mean WER)
 gevalCoreOnSources (Mean CER)
   = gevalCoreWithoutInputOnItemTargets getString
                                        getString
-                                       ((uncurry (/.)) . (uncurry werStep))
+                                       ((uncurry errorRate) . (uncurry werStep))
                                        averageC
                                        id
                                        noGraph
@@ -995,12 +995,12 @@ continueGEvalCalculations SAGLEU GLEU = defineContinuation gleuAgg gleuFinal noG
 continueGEvalCalculations SAWER WER = defineContinuation werAgg werFinal noGraph
   where werAgg = CC.foldl werFuse (0, 0)
         werFuse (a1, a2) (b1, b2) = (a1 + b1, a2 + b2)
-        werFinal (errors, ref) = errors /. ref
+        werFinal (errors, ref) = errors `errorRate` ref
 
 continueGEvalCalculations SACER CER = defineContinuation cerAgg cerFinal noGraph
   where cerAgg = CC.foldl cerFuse (0, 0)
         cerFuse (a1, a2) (b1, b2) = (a1 + b1, a2 + b2)
-        cerFinal (errors, ref) = errors /. ref
+        cerFinal (errors, ref) = errors `errorRate` ref
 
 continueGEvalCalculations (SAAccuracy _) (Accuracy _) = defineContinuation averageC id noGraph
 
