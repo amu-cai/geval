@@ -59,6 +59,8 @@ listOfAvailableMetrics = [RMSE,
                           GLEU,
                           WER,
                           CER,
+                          WAR,
+                          CAR,
                           NMI,
                           ClippEU,
                           LogLossHashed defaultLogLossHashedSize,
@@ -91,6 +93,7 @@ listOfAvailableMetrics = [RMSE,
 
 extraInfo :: EvaluationScheme -> Maybe String
 extraInfo (EvaluationScheme CER []) = Just "Character-Error Rate"
+extraInfo (EvaluationScheme CAR []) = Just "Character-Accuracy Rate (1-CER)"
 extraInfo (EvaluationScheme GLEU [])  = Just "\"Google GLEU\" not the grammar correction metric"
 extraInfo (EvaluationScheme BLEU [LowerCasing,
                                  RegexpMatch _]) = Just "BLEU on lowercased strings, only Latin characters and digits considered"
@@ -113,6 +116,8 @@ isMetricDescribed (ProbabilisticMultiLabelFMeasure _) = True
 isMetricDescribed GLEU = True
 isMetricDescribed WER = True
 isMetricDescribed CER = True
+isMetricDescribed WAR = True
+isMetricDescribed CAR = True
 isMetricDescribed SegmentAccuracy = True
 isMetricDescribed Haversine = True
 isMetricDescribed BIOWeightedF1 = True
@@ -184,7 +189,12 @@ getMetricDescription CER =
 by the total length of the expected output. Possible mistakes are
 deletions, insertions and substitions — as in the Levenshtein distance.
 |]
-
+getMetricDescription WAR =
+  [i|WAR (Word-Accuracy Rate) is 1-WER
+|]
+getMetricDescription CER =
+  [i|CAR (Character-Accuracy Rate) is 1-CER
+|]
 getMetricDescription SegmentAccuracy =
   [i|Accuracy counted for segments, i.e. labels with positions.
 The percentage of labels in the ground truth retrieved in the actual output is returned.
@@ -246,6 +256,8 @@ a ko te ahiahi , ko ata , he ra ko kotahi
 outContents CER = [hereLit|esse esi perctp
 tabula rasai
 |]
+outContents WAR = outContents WER
+outContents CAR = outContents CER
 outContents SegmentAccuracy = [hereLit|N:1-4 V:5-6 N:8-10 V:12-13 A:15-17
 N:1-4 V:6-7 A:9-13
 |]
@@ -298,6 +310,10 @@ expectedScore (EvaluationScheme WER [])
   = 0.08571
 expectedScore (EvaluationScheme CER [])
   = 0.14814
+expectedScore (EvaluationScheme WAR [])
+  = 0.91429
+expectedScore (EvaluationScheme CAR [])
+  = 0.85186
 expectedScore (EvaluationScheme Haversine [])
   = 1044.2633358563135
 expectedScore (EvaluationScheme BIOWeightedF1 [])
@@ -382,6 +398,8 @@ such a case).
 formatDescription WER = formatDescription GLEU
 formatDescription CER = [hereLit|Any text, whitespace and punctuation marks are also considered.
 |]
+formatDescription WAR = formatDescription WER
+formatDescription CAR = formatDescription CER
 formatDescription Haversine = [hereLit|Each line is a latitude and longitude of sphere separated by tabulation,
 e.g. "41.558153 -73.051497".
 |]
@@ -432,10 +450,18 @@ scoreExplanation (EvaluationScheme WER [])
   = Just [hereLit|The total length of expected output (in words) is 35. There are 3 errors
 (1 word substituted, 1 inserted, 1 deleted)  in the actual output. Hence,
 WER = (1+1+1) / 35 = 3 / 35 = 0.08571.|]
+scoreExplanation (EvaluationScheme WAR [])
+  = Just [hereLit|The total length of expected output (in words) is 35. There are 3 errors
+(1 word substituted, 1 inserted, 1 deleted)  in the actual output. Hence,
+WER = (1+1+1) / 35 = 3 / 35 = 0.08571 and WAR = 1-WER = 1-0.08571 = 0.91429|]
 scoreExplanation (EvaluationScheme CER [])
   = Just [hereLit|The total length of expected output (in characters) is 27. There are 4 errors
 (1 word substituted, 1 inserted, 1 deleted)  in the actual output. Hence,
 CER = (2+1+1) / 27 = 4 / 27 = 0.14814.|]
+scoreExplanation (EvaluationScheme CAR [])
+  = Just [hereLit|The total length of expected output (in characters) is 27. There are 4 errors
+(1 word substituted, 1 inserted, 1 deleted)  in the actual output. Hence,
+CER = (2+1+1) / 27 = 4 / 27 = 0.14814 and CAR = 1-CER = 1 - 0.14814 = 0.85186|]
 scoreExplanation (EvaluationScheme Haversine []) = Nothing
 scoreExplanation (EvaluationScheme BIOWeightedF1 [])
   = Just [hereLit|There are two labels (firstname and surname, O is not considered). Firstname was

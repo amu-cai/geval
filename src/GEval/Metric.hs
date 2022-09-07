@@ -47,6 +47,7 @@ data Metric = RMSE | MSE | Pearson | Spearman | BLEU | GLEU | WER | CER | Accura
               | Mean Metric
               | MacroAvg Metric
               | MAEAgainstInterval | MSEAgainstInterval | RMSEAgainstInterval
+              | WAR | CAR
               -- custom metric for PolEval 2022 Abbreviation Ambiguation
               -- to be replaced by a proper metric - weighted average
               | CustomMetric1
@@ -61,6 +62,8 @@ instance Show Metric where
   show GLEU = "GLEU"
   show WER = "WER"
   show CER = "CER"
+  show WAR = "WAR"
+  show CAR = "CAR"
   show (Accuracy ExactMatch) = "Accuracy"
   show (Accuracy FuzzyMatch) = "Fuzzy/" ++ (show $ Accuracy ExactMatch)
   show (Accuracy (CutLabel matchSpec)) = "CutLabel/" ++ (show $ Accuracy matchSpec)
@@ -175,6 +178,8 @@ instance Read Metric where
   readsPrec _ ('G':'L':'E':'U':theRest) = [(GLEU, theRest)]
   readsPrec _ ('W':'E':'R':theRest) = [(WER, theRest)]
   readsPrec _ ('C':'E':'R':theRest) = [(CER, theRest)]
+  readsPrec _ ('W':'A':'R':theRest) = [(WAR, theRest)]
+  readsPrec _ ('C':'A':'R':theRest) = [(CAR, theRest)]
   readsPrec _ ('A':'c':'c':'u':'r':'a':'c':'y':theRest) = [(Accuracy ExactMatch, theRest)]
   readsPrec _ ('C':'l':'i':'p':'p':'E':'U':theRest) = [(ClippEU, theRest)]
   readsPrec _ ('N':'M':'I':theRest) = [(NMI, theRest)]
@@ -251,6 +256,8 @@ getMetricOrdering BLEU     = TheHigherTheBetter
 getMetricOrdering GLEU     = TheHigherTheBetter
 getMetricOrdering WER      = TheLowerTheBetter
 getMetricOrdering CER      = TheLowerTheBetter
+getMetricOrdering WAR      = TheHigherTheBetter
+getMetricOrdering CAR      = TheHigherTheBetter
 getMetricOrdering (Accuracy _) = TheHigherTheBetter
 getMetricOrdering ClippEU  = TheHigherTheBetter
 getMetricOrdering (FMeasure _) = TheHigherTheBetter

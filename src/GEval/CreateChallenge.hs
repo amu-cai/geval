@@ -116,7 +116,8 @@ Do OCR.
 
 This is a sample fake challenge for Gonito framework. Replace it with
 the description of your challenge.|] ++ (commonReadmeMDContents testName)
-
+readmeMDContents WAR testName = readmeMDContents WER testName
+readmeMDContents CAR testName = readmeMDContents CER testName
 readmeMDContents Haversine testName = [i|
 GEval simple sphere distance
 ==========================
@@ -535,6 +536,8 @@ trainContents CER = [hereLit|Hannibal ad portas	train1.pdf
 equo ne credite	train2.pdf
 errare humanum est	train3.pdf
 |]
+trainContents WAR = trainContents WER
+trainContents CAR = trainContents CER
 trainContents Haversine = [hereLit|30.47547	-90.100911	some text
 33.399478	-110.87095	Another text
 |]
@@ -658,6 +661,8 @@ devInContents WER = devInContents BLEU
 devInContents CER = [hereLit|dev1.pdf
 dev2.pdf
 |]
+devInContents WAR = devInContents WER
+devInContents CAR = devInContents CER
 devInContents (Accuracy _) = [hereLit|-8	none	no
 1	mild	no
 |]
@@ -747,6 +752,8 @@ devExpectedContents WER = devExpectedContents BLEU
 devExpectedContents CER = [hereLit|et facta est lux
 Et tu, Brute?
 |]
+devExpectedContents WAR = devExpectedContents WER
+devExpectedContents CAR = devExpectedContents CER
 devExpectedContents (Accuracy _) = [hereLit|N
 Y
 |]
@@ -839,6 +846,8 @@ testInContents WER = testInContents BLEU
 testInContents CER = [hereLit|test1.pdf
 test2.pdf
 |]
+testInContents WAR = testInContents WER
+testInContents CAR = testInContents CER
 testInContents (Accuracy _) = [hereLit|2	mild	yes
 -5	mild	no
 |]
@@ -932,6 +941,8 @@ testExpectedContents CER = [hereLit|esse est percipi
 tabula rasa
 |]
 testExpectedContents WER = testExpectedContents BLEU
+testExpectedContents CAR = testExpectedContents CER
+testExpectedContents WAR = testExpectedContents WER
 testExpectedContents (Accuracy _) = [hereLit|N
 Y
 |]
@@ -1026,6 +1037,8 @@ inHeaderContents GLEU = Nothing
 inHeaderContents BLEU = Nothing
 inHeaderContents WER = Nothing
 inHeaderContents CER = Just ["Filename"]
+inHeaderContents WAR = inHeaderContents WER
+inHeaderContents CAR = inHeaderContents CER
 inHeaderContents (Accuracy _) = Just ["Temperature", "Wind", "Rain"]
 inHeaderContents (FMeasure _) = Just ["seismic",
                                       "seismoacoustic",
@@ -1084,6 +1097,8 @@ outHeaderContents BLEU = Nothing
 outHeaderContents GLEU = Nothing
 outHeaderContents WER = Nothing
 outHeaderContents CER = Just ["OCRedText"]
+outHeaderContents WAR = outHeaderContents WER
+outHeaderContents CAR = outHeaderContents CER
 outHeaderContents (Accuracy _) = Just ["ShouldYouKidForWalk"]
 outHeaderContents (FMeasure _) = Just ["IsSeismicBump"]
 outHeaderContents (MacroFMeasure _) = Just ["LanguageCode"]

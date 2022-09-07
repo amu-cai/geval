@@ -150,6 +150,8 @@ isPreprocessable BLEU     = True
 isPreprocessable GLEU     = True
 isPreprocessable WER      = True
 isPreprocessable CER      = True
+isPreprocessable WAR      = True
+isPreprocessable CAR      = True
 isPreprocessable (Accuracy _) = True
 isPreprocessable ClippEU  = False
 isPreprocessable (FMeasure _) = False
@@ -724,6 +726,20 @@ gevalCoreOnSources (Mean WER)
       intoWords (RawItemTarget t) = expectedParser SAWER t
       intoWords (PartiallyParsedItemTarget ts) = Right $ Prelude.map unpack ts
 
+gevalCoreOnSources (Mean WAR)
+  = gevalCoreWithoutInputOnItemTargets intoWords
+                                       getWords
+                                       ((uncurry errorRate) . (uncurry werStep))
+                                       averageC
+                                       (1.0-)
+                                       noGraph
+    where
+      -- repeated as below, as it will be refactored into dependent types soon anyway
+      getWords (RawItemTarget t) = outputParser SAWAR t
+      getWords (PartiallyParsedItemTarget ts) = Right $ Prelude.map unpack ts
+      intoWords (RawItemTarget t) = expectedParser SAWAR t
+      intoWords (PartiallyParsedItemTarget ts) = Right $ Prelude.map unpack ts
+
 gevalCoreOnSources (Mean CER)
   = gevalCoreWithoutInputOnItemTargets getString
                                        getString
@@ -736,6 +752,17 @@ gevalCoreOnSources (Mean CER)
       getString (RawItemTarget t) = expectedParser SACER t
       getString (PartiallyParsedItemTarget ts) = Right $ Prelude.unwords $ Prelude.map unpack ts
 
+gevalCoreOnSources (Mean CAR)
+  = gevalCoreWithoutInputOnItemTargets getString
+                                       getString
+                                       ((uncurry errorRate) . (uncurry werStep))
+                                       averageC
+                                       (1.0-)
+                                       noGraph
+    where
+      -- repeated as below, as it will be refactored into dependent types soon anyway
+      getString (RawItemTarget t) = expectedParser SACAR t
+      getString (PartiallyParsedItemTarget ts) = Right $ Prelude.unwords $ Prelude.map unpack ts
 
 gevalCoreOnSources (NDCG n)
   = gevalCoreWithoutInputOnItemTargets (liftOp splitByTabs)
@@ -745,7 +772,7 @@ gevalCoreOnSources (NDCG n)
                           id
                           noGraph
 
-gevalCoreOnSources (Mean _) = error $ "Mean/ meta-metric defined only for MultiLabel-F1, WER and CER for the time being"
+gevalCoreOnSources (Mean _) = error $ "Mean/ meta-metric defined only for MultiLabel-F1, WER, CER, WAR and CAR for the time being"
 
 -- only MultiLabel-F1 handled for JSONs for the time being...
 gevalCoreOnSources (MultiLabelFMeasure beta matchingSpec) =
@@ -954,6 +981,12 @@ gevalRunPipeline' parserSpec itemStep finalPipeline context = do
        <*> (ZipSource $ recordSource context parserSpec)) .| CL.map (checkStep (Proxy :: Proxy m) itemStep)) .| CL.catMaybes .| finalPipeline)
 
 
+erContinuation :: Monad m => (Double -> Double) -> ConduitT ((Int, Int)) Void m MetricOutput
+erContinuation finalFun = defineContinuation erAgg erFinal noGraph
+  where erAgg = CC.foldl erFuse (0, 0)
+        erFuse (a1, a2) (b1, b2) = (a1 + b1, a2 + b2)
+        erFinal (errors, ref) = finalFun (errors `errorRate` ref)
+
 
 continueGEvalCalculations :: Monad m => SAMetric t
                             -> Metric
@@ -992,15 +1025,13 @@ continueGEvalCalculations SAGLEU GLEU = defineContinuation gleuAgg gleuFinal noG
         gleuAgg = CC.foldl gleuFuse (0, 0)
         gleuFuse (a1, a2) (b1, b2) = (a1+b1, a2+b2)
 
-continueGEvalCalculations SAWER WER = defineContinuation werAgg werFinal noGraph
-  where werAgg = CC.foldl werFuse (0, 0)
-        werFuse (a1, a2) (b1, b2) = (a1 + b1, a2 + b2)
-        werFinal (errors, ref) = errors `errorRate` ref
+continueGEvalCalculations SAWER WER = erContinuation id
 
-continueGEvalCalculations SACER CER = defineContinuation cerAgg cerFinal noGraph
-  where cerAgg = CC.foldl cerFuse (0, 0)
-        cerFuse (a1, a2) (b1, b2) = (a1 + b1, a2 + b2)
-        cerFinal (errors, ref) = errors `errorRate` ref
+continueGEvalCalculations SACER CER = erContinuation id
+
+continueGEvalCalculations SAWAR WAR = erContinuation (1.0-)
+
+continueGEvalCalculations SACAR CAR = erContinuation (1.0-)
 
 continueGEvalCalculations (SAAccuracy _) (Accuracy _) = defineContinuation averageC id noGraph
 

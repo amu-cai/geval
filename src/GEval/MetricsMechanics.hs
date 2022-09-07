@@ -66,6 +66,7 @@ singletons [d|data AMetric = ARMSE | AMSE | APearson | ASpearman | ABLEU | AGLEU
                              | AFLCFMeasure | AHaversine | AImprovement
                              | AMacroAvg AMetric
                              | AMSEAgainstInterval | ARMSEAgainstInterval | AMAEAgainstInterval
+                             | AWAR | ACAR
                              | ACustomMetric1
                              deriving (Eq)
              |]
@@ -80,6 +81,8 @@ toHelper BLEU = ABLEU
 toHelper GLEU = AGLEU
 toHelper WER = AWER
 toHelper CER = ACER
+toHelper WAR = AWAR
+toHelper CAR = ACAR
 toHelper (Accuracy matchingSpec) = AAccuracy matchingSpec
 toHelper ClippEU = AClippEU
 toHelper (FMeasure _) = AFMeasure
@@ -130,6 +133,8 @@ type family ParsedExpectedType (t :: AMetric) :: * where
   ParsedExpectedType AGLEU     = [[String]]
   ParsedExpectedType AWER      = [String]
   ParsedExpectedType ACER      = String
+  ParsedExpectedType AWAR      = ParsedExpectedType AWER
+  ParsedExpectedType ACAR      = ParsedExpectedType ACER
   ParsedExpectedType (AAccuracy _) = Text
   ParsedExpectedType AClippEU  = [ClippingSpec]
   ParsedExpectedType AFMeasure = Bool
@@ -176,6 +181,8 @@ expectedParser SABLEU = alternativeSentencesParser
 expectedParser SAGLEU = alternativeSentencesParser
 expectedParser SAWER = intoStringWords
 expectedParser SACER = Right . unpack
+expectedParser SAWAR = expectedParser SAWER
+expectedParser SACAR = expectedParser SACER
 expectedParser (SAAccuracy _) = onlyStrip
 expectedParser SAClippEU = controlledParse lineClippingSpecsParser
 expectedParser SAFMeasure = zeroOneParser
@@ -250,6 +257,8 @@ outputParser SABLEU = Right . Prelude.words . unpack
 outputParser SAGLEU = Right . Prelude.words . unpack
 outputParser SAWER = expectedParser SAWER
 outputParser SACER = expectedParser SACER
+outputParser SAWAR = expectedParser SAWAR
+outputParser SACAR = expectedParser SACAR
 outputParser p@(SAAccuracy _) = expectedParser p
 outputParser SAClippEU = controlledParse lineClippingsParser
 outputParser SAFMeasure = probToZeroOneParser
@@ -316,6 +325,8 @@ type family ItemIntermediateRepresentationType (t :: AMetric) :: * where
   ItemIntermediateRepresentationType ACharMatch = (Text, Text)
   ItemIntermediateRepresentationType AWER = (Int, Int)
   ItemIntermediateRepresentationType ACER = (Int, Int)
+  ItemIntermediateRepresentationType AWAR = ItemIntermediateRepresentationType AWER
+  ItemIntermediateRepresentationType ACAR = ItemIntermediateRepresentationType ACER
   ItemIntermediateRepresentationType AHaversine = Double
   ItemIntermediateRepresentationType AImprovement = (Double, Double)
   ItemIntermediateRepresentationType (AMacroAvg m) = (ParsedExpectedType m, ItemIntermediateRepresentationType m)
@@ -338,6 +349,8 @@ itemStep SAGLEU = uncurry gleuStep
 itemStep SAWER = uncurry werStep
 -- strings are character lists, so we could re-use werStep
 itemStep SACER = uncurry werStep
+itemStep SAWAR = itemStep SAWER
+itemStep SACAR = itemStep SACER
 itemStep (SAAccuracy SExactMatch) = hitOrMiss
 itemStep (SAAccuracy smatchSpec) = uncurry (findBest $ getMatchingFunctionForText $ fromSing smatchSpec)
 itemStep SAClippEU = clippEUMatchStep
