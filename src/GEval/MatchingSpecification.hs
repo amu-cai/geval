@@ -6,6 +6,9 @@
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE QuasiQuotes, FlexibleContexts #-}
+{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE StandaloneKindSignatures #-}
+{-# LANGUAGE InstanceSigs #-}
 
 -- | This module is for defining possible "matching specifications",
 -- i.e. the way tokens are matched against one another in metrics such as MultiLabel-F1.
@@ -16,6 +19,7 @@
 module GEval.MatchingSpecification
   where
 
+import Data.Singletons.Base.TH
 import Data.Singletons.TH
 import Data.Text
 import Data.List.Extra (breakOn)

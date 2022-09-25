@@ -67,7 +67,7 @@ import Statistics.Distribution (cumulative)
 import Statistics.Distribution.Normal (normalDistr)
 import Data.Statistics.Kendall (kendall, kendallZ)
 import qualified Data.Vector.Unboxed as DVU
-import qualified Statistics.Matrix.Types as SMT
+--import qualified Statistics.Matrix.Types as SMT
 import Data.Statistics.Loess (loess)
 import Data.Statistics.Calibration (calibration)
 import Data.CartesianStrings (parseCartesianString)

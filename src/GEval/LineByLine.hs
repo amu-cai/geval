@@ -80,7 +80,10 @@ import qualified Data.HashMap.Strict as H
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
 
-import Rainbow (Chunk, (&), magenta, cyan, fore, bold, yellow, brightYellow, red, brightRed, chunk, chunksToByteStrings, byteStringMakerFromEnvironment, byteStringMakerFromHandle, ByteString)
+import Rainbow (Chunk, magenta, cyan, fore, bold, yellow, brightYellow, red, brightRed, chunk, chunksToByteStrings, byteStringMakerFromEnvironment, byteStringMakerFromHandle)
+
+import Data.ByteString
+import Data.Function
 
 data LineRecord = LineRecord Text Text Text Word32 MetricValue
                   deriving (Eq, Show)
@@ -95,7 +98,7 @@ readReferences referencesFilePath = do
   return $ References h
 
 parseReferenceEntry :: Text -> (Integer, Text)
-parseReferenceEntry line = (read $ unpack refId, t)
+parseReferenceEntry line = (read $ Data.Text.unpack refId, t)
   where [refId, t] = splitOn "\t" line
 
 runLineByLine :: ResultOrdering -> Maybe String -> GEvalSpecification -> BlackBoxDebuggingOptions -> IO ()
@@ -121,7 +124,7 @@ runLineByLineWithWorstFeatures ordering featureFilter spec bbdo = do
   let consum = CL.map (recordToBytes maker) .| CC.unlinesAscii .| CC.stdout
   runLineByLineWithWorstFeaturesGeneralized ordering featureFilter spec bbdo consum
 
-recordToBytes :: (Chunk Text -> [ByteString] -> [ByteString]) -> SpanLineRecord -> ByteString
+recordToBytes :: (Chunk -> [ByteString] -> [ByteString]) -> SpanLineRecord -> ByteString
 recordToBytes maker (SpanLineRecord inSpans expSpans outSpans score) =
   (mconcat . Data.List.intersperse "\t") [encodeUtf8 $ formatScore score,
                      lineToBytes maker inSpans,
@@ -132,19 +135,19 @@ recordToBytes maker (SpanLineRecord inSpans expSpans outSpans score) =
         formatScore = Data.Text.pack . printf "%f"
 
 
-lineToBytes :: (Chunk Text -> [ByteString] -> [ByteString]) -> [LineSpan] -> ByteString
+lineToBytes :: (Chunk -> [ByteString] -> [ByteString]) -> [LineSpan] -> ByteString
 lineToBytes maker spans =
   mconcat
   $ chunksToByteStrings maker
   $ Data.List.intersperse (chunk " ")
   $ Prelude.map spanToRainbowChunk $ spans
 
-spanToRainbowChunk :: LineSpan -> Chunk Text
+spanToRainbowChunk :: LineSpan -> Chunk
 spanToRainbowChunk (UnmarkedSpan t) = chunk t
 spanToRainbowChunk (MarkedSpan p t) = markedChunk p c
   where c = chunk t
 
-markedChunk :: Double -> Chunk Text -> Chunk Text
+markedChunk :: Double -> Chunk -> Chunk
 markedChunk pValue c
   | pValue < 0.000000000000001 = bold c & fore brightRed
   | pValue < 0.000000000001 = c & fore red
@@ -186,7 +189,7 @@ runLineByLineWithWorstFeaturesGeneralized :: ResultOrdering
                                             -> ConduitT SpanLineRecord Void (ResourceT IO) r
                                             -> IO r
 runLineByLineWithWorstFeaturesGeneralized ordering featureFilter spec bbdo consum = do
-  hPutStrLn stderr "Looking for worst features..."
+  System.IO.hPutStrLn stderr "Looking for worst features..."
   mInHeader <- readHeaderFileWrapper $ getInHeader spec
   worstFeatures <- runLineByLineGeneralized ordering' spec (\mReferences -> worstFeaturesPipeline False spec bbdo mReferences mInHeader (CL.take 100))
   let worstFeaturesMap = M.fromList
@@ -219,7 +222,7 @@ runFeatureFilter (Just feature) spec bbdo mReferences mInHeader = CC.map (\l -> 
                                                                   .| CC.map fst
   where mTokenizer = gesTokenizer spec
         fakeRank = 0.0
-        checkFeature feature (_, LineWithFactors _ _ fs) = feature `elem` (Prelude.map show fs)
+        checkFeature feature (_, LineWithFactors _ _ fs) = feature `Prelude.elem` (Prelude.map show fs)
 
 runWorstFeatures :: ResultOrdering -> GEvalSpecification -> BlackBoxDebuggingOptions -> IO ()
 runWorstFeatures ordering spec bbdo = do
@@ -271,10 +274,10 @@ data FeatureWithPValue = FeatureWithPValue Feature     -- ^ feature itself
 
 formatFeatureWithPValue :: FeatureWithPValue -> Text
 formatFeatureWithPValue (FeatureWithPValue f p avg c) =
-  Data.Text.intercalate "\t" [pack $ show f,
-                              (pack $ show c),
-                              (pack $ printf "%0.8f" avg),
-                              (pack $ printf "%0.20f" p)]
+  Data.Text.intercalate "\t" [Data.Text.pack $ show f,
+                              (Data.Text.pack $ show c),
+                              (Data.Text.pack $ printf "%0.8f" avg),
+                              (Data.Text.pack $ printf "%0.20f" p)]
 
 rankedFeatureExtractor :: Monad m => GEvalSpecification -> BlackBoxDebuggingOptions -> Maybe References -> Maybe TabularHeader -> ConduitT (Double, LineRecord) RankedFactor m ()
 rankedFeatureExtractor spec bbdo mReferences mInHeader = featureExtractor mTokenizer bbdo mReferences mInHeader

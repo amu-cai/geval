@@ -24,6 +24,9 @@ import qualified Data.ByteString               as B
 import qualified Data.ByteString.Internal      as BI
 import qualified Data.ByteString.Lazy          as BL
 
+import Data.Aeson.KeyMap as DAKM
+import Data.Aeson.Key as DAK
+
 data Selector = Selector [T.Text]
      deriving (Eq, Show)
 
@@ -70,5 +73,5 @@ selectInJson :: Selector -> Maybe Value -> Maybe Value
 selectInJson _ Nothing = Nothing
 selectInJson (Selector []) value = value
 selectInJson (Selector (h:r)) (Just (Object object)) =
-    selectInJson (Selector r) (H.lookup h object)
+    selectInJson (Selector r) (DAKM.lookup (DAK.fromText h) object)
 selectInJson _ _ = Nothing

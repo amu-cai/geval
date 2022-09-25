@@ -7,11 +7,15 @@
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE StandaloneKindSignatures #-}
+{-# LANGUAGE InstanceSigs #-}
 
 module GEval.MetricsMechanics
   where
 
 import Data.Singletons.TH
+import Data.Singletons.Base.TH
 
 import Text.Read (readMaybe)
 

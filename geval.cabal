@@ -69,6 +69,7 @@ library
                      , conduit-combinators
                      , conduit-extra
                      , directory
+                     , dense-linear-algebra
                      , filepath
                      , here
                      , multiset
@@ -96,6 +97,8 @@ library
                      , Glob
                      , naturalcomp
                      , containers
+                     , singletons-base
+                     , singletons-th
                      , statistics
                      , pcre-heavy
                      , pcre-light
