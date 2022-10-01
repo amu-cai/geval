@@ -3,7 +3,7 @@ stages:
   - build
 
 build:
-  image: fpco/stack-build:lts-12.26
+  image: fpco/stack-build:lts-19.25
   stage: build
   script:
     - stack install
