@@ -121,7 +121,7 @@ main = hspec $ do
     it "with tokenization" $
       runGEvalTest "bleu-with-tokenization" `shouldReturnAlmost` 0.6501914150070065
     it "with bootstrap" $
-      runGEvalTest "bleu-complex-bootstrap" `shouldReturnAlmost` 0.7061420723046241
+      runGEvalTest "bleu-complex-bootstrap" `shouldReturnAlmost` 0.607618073110004
   describe "GLEU" $ do
     it "simple example" $
       runGEvalTest "gleu-simple" `shouldReturnAlmost` 0.462962962962963
