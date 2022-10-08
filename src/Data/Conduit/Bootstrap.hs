@@ -14,13 +14,15 @@ import Data.Vector
 import qualified Data.Vector.Generic as VG
 import Data.List (sort)
 
-import System.Random (mkStdGen, randomRs)
+import System.Random.TF (mkTFGen)
+import System.Random (randomRs)
 
 bootstrapC :: Monad m => Int -> ConduitT c Void (ResourceT m) f -> ConduitT c Void (ResourceT m) [f]
 bootstrapC numberOfSamples final = do
   l <- CC.sinkList
   let v = fromList l
-  results <- Prelude.mapM (\i -> (CC.yieldMany (resampleVector (mkStdGen i) v) .| final)) [1..numberOfSamples]
+  results <- Prelude.mapM (\i -> (CC.yieldMany (resampleVector (mkTFGen i) v) .| final)) [1..numberOfSamples]
+
   return results
 
 resampleVector gen v = Prelude.map (\ix -> v VG.! ix) $ Prelude.take n $ randomRs (0, n-1) gen
