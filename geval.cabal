@@ -120,6 +120,7 @@ library
                      , singletons
                      , ordered-containers
                      , random
+                     , tf-random
                      , rainbow
                      , yaml
                      , extra
