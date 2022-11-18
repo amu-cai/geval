@@ -1,4 +1,11 @@
 
+## 1.42.2.0 (2022-11-18)
+
+Changes:
+
+* Switch to Stack LTS 19.25
+* … much faster compilation as a by-product
+
 ## 1.42.1.0 (2022-11-18)
 
 Bug fixes:
