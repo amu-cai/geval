@@ -1,4 +1,10 @@
 
+## 1.42.1.0 (2022-11-18)
+
+Bug fixes:
+
+* Switch to better random number generator for bootstrap sampling
+
 ## 1.42.0.0 (2022-09-08)
 
 Enhancements:
