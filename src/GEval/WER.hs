@@ -1,11 +1,17 @@
 module GEval.WER
-       (werStep, errorRate)
+       (werStep, errorRate, werStepLev)
        where
 
 import Data.Array
 
 werStep :: Eq a => [a] -> [a] -> (Int, Int)
 werStep expected got = (distance expected got, length expected)
+
+
+werStepLev :: Eq a => [a] -> [a] -> (Int, Int)
+werStepLev expected got =
+    (distance expected got, max (length expected) (length got))
+
 
 errorRate :: Int -> Int -> Double
 errorRate 0 0 = 0.0

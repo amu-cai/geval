@@ -26,18 +26,21 @@ import qualified Data.ByteString.UTF8 as BSU
 data EvaluationScheme = EvaluationScheme Metric [PreprocessingOperation]
   deriving (Eq)
 
-data PreprocessingOperation = RegexpMatch Regex
-                              | RegexpTokenMatch Regex
-                              | LowerCasing
-                              | UpperCasing
-                              | CaseFolding
-                              | Sorting
-                              | SetName Text
-                              | SetPriority Int
-                              | RegexpSubstition Regex Text
-                              | FeatureFilter Text
-                              | TopConfidence Double
-  deriving (Eq)
+
+data PreprocessingOperation =
+      RegexpMatch Regex
+    | RegexpTokenMatch Regex
+    | LowerCasing
+    | UpperCasing
+    | CaseFolding
+    | Sorting
+    | SetName Text
+    | SetPriority Int
+    | RegexpSubstition Regex Text
+    | FeatureFilter Text
+    | TopConfidence Double
+    deriving (Eq)
+
 
 leftParameterBracket :: Char
 leftParameterBracket = '<'

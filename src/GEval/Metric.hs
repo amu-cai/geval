@@ -51,85 +51,88 @@ data Metric = RMSE | MSE | Pearson | Spearman | BLEU | GLEU | WER | CER | Accura
               -- custom metric for PolEval 2022 Abbreviation Ambiguation
               -- to be replaced by a proper metric - weighted average
               | CustomMetric1
+              | CustomMetric Text
               deriving (Eq)
 
 instance Show Metric where
-  show RMSE = "RMSE"
-  show MSE  = "MSE"
-  show Pearson = "Pearson"
-  show Spearman = "Spearman"
-  show BLEU = "BLEU"
-  show GLEU = "GLEU"
-  show WER = "WER"
-  show CER = "CER"
-  show WAR = "WAR"
-  show CAR = "CAR"
-  show (Accuracy ExactMatch) = "Accuracy"
-  show (Accuracy FuzzyMatch) = "Fuzzy/" ++ (show $ Accuracy ExactMatch)
-  show (Accuracy (CutLabel matchSpec)) = "CutLabel/" ++ (show $ Accuracy matchSpec)
-  show (Accuracy (SmartMatch matchSpec)) = "Smart/" ++ (show $ Accuracy matchSpec)
-  show (Accuracy (Harden matchSpec)) = "Harden/" ++ (show $ Accuracy matchSpec)
-  show (Accuracy (LenientHarden matchSpec)) = "LenientHarden/" ++ (show $ Accuracy matchSpec)
-  show (Accuracy (Lower matchSpec)) = "Lower/" ++ (show $ Accuracy matchSpec)
-  show (Accuracy (ExtractNumber matchSpec)) = "ExtractNumber/" ++ (show $ Accuracy matchSpec)
-  show ClippEU = "ClippEU"
-  show (FMeasure beta) = "F" ++ (show beta)
-  show (MacroFMeasure beta) = "Macro-F" ++ (show beta)
-  show (SoftFMeasure beta) = "Soft-F" ++ (show beta)
-  show (ProbabilisticMultiLabelFMeasure beta) = "Probabilistic-MultiLabel-F" ++ (show beta)
-  show (ProbabilisticSoftFMeasure beta) = "Probabilistic-Soft-F" ++ (show beta)
-  show (ProbabilisticSoft2DFMeasure beta) = "Probabilistic-Soft2D-F" ++ (show beta)
-  show (Soft2DFMeasure beta) = "Soft2D-F" ++ (show beta)
-  show (FLCFMeasure beta) = "FLC-F" ++ (show beta)
-  show NMI = "NMI"
-  show (LogLossHashed nbOfBits) = "LogLossHashed" ++ (if
-                                                       nbOfBits == defaultLogLossHashedSize
-                                                      then
-                                                       ""
-                                                      else
-                                                       (show nbOfBits))
-  show (LikelihoodHashed nbOfBits) = "LikelihoodHashed" ++ (if
-                                                               nbOfBits == defaultLogLossHashedSize
-                                                            then
-                                                              ""
-                                                            else
-                                                              (show nbOfBits))
-  show (PerplexityHashed nbOfBits) = "PerplexityHashed" ++ (if
-                                                               nbOfBits == defaultLogLossHashedSize
-                                                            then
-                                                              ""
-                                                            else
-                                                              (show nbOfBits))
-  show CharMatch = "CharMatch"
-  show MAP = "MAP"
-  show (NDCG n) = "NDCG@" ++ (show n)
-  show LogLoss = "LogLoss"
-  show Likelihood = "Likelihood"
-  show BIOF1 = "BIO-F1"
-  show BIOF1Labels = "BIO-F1-Labels"
-  show BIOWeightedF1 = "BIO-Weighted-F1"
-  show TokenAccuracy = "TokenAccuracy"
-  show SegmentAccuracy = "SegmentAccuracy"
-  show MAE = "MAE"
-  show SMAPE = "SMAPE"
-  show (MultiLabelFMeasure beta ExactMatch) = "MultiLabel-F" ++ (show beta)
-  show (MultiLabelFMeasure beta FuzzyMatch) = "Fuzzy/" ++ (show $ MultiLabelFMeasure beta ExactMatch)
-  show (MultiLabelFMeasure beta (CutLabel matchSpec)) = "CutLabel/" ++ (show $ MultiLabelFMeasure beta matchSpec)
-  show (MultiLabelFMeasure beta (SmartMatch matchSpec)) = "Smart/" ++ (show $ MultiLabelFMeasure beta matchSpec)
-  show (MultiLabelFMeasure beta (Harden matchSpec)) = "Harden/" ++ (show $ MultiLabelFMeasure beta matchSpec)
-  show (MultiLabelFMeasure beta (LenientHarden matchSpec)) = "LenientHarden/" ++ (show $ MultiLabelFMeasure beta matchSpec)
-  show (MultiLabelFMeasure beta (Lower matchSpec)) = "Lower/" ++ (show $ MultiLabelFMeasure beta matchSpec)
-  show (MultiLabelFMeasure beta (ExtractNumber matchSpec)) = "ExtractNumber/" ++ (show $ MultiLabelFMeasure beta matchSpec)
-  show MultiLabelLogLoss = "MultiLabel-Logloss"
-  show MultiLabelLikelihood = "MultiLabel-Likelihood"
-  show Haversine = "Haversine"
-  show (Improvement threshold) = "Improvement@" ++ (show threshold)
-  show (Mean metric) = "Mean/" ++ (show metric)
-  show (MacroAvg metric) = "MacroAvg/" ++ (show metric)
-  show MAEAgainstInterval = "MAE-Against-Interval"
-  show MSEAgainstInterval = "MSE-Against-Interval"
-  show RMSEAgainstInterval = "RMSE-Against-Interval"
-  show CustomMetric1 = "CustomMetric1"
+    show RMSE = "RMSE"
+    show MSE  = "MSE"
+    show Pearson = "Pearson"
+    show Spearman = "Spearman"
+    show BLEU = "BLEU"
+    show GLEU = "GLEU"
+    show WER = "WER"
+    show CER = "CER"
+    show WAR = "WAR"
+    show CAR = "CAR"
+    show (Accuracy ExactMatch) = "Accuracy"
+    show (Accuracy FuzzyMatch) = "Fuzzy/" ++ show (Accuracy ExactMatch)
+    show (Accuracy (CutLabel matchSpec)) = "CutLabel/" ++ show (Accuracy matchSpec)
+    show (Accuracy (SmartMatch matchSpec)) = "Smart/" ++ show (Accuracy matchSpec)
+    show (Accuracy (Harden matchSpec)) = "Harden/" ++ show (Accuracy matchSpec)
+    show (Accuracy (LenientHarden matchSpec)) = "LenientHarden/" ++ show (Accuracy matchSpec)
+    show (Accuracy (Lower matchSpec)) = "Lower/" ++ show (Accuracy matchSpec)
+    show (Accuracy (ExtractNumber matchSpec)) = "ExtractNumber/" ++ show (Accuracy matchSpec)
+    show ClippEU = "ClippEU"
+    show (FMeasure beta) = "F" ++ show beta
+    show (MacroFMeasure beta) = "Macro-F" ++ show beta
+    show (SoftFMeasure beta) = "Soft-F" ++ show beta
+    show (ProbabilisticMultiLabelFMeasure beta) = "Probabilistic-MultiLabel-F" ++ show beta
+    show (ProbabilisticSoftFMeasure beta) = "Probabilistic-Soft-F" ++ show beta
+    show (ProbabilisticSoft2DFMeasure beta) = "Probabilistic-Soft2D-F" ++ show beta
+    show (Soft2DFMeasure beta) = "Soft2D-F" ++ show beta
+    show (FLCFMeasure beta) = "FLC-F" ++ show beta
+    show NMI = "NMI"
+    show (LogLossHashed nbOfBits) = "LogLossHashed" ++
+        (
+            if nbOfBits == defaultLogLossHashedSize
+                then ""
+                else show nbOfBits
+        )
+    show (LikelihoodHashed nbOfBits) = "LikelihoodHashed" ++
+        (
+            if nbOfBits == defaultLogLossHashedSize
+                then ""
+                else show nbOfBits
+        )
+    show (PerplexityHashed nbOfBits) = "PerplexityHashed" ++
+        (
+            if nbOfBits == defaultLogLossHashedSize
+                then ""
+                else show nbOfBits
+        )
+    show CharMatch = "CharMatch"
+    show MAP = "MAP"
+    show (NDCG n) = "NDCG@" ++ show n
+    show LogLoss = "LogLoss"
+    show Likelihood = "Likelihood"
+    show BIOF1 = "BIO-F1"
+    show BIOF1Labels = "BIO-F1-Labels"
+    show BIOWeightedF1 = "BIO-Weighted-F1"
+    show TokenAccuracy = "TokenAccuracy"
+    show SegmentAccuracy = "SegmentAccuracy"
+    show MAE = "MAE"
+    show SMAPE = "SMAPE"
+    show (MultiLabelFMeasure beta ExactMatch) = "MultiLabel-F" ++ show beta
+    show (MultiLabelFMeasure beta FuzzyMatch) = "Fuzzy/" ++ show (MultiLabelFMeasure beta ExactMatch)
+    show (MultiLabelFMeasure beta (CutLabel matchSpec)) = "CutLabel/" ++ show (MultiLabelFMeasure beta matchSpec)
+    show (MultiLabelFMeasure beta (SmartMatch matchSpec)) = "Smart/" ++ show (MultiLabelFMeasure beta matchSpec)
+    show (MultiLabelFMeasure beta (Harden matchSpec)) = "Harden/" ++ show (MultiLabelFMeasure beta matchSpec)
+    show (MultiLabelFMeasure beta (LenientHarden matchSpec)) = "LenientHarden/" ++ show (MultiLabelFMeasure beta matchSpec)
+    show (MultiLabelFMeasure beta (Lower matchSpec)) = "Lower/" ++ show (MultiLabelFMeasure beta matchSpec)
+    show (MultiLabelFMeasure beta (ExtractNumber matchSpec)) = "ExtractNumber/" ++ show (MultiLabelFMeasure beta matchSpec)
+    show MultiLabelLogLoss = "MultiLabel-Logloss"
+    show MultiLabelLikelihood = "MultiLabel-Likelihood"
+    show Haversine = "Haversine"
+    show (Improvement threshold) = "Improvement@" ++ show threshold
+    show (Mean metric) = "Mean/" ++ show metric
+    show (MacroAvg metric) = "MacroAvg/" ++ show metric
+    show MAEAgainstInterval = "MAE-Against-Interval"
+    show MSEAgainstInterval = "MSE-Against-Interval"
+    show RMSEAgainstInterval = "RMSE-Against-Interval"
+    show CustomMetric1 = "CustomMetric1"
+    show (CustomMetric text) = "CustomMetric" ++ unpack text
+
 
 applyMatchingSpecification :: (MatchingSpecification -> MatchingSpecification)
                            -> Metric
@@ -138,7 +141,7 @@ applyMatchingSpecification fun (MultiLabelFMeasure beta matchSpec)
   = MultiLabelFMeasure beta (fun matchSpec)
 applyMatchingSpecification fun (Accuracy matchSpec)
   = Accuracy (fun matchSpec)
-applyMatchingSpecification _ metric = error $ "Matching specification cannot be applied to the " ++ (show metric) ++ " metric"
+applyMatchingSpecification _ metric = error $ "Matching specification cannot be applied to the " ++ show metric ++ " metric"
 
 instance Read Metric where
   readsPrec p ('M':'e':'a':'n':'/':theRest) = case readsPrec p theRest of
@@ -237,10 +240,15 @@ instance Read Metric where
   readsPrec _ ('M':'u':'l':'t':'i':'L':'a':'b':'e':'l':'-':'L':'o':'g':'L':'o':'s':'s':theRest) = [(MultiLabelLogLoss, theRest)]
   readsPrec _ ('M':'u':'l':'t':'i':'L':'a':'b':'e':'l':'-':'L':'i':'k':'e':'l':'i':'h':'o':'o':'d':theRest) = [(MultiLabelLikelihood, theRest)]
   readsPrec _ ('H':'a':'v':'e':'r':'s':'i':'n':'e':theRest) = [(Haversine, theRest)]
-  readsPrec p ('I':'m':'p':'r':'o':'v':'e':'m':'e':'n':'t':'@':theRest) = case readsPrec p theRest of
-    [(threshold, theRest')] -> [(Improvement threshold, theRest')]
-    _ -> []
+  readsPrec p ('I':'m':'p':'r':'o':'v':'e':'m':'e':'n':'t':'@':theRest) =
+      case readsPrec p theRest of
+          [(threshold, theRest')] -> [(Improvement threshold, theRest')]
+          _ -> []
   readsPrec _ ('C':'u':'s':'t':'o':'m':'M':'e':'t':'r':'i':'c':'1':theRest) = [(CustomMetric1, theRest)]
+  readsPrec p ('C':'u':'s':'t':'o':'m':'M':'e':'t':'r':'i':'c':theRest) =
+      case readsPrec p theRest of
+          [(metricName, theRest')] ->  [(CustomMetric metricName, theRest')]
+          _ -> []
   readsPrec _ t = throw $ UnknownMetric t
 
 
@@ -295,6 +303,7 @@ getMetricOrdering MAEAgainstInterval = TheLowerTheBetter
 getMetricOrdering CustomMetric1 = TheHigherTheBetter
 getMetricOrdering (Mean metric) = getMetricOrdering metric
 getMetricOrdering (MacroAvg metric) = getMetricOrdering metric
+getMetricOrdering (CustomMetric _) = TheHigherTheBetter
 
 metricCompare :: Metric -> MetricValue -> MetricValue -> Ordering
 metricCompare metric a b = metricCompare' (getMetricOrdering metric) a b
