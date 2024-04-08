@@ -49,12 +49,15 @@ rightParameterBracket :: Char
 rightParameterBracket = '>'
 
 instance Read EvaluationScheme where
-  readsPrec _ s = [(EvaluationScheme metric ops, theRest)]
-    where (metricS, opS) = break (== ':') s
-          metric = read metricS
-          (ops, theRest) = case opS of
-            "" -> ([], "")
-            (_:opS') -> readOps opS'
+    readsPrec _ s = [(EvaluationScheme metric ops, theRest)]
+        where
+            (metricS, opS) = break (== ':') s
+            metric = read metricS
+            (ops, theRest) = 
+                case opS of
+                    "" -> ([], "")
+                    (_:opS') -> readOps opS'
+
 
 readOps :: String -> ([PreprocessingOperation], String)
 readOps ('l':theRest) = (LowerCasing:ops, theRest')
