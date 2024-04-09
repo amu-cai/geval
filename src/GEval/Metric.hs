@@ -245,7 +245,7 @@ instance Read Metric where
           [(threshold, theRest')] -> [(Improvement threshold, theRest')]
           _ -> []
   readsPrec _ ('C':'u':'s':'t':'o':'m':'M':'e':'t':'r':'i':'c':'1':theRest) = [(CustomMetric1, theRest)]
-  readsPrec p ('C':'u':'s':'t':'o':'m':'M':'e':'t':'r':'i':'c':'@':theRest) =
+  readsPrec p ('C':'u':'s':'t':'o':'m':'M':'e':'t':'r':'i':'c':'%':theRest) =
       case readsPrec p theRest of
           [(metricName, theRest')] ->  [(CustomMetric metricName, theRest')]
           _ -> []
