@@ -102,6 +102,7 @@ import GEval.BlackBoxDebugging
 import Data.Conduit.Bootstrap
 import GEval.DataSource
 import GEval.MatchingSpecification
+import GEval.TextF1
 import Data.NDCG
 
 import qualified Data.HashMap.Strict as M
@@ -188,6 +189,7 @@ isPreprocessable (Mean metric) = isPreprocessable metric
 isPreprocessable Haversine = False
 isPreprocessable (Improvement _) = False
 isPreprocessable CustomMetric1 = True
+isPreprocessable PolevalTextF1 = True
 isPreprocessable (MacroAvg metric) = isPreprocessable metric
 
 isInputModifiable :: Metric -> Bool
@@ -693,6 +695,13 @@ gevalCoreOnSources CharMatch = helper
    step (ParsedRecordWithInput inp exp out) = getCharMatchCount inp exp out
    justUnpack = liftOp (Right . unpack)
 
+gevalCoreOnSources PolevalTextF1 = helper
+    where
+        helper lsSpec = do
+            gevalCoreGeneralized (ParserSpecWithInput justUnpack justUnpack justUnpack) step polevalAgg f1TextPoleval noGraph (fromSpecificationToWithInput lsSpec)
+        step (ParsedRecordWithInput inp exp out) = getTextF1SingleLine inp exp out
+        justUnpack = liftOp (Right . unpack)
+
 gevalCoreOnSources (LogLossHashed nbOfBits) = helperLogLossHashed nbOfBits id
 gevalCoreOnSources (LikelihoodHashed nbOfBits) = helperLogLossHashed nbOfBits logLossToLikehood
 gevalCoreOnSources (PerplexityHashed nbOfBits) = helperLogLossHashed nbOfBits logLossToPerplexity
@@ -1036,6 +1045,8 @@ continueGEvalCalculations SACAR CAR = erContinuation (1.0-)
 continueGEvalCalculations (SAAccuracy _) (Accuracy _) = defineContinuation averageC id noGraph
 
 continueGEvalCalculations SACustomMetric1 CustomMetric1 = defineContinuation averageC id noGraph
+
+continueGEvalCalculations SAPolevalTextF1 PolevalTextF1 = defineContinuation averageC id noGraph
 
 continueGEvalCalculations SAFMeasure (FMeasure beta) = defineContinuation countAgg (fMeasureOnCounts beta) noGraph
 

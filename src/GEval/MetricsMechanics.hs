@@ -72,6 +72,8 @@ singletons [d|data AMetric = ARMSE | AMSE | APearson | ASpearman | ABLEU | AGLEU
                              | AMSEAgainstInterval | ARMSEAgainstInterval | AMAEAgainstInterval
                              | AWAR | ACAR
                              | ACustomMetric1
+                             | APolevalTextF1
+                             | APolevalSentenceF1
                              deriving (Eq)
              |]
 
@@ -121,6 +123,7 @@ toHelper MSEAgainstInterval = AMSEAgainstInterval
 toHelper RMSEAgainstInterval = ARMSEAgainstInterval
 toHelper MAEAgainstInterval = AMAEAgainstInterval
 toHelper CustomMetric1 = ACustomMetric1
+toHelper PolevalTextF1 = APolevalTextF1
 toHelper (Improvement _) = AImprovement
 toHelper (MacroAvg m) = AMacroAvg (toHelper m)
 
@@ -174,6 +177,7 @@ type family ParsedExpectedType (t :: AMetric) :: * where
   ParsedExpectedType AMAEAgainstInterval = (Double, Double)
   ParsedExpectedType AImprovement = Double
   ParsedExpectedType ACustomMetric1 = (Text, Text)
+  ParsedExpectedType APolevalTextF1 = Text
   ParsedExpectedType (AMacroAvg m) = ParsedExpectedType m
 
 expectedParser :: SAMetric t -> Text -> Either String (ParsedExpectedType t)
