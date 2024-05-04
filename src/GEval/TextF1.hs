@@ -86,17 +86,17 @@ getSentenceF1SingleLine input expected output
 
 countPolevalAgg :: AggregatedResult -> [Int] -> AggregatedResult
 countPolevalAgg agg xs = AggregatedResult
-    { col0  = (take (xs !! 0) oldCol0) ++ [(succ (oldCol0 !! (xs !! 0)))] ++ (drop (succ (xs !! 0)) oldCol0)
-    , col1  = (take (xs !! 1) oldCol1) ++ [(succ (oldCol1 !! (xs !! 1)))] ++ (drop (succ (xs !! 1)) oldCol1)
-    , col2  = (take (xs !! 2) oldCol2) ++ [(succ (oldCol2 !! (xs !! 2)))] ++ (drop (succ (xs !! 2)) oldCol2)
-    , col3  = (take (xs !! 3) oldCol3) ++ [(succ (oldCol3 !! (xs !! 3)))] ++ (drop (succ (xs !! 3)) oldCol3)
-    , col4  = (take (xs !! 4) oldCol4) ++ [(succ (oldCol4 !! (xs !! 4)))] ++ (drop (succ (xs !! 4)) oldCol4)
-    , col5  = (take (xs !! 5) oldCol5) ++ [(succ (oldCol5 !! (xs !! 5)))] ++ (drop (succ (xs !! 5)) oldCol5)
-    , col6  = (take (xs !! 6) oldCol6) ++ [(succ (oldCol6 !! (xs !! 6)))] ++ (drop (succ (xs !! 6)) oldCol6)
-    , col7  = (take (xs !! 7) oldCol7) ++ [(succ (oldCol7 !! (xs !! 7)))] ++ (drop (succ (xs !! 7)) oldCol7)
-    , col8  = (take (xs !! 8) oldCol8) ++ [(succ (oldCol8 !! (xs !! 8)))] ++ (drop (succ (xs !! 8)) oldCol8)
-    , col9  = (take (xs !! 9) oldCol9) ++ [(succ (oldCol9 !! (xs !! 9)))] ++ (drop (succ (xs !! 9)) oldCol9)
-    , col10 = (take (xs !! 10) oldCol10) ++ [(succ (oldCol10 !! (xs !! 10)))] ++ (drop (succ (xs !! 10)) oldCol10)
+    { col0  = take (xs !! 0) oldCol0 ++ [succ (oldCol0 !! (xs !! 0))] ++ drop (succ (xs !! 0)) oldCol0
+    , col1  = take (xs !! 1) oldCol1 ++ [succ (oldCol1 !! (xs !! 1))] ++ drop (succ (xs !! 1)) oldCol1
+    , col2  = take (xs !! 2) oldCol2 ++ [succ (oldCol2 !! (xs !! 2))] ++ drop (succ (xs !! 2)) oldCol2
+    , col3  = take (xs !! 3) oldCol3 ++ [succ (oldCol3 !! (xs !! 3))] ++ drop (succ (xs !! 3)) oldCol3
+    , col4  = take (xs !! 4) oldCol4 ++ [succ (oldCol4 !! (xs !! 4))] ++ drop (succ (xs !! 4)) oldCol4
+    , col5  = take (xs !! 5) oldCol5 ++ [succ (oldCol5 !! (xs !! 5))] ++ drop (succ (xs !! 5)) oldCol5
+    , col6  = take (xs !! 6) oldCol6 ++ [succ (oldCol6 !! (xs !! 6))] ++ drop (succ (xs !! 6)) oldCol6
+    , col7  = take (xs !! 7) oldCol7 ++ [succ (oldCol7 !! (xs !! 7))] ++ drop (succ (xs !! 7)) oldCol7
+    , col8  = take (xs !! 8) oldCol8 ++ [succ (oldCol8 !! (xs !! 8))] ++ drop (succ (xs !! 8)) oldCol8
+    , col9  = take (xs !! 9) oldCol9 ++ [succ (oldCol9 !! (xs !! 9))] ++ drop (succ (xs !! 9)) oldCol9
+    , col10 = take (xs !! 10) oldCol10 ++ [succ (oldCol10 !! (xs !! 10))] ++ drop (succ (xs !! 10)) oldCol10
     }
     where
         oldCol0  = col0 agg
