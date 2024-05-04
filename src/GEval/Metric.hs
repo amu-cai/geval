@@ -301,6 +301,7 @@ getMetricOrdering RMSEAgainstInterval = TheLowerTheBetter
 getMetricOrdering MAEAgainstInterval = TheLowerTheBetter
 getMetricOrdering CustomMetric1 = TheHigherTheBetter
 getMetricOrdering PolevalTextF1 = TheHigherTheBetter
+getMetricOrdering PolevalSentenceF1 = TheHigherTheBetter
 getMetricOrdering (Mean metric) = getMetricOrdering metric
 getMetricOrdering (MacroAvg metric) = getMetricOrdering metric
 

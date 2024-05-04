@@ -2,15 +2,16 @@ module GEval.TextF1
     ( AggregatedResult
     , aggregatedResultZero
     , getTextF1SingleLine
+    , getSentenceF1SingleLine
     , polevalAgg
     , f1TextPoleval
     ) where
 
 
-import GHC.Float (int2Double)
-import Data.List.Split (splitOn)
-import Data.Conduit.Combinators (foldl)
-import Data.Conduit (ConduitM)
+import           Data.Conduit             (ConduitM)
+import           Data.Conduit.Combinators (foldl)
+import           Data.List.Split          (splitOn)
+import           GHC.Float                (int2Double)
 
 
 data AggregatedResult = AggregatedResult
@@ -72,6 +73,17 @@ getTextF1SingleLine input expected output
         result = [score x | x <- zipped]
 
 
+getSentenceF1SingleLine :: String -> String -> String -> [Int]
+getSentenceF1SingleLine input expected output
+    | input == "###########################" = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+    | otherwise = result
+    where
+        expectedList = splitOn "\t" expected
+        outputList = splitOn "\t" output
+        zipped = zip expectedList outputList
+        result = [score x | x <- zipped]
+
+
 countPolevalAgg :: AggregatedResult -> [Int] -> AggregatedResult
 countPolevalAgg agg xs = AggregatedResult
     { col0  = (take (xs !! 0) oldCol0) ++ [(succ (oldCol0 !! (xs !! 0)))] ++ (drop (succ (xs !! 0)) oldCol0)
@@ -126,4 +138,4 @@ f1TextPoleval aggResult = sumAll / 11
                 tpCol = int2Double $ col !! 1
                 fpCol = int2Double $ col !! 3
                 fnCol = int2Double $ col !! 4
-                        
+

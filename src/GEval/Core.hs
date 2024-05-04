@@ -190,6 +190,7 @@ isPreprocessable Haversine = False
 isPreprocessable (Improvement _) = False
 isPreprocessable CustomMetric1 = True
 isPreprocessable PolevalTextF1 = True
+isPreprocessable PolevalSentenceF1 = True
 isPreprocessable (MacroAvg metric) = isPreprocessable metric
 
 isInputModifiable :: Metric -> Bool
@@ -695,12 +696,22 @@ gevalCoreOnSources CharMatch = helper
    step (ParsedRecordWithInput inp exp out) = getCharMatchCount inp exp out
    justUnpack = liftOp (Right . unpack)
 
+--------------------------------------------------------------------------------
+-- PolEval metrics
 gevalCoreOnSources PolevalTextF1 = helper
     where
         helper lsSpec = do
             gevalCoreGeneralized (ParserSpecWithInput justUnpack justUnpack justUnpack) step polevalAgg f1TextPoleval noGraph (fromSpecificationToWithInput lsSpec)
         step (ParsedRecordWithInput inp exp out) = getTextF1SingleLine inp exp out
         justUnpack = liftOp (Right . unpack)
+
+gevalCoreOnSources PolevalSentenceF1 = helper
+    where
+        helper lsSpec = do
+            gevalCoreGeneralized (ParserSpecWithInput justUnpack justUnpack justUnpack) step polevalAgg f1TextPoleval noGraph (fromSpecificationToWithInput lsSpec)
+        step (ParsedRecordWithInput inp exp out) = getSentenceF1SingleLine inp exp out
+        justUnpack = liftOp (Right . unpack)
+--------------------------------------------------------------------------------
 
 gevalCoreOnSources (LogLossHashed nbOfBits) = helperLogLossHashed nbOfBits id
 gevalCoreOnSources (LikelihoodHashed nbOfBits) = helperLogLossHashed nbOfBits logLossToLikehood
@@ -1047,6 +1058,7 @@ continueGEvalCalculations (SAAccuracy _) (Accuracy _) = defineContinuation avera
 continueGEvalCalculations SACustomMetric1 CustomMetric1 = defineContinuation averageC id noGraph
 
 continueGEvalCalculations SAPolevalTextF1 PolevalTextF1 = defineContinuation averageC id noGraph
+continueGEvalCalculations SAPolevalSentenceF1 PolevalSentenceF1 = defineContinuation averageC id noGraph
 
 continueGEvalCalculations SAFMeasure (FMeasure beta) = defineContinuation countAgg (fMeasureOnCounts beta) noGraph
 
