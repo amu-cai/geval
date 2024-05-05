@@ -228,6 +228,8 @@ expectedParser SARMSEAgainstInterval = parseInterval
 expectedParser SAMAEAgainstInterval = parseInterval
 expectedParser SAImprovement = doubleParser
 expectedParser SACustomMetric1 = pairParser
+expectedParser SAPolevalTextF1 = Right
+expectedParser SAPolevalSentenceF1 = Right
 expectedParser (SAMacroAvg m) = expectedParser m
 
 pairParser :: Text -> Either String (Text, Text)
@@ -304,6 +306,8 @@ outputParser SARMSEAgainstInterval = doubleParser
 outputParser SAMAEAgainstInterval = doubleParser
 outputParser SAImprovement = doubleParser
 outputParser SACustomMetric1 = pairParser
+outputParser SAPolevalTextF1 = Right
+outputParser SAPolevalSentenceF1 = Right
 outputParser (SAMacroAvg m) = outputParser m
 
 type family ItemIntermediateRepresentationType (t :: AMetric) :: * where
@@ -396,6 +400,8 @@ itemStep SAMSEAgainstInterval = squaredErrorAgainstInterval
 itemStep SARMSEAgainstInterval = squaredErrorAgainstInterval
 itemStep SAMAEAgainstInterval = absoluteErrorAgainstInterval
 itemStep SACustomMetric1 = customMetric1
+--itemStep SAPolevalTextF1 = id
+--itemStep SAPolevalSentenceF1 = id
 itemStep (SAMacroAvg m) = repack m
 
 customMetric1 :: ((Text, Text), (Text, Text)) -> Double

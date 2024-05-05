@@ -133,6 +133,8 @@ isBetter metric valA valB = isBetter' metricOrdering valA valB
 
 isInputNeeded :: EvaluationScheme -> Bool
 isInputNeeded (EvaluationScheme CharMatch _) = True
+isInputNeeded (EvaluationScheme PolevalTextF1 _) = True
+isInputNeeded (EvaluationScheme PolevalSentenceF1 _) = True
 isInputNeeded (EvaluationScheme _ ops) = hasFiltering ops
 
 hasFiltering :: [PreprocessingOperation] -> Bool
@@ -195,6 +197,8 @@ isPreprocessable (MacroAvg metric) = isPreprocessable metric
 
 isInputModifiable :: Metric -> Bool
 isInputModifiable CharMatch = True
+isInputModifiable PolevalTextF1 = True
+isInputModifiable PolevalSentenceF1 = True
 isInputModifiable _ = False
 
 defaultOutDirectory :: FilePath
