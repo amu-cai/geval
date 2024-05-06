@@ -38,6 +38,7 @@ library
                      , GEval.Submit
                      , GEval.Validation
                      , GEval.PolevalEmotionRecognition
+                     , GEval.PolevalQuestionAnswering
                      , Data.Conduit.AutoDecompress
                      , Data.Conduit.SmartSource
                      , Data.Conduit.Rank

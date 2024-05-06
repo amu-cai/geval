@@ -2,6 +2,7 @@ module GEval.PolevalQuestionAnswering
     () where
 
 
+import           Data.Array
 import           Data.Conduit             (ConduitM)
 import           Data.Conduit.Combinators (foldl)
 import           Data.List.Split          (splitOn)
@@ -21,17 +22,17 @@ aggregatedResultZero = AggregatedResult
     }
 
 
-getNLevenshteinSingleLine :: String -> String -> (Bolean, Double)
+getNLevenshteinSingleLine :: String -> String -> (Bool, Double)
 getNLevenshteinSingleLine expected output
     | expected == "" = (False, 0.0)
     | otherwise = (True, metricValue)
     where
-        maxLength = maximum [length expected, length output]
-        metricvalue = 1 - ((distance expected output) / maxLength)
+        maxLength = int2Double $ maximum [length expected, length output]
+        metricValue = 1.0 - ((distance expected output) / maxLength)
 
 
-distance :: Eq e => [e] -> [e] -> Int
-distance u v = memo ! (m, n)
+distance :: Eq e => [e] -> [e] -> Double
+distance u v = int2Double $ memo ! (m, n)
    where memo = listArray ((0, 0), (m, n)) [dist i j | i <- [0..m], j <- [0..n]]
 
          dist 0 j = j
@@ -48,15 +49,15 @@ distance u v = memo ! (m, n)
          n = length v
 
 
-polevalQACond :: Monad m => ConduitM (Bolean, Double) o m AggregatedResult
-polevalQACond = Data.Conduit.Combinators.foldl countPolevalAgg aggregatedResultZero
+polevalQACond :: Monad m => ConduitM (Bool, Double) o m AggregatedResult
+polevalQACond = Data.Conduit.Combinators.foldl polevalQACount aggregatedResultZero
 
 
-polevalQACount :: AggregatedResult -> (Bolean, Double) -> AggregatedResult
+polevalQACount :: AggregatedResult -> (Bool, Double) -> AggregatedResult
 polevalQACount agg (cond, num)
     | cond = AggregatedResult
         { sumAgg = newSum
-        , avgAgg = newSum / newNLines
+        , avgAgg = newSum / (int2Double newNLines)
         , nLines = newNLines
         }
     | otherwise = agg
