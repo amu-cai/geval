@@ -102,7 +102,7 @@ import GEval.BlackBoxDebugging
 import Data.Conduit.Bootstrap
 import GEval.DataSource
 import GEval.MatchingSpecification
-import GEval.TextF1
+import GEval.PolevalEmotionRecognition
 import Data.NDCG
 
 import qualified Data.HashMap.Strict as M
@@ -135,6 +135,7 @@ isInputNeeded :: EvaluationScheme -> Bool
 isInputNeeded (EvaluationScheme CharMatch _) = True
 isInputNeeded (EvaluationScheme PolevalTextF1 _) = True
 isInputNeeded (EvaluationScheme PolevalSentenceF1 _) = True
+isInputNeeded (EvaluationScheme PolevalFinalF1 _) = True
 isInputNeeded (EvaluationScheme _ ops) = hasFiltering ops
 
 hasFiltering :: [PreprocessingOperation] -> Bool
@@ -193,12 +194,14 @@ isPreprocessable (Improvement _) = False
 isPreprocessable CustomMetric1 = True
 isPreprocessable PolevalTextF1 = True
 isPreprocessable PolevalSentenceF1 = True
+isPreprocessable PolevalFinalF1 = True
 isPreprocessable (MacroAvg metric) = isPreprocessable metric
 
 isInputModifiable :: Metric -> Bool
 isInputModifiable CharMatch = True
 isInputModifiable PolevalTextF1 = True
 isInputModifiable PolevalSentenceF1 = True
+isInputModifiable PolevalFinalF1 = True
 isInputModifiable _ = False
 
 defaultOutDirectory :: FilePath
@@ -715,6 +718,23 @@ gevalCoreOnSources PolevalSentenceF1 = helper
             gevalCoreGeneralized (ParserSpecWithInput justUnpack justUnpack justUnpack) step polevalAgg f1TextPoleval noGraph (fromSpecificationToWithInput lsSpec)
         step (ParsedRecordWithInput inp exp out) = getSentenceF1SingleLine inp exp out
         justUnpack = liftOp (Right . unpack)
+
+gevalCoreOnSources PolevalFinalF1 = helper
+    where
+        justUnpack = liftOp (Right . unpack)
+
+        sentenceStep (ParsedRecordWithInput inp exp out) = getSentenceF1SingleLine inp exp out
+        sentenceHelper lsSpec = do
+            gevalCoreGeneralized (ParserSpecWithInput justUnpack justUnpack justUnpack) sentenceStep polevalAgg f1TextPoleval noGraph (fromSpecificationToWithInput lsSpec)
+
+        textHelper lsSpec = do
+            gevalCoreGeneralized (ParserSpecWithInput justUnpack justUnpack justUnpack) textStep polevalAgg f1TextPoleval noGraph (fromSpecificationToWithInput lsSpec)
+        textStep (ParsedRecordWithInput inp exp out) = getTextF1SingleLine inp exp out
+
+        helper lsSpec = do
+            sentenceVal <- (extractSimpleRunValue . getMetricValue) <$> (sentenceHelper lsSpec)
+            textVal <- (extractSimpleRunValue . getMetricValue) <$> (textHelper lsSpec)
+            pure $ MetricOutput (SimpleRun $ (sentenceVal + textVal) / 2.0) Nothing
 --------------------------------------------------------------------------------
 
 gevalCoreOnSources (LogLossHashed nbOfBits) = helperLogLossHashed nbOfBits id
@@ -1063,6 +1083,7 @@ continueGEvalCalculations SACustomMetric1 CustomMetric1 = defineContinuation ave
 
 continueGEvalCalculations SAPolevalTextF1 PolevalTextF1 = defineContinuation averageC id noGraph
 continueGEvalCalculations SAPolevalSentenceF1 PolevalSentenceF1 = defineContinuation averageC id noGraph
+continueGEvalCalculations SAPolevalFinalF1 PolevalFinalF1 = defineContinuation averageC id noGraph
 
 continueGEvalCalculations SAFMeasure (FMeasure beta) = defineContinuation countAgg (fMeasureOnCounts beta) noGraph
 

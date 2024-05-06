@@ -37,7 +37,7 @@ library
                      , GEval.ProbList
                      , GEval.Submit
                      , GEval.Validation
-                     , GEval.TextF1
+                     , GEval.PolevalEmotionRecognition
                      , Data.Conduit.AutoDecompress
                      , Data.Conduit.SmartSource
                      , Data.Conduit.Rank

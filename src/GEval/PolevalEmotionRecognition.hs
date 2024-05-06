@@ -1,4 +1,4 @@
-module GEval.TextF1
+module GEval.PolevalEmotionRecognition
     ( AggregatedResult
     , aggregatedResultZero
     , getTextF1SingleLine
@@ -116,7 +116,9 @@ polevalAgg :: Monad m => ConduitM [Int] o m AggregatedResult
 polevalAgg = Data.Conduit.Combinators.foldl countPolevalAgg aggregatedResultZero
 
 f1TextPoleval :: AggregatedResult -> Double
-f1TextPoleval aggResult = sumAll / 11
+f1TextPoleval aggResult 
+    | any (/= 0) allNoParse = 0.0
+    | otherwise = sumAll / 11
     where
         f1Col0 = getF1Col $ col0 aggResult
         f1Col1 = getF1Col $ col1 aggResult
@@ -139,3 +141,15 @@ f1TextPoleval aggResult = sumAll / 11
                 fpCol = int2Double $ col !! 3
                 fnCol = int2Double $ col !! 4
 
+        noParse0 = head $ reverse $ col0 aggResult
+        noParse1 = head $ reverse $ col1 aggResult
+        noParse2 = head $ reverse $ col2 aggResult
+        noParse3 = head $ reverse $ col3 aggResult
+        noParse4 = head $ reverse $ col4 aggResult
+        noParse5 = head $ reverse $ col5 aggResult
+        noParse6 = head $ reverse $ col6 aggResult
+        noParse7 = head $ reverse $ col7 aggResult
+        noParse8 = head $ reverse $ col8 aggResult
+        noParse9 = head $ reverse $ col9 aggResult
+        noParse10 = head $ reverse $ col10 aggResult
+        allNoParse = [noParse0, noParse1, noParse2, noParse3, noParse4, noParse5, noParse6, noParse7, noParse8, noParse9, noParse10]
