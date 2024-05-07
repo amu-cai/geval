@@ -1,5 +1,8 @@
 module GEval.PolevalQuestionAnswering
-    () where
+    ( polevalQACond
+    , nLevenshteinPoleval
+    , getNLevenshteinSingleLine
+    ) where
 
 
 import           Data.Array

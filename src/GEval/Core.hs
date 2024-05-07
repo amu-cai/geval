@@ -103,6 +103,7 @@ import Data.Conduit.Bootstrap
 import GEval.DataSource
 import GEval.MatchingSpecification
 import GEval.PolevalEmotionRecognition
+import GEval.PolevalQuestionAnswering
 import Data.NDCG
 
 import qualified Data.HashMap.Strict as M
@@ -195,6 +196,7 @@ isPreprocessable CustomMetric1 = True
 isPreprocessable PolevalTextF1 = True
 isPreprocessable PolevalSentenceF1 = True
 isPreprocessable PolevalFinalF1 = True
+isPreprocessable PolevalLevenshtein = True
 isPreprocessable (MacroAvg metric) = isPreprocessable metric
 
 isInputModifiable :: Metric -> Bool
@@ -735,6 +737,33 @@ gevalCoreOnSources PolevalFinalF1 = helper
             sentenceVal <- (extractSimpleRunValue . getMetricValue) <$> (sentenceHelper lsSpec)
             textVal <- (extractSimpleRunValue . getMetricValue) <$> (textHelper lsSpec)
             pure $ MetricOutput (SimpleRun $ (sentenceVal + textVal) / 2.0) Nothing
+
+gevalCoreOnSources PolevalLevenshtein = helper
+    where
+        helper lsSpec = do
+            gevalCoreGeneralized (ParserSpecWithInput justUnpack justUnpack justUnpack) step polevalQACond nLevenshteinPoleval noGraph (fromSpecificationToWithInput lsSpec)
+        step (ParsedRecordWithInput _ exp out) = getNLevenshteinSingleLine exp out
+        justUnpack = liftOp (Right . unpack)
+{-
+gevalCoreWithoutInput :: (MonadUnliftIO m, MonadThrow m, MonadIO m)
+                      => SAMetric t
+                      -> (ConduitT (ItemIntermediateRepresentationType t) Void (ResourceT m) d)  -- ^ a Conduit which aggregates all the combined values into
+                                                   -- a "total" value
+                      -> (d -> Double)             -- ^ function to transform the "total" value into the final score
+                      -> (d -> Maybe GraphSeries)
+                      -> LineSourcesSpecification (ResourceT m)
+                      -> m (MetricOutput)           -- ^ metric values for the output against the expected output
+gevalCoreWithoutInput smetric aggregator finalStep generateGraph lsSpec =
+  gevalCoreWithoutInputOnItemTargets (liftOp expParser) (liftOp outParser) iStep aggregator finalStep generateGraph lsSpec
+  where expParser = expectedParser smetric
+        outParser = outputParser smetric
+        iStep = itemStep smetric
+gevalCoreOnSources PolevalLevenshtein = gevalCoreWithoutInput
+    SAPolevalLevenshtein
+    polevalQACond
+    nLevenshteinPoleval
+    noGraph
+-}
 --------------------------------------------------------------------------------
 
 gevalCoreOnSources (LogLossHashed nbOfBits) = helperLogLossHashed nbOfBits id
@@ -1084,6 +1113,7 @@ continueGEvalCalculations SACustomMetric1 CustomMetric1 = defineContinuation ave
 continueGEvalCalculations SAPolevalTextF1 PolevalTextF1 = defineContinuation averageC id noGraph
 continueGEvalCalculations SAPolevalSentenceF1 PolevalSentenceF1 = defineContinuation averageC id noGraph
 continueGEvalCalculations SAPolevalFinalF1 PolevalFinalF1 = defineContinuation averageC id noGraph
+continueGEvalCalculations SAPolevalLevenshtein PolevalLevenshtein = defineContinuation averageC id noGraph
 
 continueGEvalCalculations SAFMeasure (FMeasure beta) = defineContinuation countAgg (fMeasureOnCounts beta) noGraph
 
