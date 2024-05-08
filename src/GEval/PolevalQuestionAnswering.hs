@@ -2,6 +2,9 @@ module GEval.PolevalQuestionAnswering
     ( polevalQACond
     , nLevenshteinPoleval
     , getNLevenshteinSingleLine
+    , f1Answerability
+    , getAnswerabilitySingleLine
+    , polevalAnswerabilityCond
     ) where
 
 
@@ -71,3 +74,72 @@ polevalQACount agg (cond, num)
 
 nLevenshteinPoleval :: AggregatedResult -> Double
 nLevenshteinPoleval = avgAgg
+
+
+data AnswerabilityScore = TP | TN | FP | FN
+    deriving (Eq, Show)
+
+
+data AnswerabilityAgg = AnswerabilityAgg
+    { truePostivie  :: Int -- pusty string w expected.tsv i pusty string w out.tsv
+    , trueNegative  :: Int -- niepusty string w expected.tsv i niepusty string w out.tsv
+    , falsePositive :: Int -- niepusty string w expected.tsv i pusty string w out.tsv
+    , falseNegative :: Int -- pusty string w expected.tsv i niepusty string w out.tsv
+    } deriving (Eq, Show)
+
+
+answerabilityAggZero :: AnswerabilityAgg
+answerabilityAggZero = AnswerabilityAgg
+    { truePostivie  = 0
+    , trueNegative  = 0
+    , falsePositive = 0
+    , falseNegative = 0
+    }
+
+
+getAnswerabilitySingleLine :: String -> String -> AnswerabilityScore
+getAnswerabilitySingleLine expected output
+    | expected == "" && output == "" = TP
+    | expected == "" && output /= "" = FN
+    | expected /= "" && output /= "" = TN
+    | otherwise                      = FP
+
+
+countAnswerability :: AnswerabilityAgg -> AnswerabilityScore -> AnswerabilityAgg
+countAnswerability (AnswerabilityAgg tpOld tnOld fpOld fnOld) sc
+    | sc == TP = AnswerabilityAgg
+        { truePostivie  = succ tpOld
+        , trueNegative  = tnOld
+        , falsePositive = fpOld
+        , falseNegative = fnOld
+        }
+    | sc == FN = AnswerabilityAgg
+        { truePostivie  = tpOld
+        , trueNegative  = tnOld
+        , falsePositive = fpOld
+        , falseNegative = succ fnOld
+        }
+    | sc == TN = AnswerabilityAgg
+        { truePostivie  = tpOld
+        , trueNegative  = succ tnOld
+        , falsePositive = fpOld
+        , falseNegative = fnOld
+        }
+    | sc == FP = AnswerabilityAgg
+        { truePostivie  = tpOld
+        , trueNegative  = tnOld
+        , falsePositive = succ fpOld
+        , falseNegative = fnOld
+        }
+
+
+polevalAnswerabilityCond :: Monad m => ConduitM AnswerabilityScore o m AnswerabilityAgg
+polevalAnswerabilityCond = Data.Conduit.Combinators.foldl countAnswerability answerabilityAggZero
+
+
+f1Answerability :: AnswerabilityAgg -> Double
+f1Answerability (AnswerabilityAgg tp _ fp fn) = tpD / (tpD + ((fpD + fnD) / 2))
+    where
+        tpD = int2Double tp
+        fpD = int2Double fp
+        fnD = int2Double fn

@@ -137,6 +137,8 @@ isInputNeeded (EvaluationScheme CharMatch _) = True
 isInputNeeded (EvaluationScheme PolevalTextF1 _) = True
 isInputNeeded (EvaluationScheme PolevalSentenceF1 _) = True
 isInputNeeded (EvaluationScheme PolevalFinalF1 _) = True
+isInputNeeded (EvaluationScheme PolevalLevenshtein _) = True
+isInputNeeded (EvaluationScheme PolevalAnswerability _) = True
 isInputNeeded (EvaluationScheme _ ops) = hasFiltering ops
 
 hasFiltering :: [PreprocessingOperation] -> Bool
@@ -197,6 +199,7 @@ isPreprocessable PolevalTextF1 = True
 isPreprocessable PolevalSentenceF1 = True
 isPreprocessable PolevalFinalF1 = True
 isPreprocessable PolevalLevenshtein = True
+isPreprocessable PolevalAnswerability = True
 isPreprocessable (MacroAvg metric) = isPreprocessable metric
 
 isInputModifiable :: Metric -> Bool
@@ -204,6 +207,8 @@ isInputModifiable CharMatch = True
 isInputModifiable PolevalTextF1 = True
 isInputModifiable PolevalSentenceF1 = True
 isInputModifiable PolevalFinalF1 = True
+isInputModifiable PolevalLevenshtein = True
+isInputModifiable PolevalAnswerability = True
 isInputModifiable _ = False
 
 defaultOutDirectory :: FilePath
@@ -744,6 +749,13 @@ gevalCoreOnSources PolevalLevenshtein = helper
             gevalCoreGeneralized (ParserSpecWithInput justUnpack justUnpack justUnpack) step polevalQACond nLevenshteinPoleval noGraph (fromSpecificationToWithInput lsSpec)
         step (ParsedRecordWithInput _ exp out) = getNLevenshteinSingleLine exp out
         justUnpack = liftOp (Right . unpack)
+
+gevalCoreOnSources PolevalAnswerability = helper
+    where
+        helper lsSpec = do
+            gevalCoreGeneralized (ParserSpecWithInput justUnpack justUnpack justUnpack) step polevalAnswerabilityCond f1Answerability noGraph (fromSpecificationToWithInput lsSpec)
+        step (ParsedRecordWithInput _ exp out) = getAnswerabilitySingleLine exp out
+        justUnpack = liftOp (Right . unpack)
 {-
 gevalCoreWithoutInput :: (MonadUnliftIO m, MonadThrow m, MonadIO m)
                       => SAMetric t
@@ -1114,6 +1126,7 @@ continueGEvalCalculations SAPolevalTextF1 PolevalTextF1 = defineContinuation ave
 continueGEvalCalculations SAPolevalSentenceF1 PolevalSentenceF1 = defineContinuation averageC id noGraph
 continueGEvalCalculations SAPolevalFinalF1 PolevalFinalF1 = defineContinuation averageC id noGraph
 continueGEvalCalculations SAPolevalLevenshtein PolevalLevenshtein = defineContinuation averageC id noGraph
+continueGEvalCalculations SAPolevalAnswerability PolevalAnswerability = defineContinuation averageC id noGraph
 
 continueGEvalCalculations SAFMeasure (FMeasure beta) = defineContinuation countAgg (fMeasureOnCounts beta) noGraph
 
