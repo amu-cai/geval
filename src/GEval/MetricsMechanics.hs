@@ -77,6 +77,7 @@ singletons [d|data AMetric = ARMSE | AMSE | APearson | ASpearman | ABLEU | AGLEU
                              | APolevalFinalF1
                              | APolevalLevenshtein
                              | APolevalAnswerability
+                             | APolevalScore
                              deriving (Eq)
              |]
 
@@ -131,6 +132,7 @@ toHelper PolevalSentenceF1 = APolevalSentenceF1
 toHelper PolevalFinalF1 = APolevalFinalF1
 toHelper PolevalLevenshtein = APolevalLevenshtein
 toHelper PolevalAnswerability = APolevalAnswerability
+toHelper PolevalScore = APolevalScore
 toHelper (Improvement _) = AImprovement
 toHelper (MacroAvg m) = AMacroAvg (toHelper m)
 
@@ -189,6 +191,7 @@ type family ParsedExpectedType (t :: AMetric) :: * where
   ParsedExpectedType APolevalFinalF1 = Text
   ParsedExpectedType APolevalLevenshtein = Text
   ParsedExpectedType APolevalAnswerability = Text
+  ParsedExpectedType APolevalScore = Text
   ParsedExpectedType (AMacroAvg m) = ParsedExpectedType m
 
 expectedParser :: SAMetric t -> Text -> Either String (ParsedExpectedType t)
@@ -242,6 +245,7 @@ expectedParser SAPolevalSentenceF1 = Right
 expectedParser SAPolevalFinalF1 = Right
 expectedParser SAPolevalLevenshtein = Right
 expectedParser SAPolevalAnswerability = Right
+expectedParser SAPolevalScore = Right
 expectedParser (SAMacroAvg m) = expectedParser m
 
 pairParser :: Text -> Either String (Text, Text)
@@ -323,6 +327,7 @@ outputParser SAPolevalSentenceF1 = Right
 outputParser SAPolevalFinalF1 = Right
 outputParser SAPolevalLevenshtein = Right
 outputParser SAPolevalAnswerability = Right
+outputParser SAPolevalScore = Right
 outputParser (SAMacroAvg m) = outputParser m
 
 type family ItemIntermediateRepresentationType (t :: AMetric) :: * where

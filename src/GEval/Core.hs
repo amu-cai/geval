@@ -139,6 +139,7 @@ isInputNeeded (EvaluationScheme PolevalSentenceF1 _) = True
 isInputNeeded (EvaluationScheme PolevalFinalF1 _) = True
 isInputNeeded (EvaluationScheme PolevalLevenshtein _) = True
 isInputNeeded (EvaluationScheme PolevalAnswerability _) = True
+isInputNeeded (EvaluationScheme PolevalScore _) = True
 isInputNeeded (EvaluationScheme _ ops) = hasFiltering ops
 
 hasFiltering :: [PreprocessingOperation] -> Bool
@@ -200,6 +201,7 @@ isPreprocessable PolevalSentenceF1 = True
 isPreprocessable PolevalFinalF1 = True
 isPreprocessable PolevalLevenshtein = True
 isPreprocessable PolevalAnswerability = True
+isPreprocessable PolevalScore = True
 isPreprocessable (MacroAvg metric) = isPreprocessable metric
 
 isInputModifiable :: Metric -> Bool
@@ -209,6 +211,7 @@ isInputModifiable PolevalSentenceF1 = True
 isInputModifiable PolevalFinalF1 = True
 isInputModifiable PolevalLevenshtein = True
 isInputModifiable PolevalAnswerability = True
+isInputModifiable PolevalScore = True
 isInputModifiable _ = False
 
 defaultOutDirectory :: FilePath
@@ -756,6 +759,23 @@ gevalCoreOnSources PolevalAnswerability = helper
             gevalCoreGeneralized (ParserSpecWithInput justUnpack justUnpack justUnpack) step polevalAnswerabilityCond f1Answerability noGraph (fromSpecificationToWithInput lsSpec)
         step (ParsedRecordWithInput _ exp out) = getAnswerabilitySingleLine exp out
         justUnpack = liftOp (Right . unpack)
+
+gevalCoreOnSources PolevalScore = helper
+    where
+        justUnpack = liftOp (Right . unpack)
+
+        levenshteinHelper lsSpec = do
+            gevalCoreGeneralized (ParserSpecWithInput justUnpack justUnpack justUnpack) levenshteinStep polevalQACond nLevenshteinPoleval noGraph (fromSpecificationToWithInput lsSpec)
+        levenshteinStep (ParsedRecordWithInput _ exp out) = getNLevenshteinSingleLine exp out
+
+        answerabilityHelper lsSpec = do
+            gevalCoreGeneralized (ParserSpecWithInput justUnpack justUnpack justUnpack) answerabilityStep polevalAnswerabilityCond f1Answerability noGraph (fromSpecificationToWithInput lsSpec)
+        answerabilityStep (ParsedRecordWithInput _ exp out) = getAnswerabilitySingleLine exp out
+
+        helper lsSpec = do
+            answerabilityVal <- (extractSimpleRunValue . getMetricValue) <$> (answerabilityHelper lsSpec)
+            levenshteinVal <- (extractSimpleRunValue . getMetricValue) <$> (levenshteinHelper lsSpec)
+            pure $ MetricOutput (SimpleRun $ (answerabilityVal + levenshteinVal) / 2.0) Nothing
 {-
 gevalCoreWithoutInput :: (MonadUnliftIO m, MonadThrow m, MonadIO m)
                       => SAMetric t
@@ -1127,6 +1147,7 @@ continueGEvalCalculations SAPolevalSentenceF1 PolevalSentenceF1 = defineContinua
 continueGEvalCalculations SAPolevalFinalF1 PolevalFinalF1 = defineContinuation averageC id noGraph
 continueGEvalCalculations SAPolevalLevenshtein PolevalLevenshtein = defineContinuation averageC id noGraph
 continueGEvalCalculations SAPolevalAnswerability PolevalAnswerability = defineContinuation averageC id noGraph
+continueGEvalCalculations SAPolevalScore PolevalScore = defineContinuation averageC id noGraph
 
 continueGEvalCalculations SAFMeasure (FMeasure beta) = defineContinuation countAgg (fMeasureOnCounts beta) noGraph
 

@@ -57,6 +57,7 @@ data Metric = RMSE | MSE | Pearson | Spearman | BLEU | GLEU | WER | CER | Accura
               | PolevalFinalF1
               | PolevalLevenshtein
               | PolevalAnswerability
+              | PolevalScore
               deriving (Eq)
 
 instance Show Metric where
@@ -141,6 +142,7 @@ instance Show Metric where
   show PolevalFinalF1 = "FinalF1"
   show PolevalLevenshtein = "Levenshtein"
   show PolevalAnswerability = "Answerability"
+  show PolevalScore = "Score"
 
 applyMatchingSpecification :: (MatchingSpecification -> MatchingSpecification)
                            -> Metric
@@ -257,6 +259,7 @@ instance Read Metric where
   readsPrec _ ('P':'o':'l':'e':'v':'a':'l':'F':'i':'n':'a':'l':'F':'1':theRest) = [(PolevalFinalF1, theRest)]
   readsPrec _ ('P':'o':'l':'e':'v':'a':'l':'L':'e':'v':'e':'n':'s':'h':'t':'e':'i':'n':theRest) = [(PolevalLevenshtein, theRest)]
   readsPrec _ ('P':'o':'l':'e':'v':'a':'l':'A':'n':'s':'w':'e':'r':'a':'b':'i':'l':'i':'t':'y':theRest) = [(PolevalAnswerability, theRest)]
+  readsPrec _ ('P':'o':'l':'e':'v':'a':'l':'S':'c':'o':'r':'e':theRest) = [(PolevalScore, theRest)]
   readsPrec _ t = throw $ UnknownMetric t
 
 
@@ -314,6 +317,7 @@ getMetricOrdering PolevalSentenceF1 = TheHigherTheBetter
 getMetricOrdering PolevalFinalF1 = TheHigherTheBetter
 getMetricOrdering PolevalLevenshtein = TheHigherTheBetter
 getMetricOrdering PolevalAnswerability = TheHigherTheBetter
+getMetricOrdering PolevalScore = TheHigherTheBetter
 getMetricOrdering (Mean metric) = getMetricOrdering metric
 getMetricOrdering (MacroAvg metric) = getMetricOrdering metric
 
