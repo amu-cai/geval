@@ -137,12 +137,12 @@ instance Show Metric where
   show MSEAgainstInterval = "MSE-Against-Interval"
   show RMSEAgainstInterval = "RMSE-Against-Interval"
   show CustomMetric1 = "CustomMetric1"
-  show PolevalTextF1 = "TextF1"
-  show PolevalSentenceF1 = "SentenceF1"
-  show PolevalFinalF1 = "FinalF1"
-  show PolevalLevenshtein = "Levenshtein"
-  show PolevalAnswerability = "Answerability"
-  show PolevalScore = "Score"
+  show PolevalTextF1 = "PolevalTextF1"
+  show PolevalSentenceF1 = "PolevalSentenceF1"
+  show PolevalFinalF1 = "PolevalFinalF1"
+  show PolevalLevenshtein = "PolevalLevenshtein"
+  show PolevalAnswerability = "PolevalAnswerability"
+  show PolevalScore = "PolevalScore"
 
 applyMatchingSpecification :: (MatchingSpecification -> MatchingSpecification)
                            -> Metric
